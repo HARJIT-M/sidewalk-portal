@@ -1,0 +1,723 @@
+* {
+  box-sizing: border-box;
+}
+
+.workers-page {
+  min-height: 100vh;
+  background: #f4f5f9;
+  padding: 30px;
+  font-family: "Segoe UI", Arial, sans-serif;
+  color: #1e1b2e;
+}
+
+
+/* =================================
+   HEADER
+================================= */
+
+.workers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  border-radius: 16px;
+  padding: 26px 30px;
+  color: white;
+  box-shadow: 0 10px 25px rgba(79, 70, 229, 0.25);
+}
+
+.workers-header h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.workers-header p {
+  margin-top: 6px;
+  color: #e0e0fb;
+  font-size: 14px;
+}
+
+.add-worker-btn {
+  border: none;
+  background: white;
+  color: #4f46e5;
+  padding: 11px 20px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.add-worker-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.15);
+}
+
+
+/* =================================
+   STATISTICS
+================================= */
+
+.worker-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin-bottom: 25px;
+}
+
+.worker-stat-card {
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(30, 27, 46, 0.06);
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.worker-stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.worker-stat-icon.total {
+  background: #e0e7ff;
+}
+
+.worker-stat-icon.active {
+  background: #dcfce7;
+}
+
+.worker-stat-icon.inactive {
+  background: #f0f0f6;
+}
+
+.worker-stat-icon.available {
+  background: #dbeafe;
+}
+
+.worker-stat-card span {
+  display: block;
+  color: #7b7794;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.worker-stat-card strong {
+  font-size: 25px;
+  color: #1e1b2e;
+}
+
+
+/* =================================
+   FILTERS
+================================= */
+
+.worker-filters {
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(30, 27, 46, 0.06);
+  padding: 16px;
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.worker-search {
+  flex: 1;
+  border: 1px solid #e5e4f0;
+  background: #f7f7fb;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.worker-search input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 11px 5px;
+  font-size: 13px;
+  color: #1e1b2e;
+}
+
+.worker-filters select {
+  min-width: 160px;
+  border: 1px solid #e5e4f0;
+  background: #f7f7fb;
+  color: #1e1b2e;
+  border-radius: 8px;
+  padding: 0 12px;
+  outline: none;
+}
+
+
+/* =================================
+   WORKERS TABLE
+================================= */
+
+.workers-container {
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(30, 27, 46, 0.06);
+  overflow: hidden;
+}
+
+.workers-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.workers-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1050px;
+}
+
+.workers-table th {
+  background: #f7f7fb;
+  text-align: left;
+  padding: 15px 14px;
+  border-bottom: 1px solid #edecf5;
+  color: #7b7794;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.workers-table td {
+  padding: 16px 14px;
+  border-bottom: 1px solid #f2f1f8;
+  font-size: 13px;
+}
+
+.workers-table tbody tr:hover {
+  background: #faf9ff;
+}
+
+
+/* =================================
+   WORKER PROFILE
+================================= */
+
+.worker-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.worker-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #e0e7ff;
+  color: #4f46e5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.worker-profile div:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.worker-profile strong {
+  font-size: 13px;
+  color: #1e1b2e;
+}
+
+.worker-profile span {
+  color: #a9a5bd;
+  font-size: 10px;
+}
+
+
+/* =================================
+   CONTACT
+================================= */
+
+.contact-details {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.contact-details span {
+  color: #7b7794;
+  font-size: 11px;
+}
+
+
+/* =================================
+   ROLE
+================================= */
+
+.role-text {
+  color: #57536b;
+  font-size: 12px;
+}
+
+
+/* =================================
+   STATUS
+================================= */
+
+.worker-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.worker-status.active {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.worker-status.inactive {
+  background: #f0f0f6;
+  color: #7b7794;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+
+/* =================================
+   ASSIGNED WORK COUNT
+================================= */
+
+.assigned-count {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.assigned-count.has-work {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.assigned-count.no-work {
+  background: #f0f0f6;
+  color: #a9a5bd;
+}
+
+
+/* =================================
+   REMOVE BUTTON
+================================= */
+
+.remove-btn {
+  border: none;
+  background: #fee2e2;
+  color: #dc2626;
+  padding: 7px 13px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.remove-btn:hover {
+  background: #fecaca;
+}
+
+
+/* =================================
+   NO WORKERS
+================================= */
+
+.no-workers {
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.no-worker-icon {
+  font-size: 35px;
+  margin-bottom: 10px;
+}
+
+.no-workers h3 {
+  margin: 0 0 5px;
+  color: #1e1b2e;
+}
+
+.no-workers p {
+  color: #7b7794;
+  font-size: 13px;
+}
+
+
+/* =================================
+   MODAL OVERLAY + ANIMATION
+================================= */
+
+.worker-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 16, 46, 0.6);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+  animation: overlayIn 0.18s ease;
+}
+
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.worker-modal,
+.remove-modal {
+  animation: modalIn 0.22s cubic-bezier(0.19, 1, 0.22, 1);
+  box-shadow: 0 25px 60px rgba(23, 16, 46, 0.35);
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+
+/* =================================
+   ADD WORKER MODAL
+================================= */
+
+.worker-modal {
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: white;
+  border-radius: 18px;
+}
+
+.worker-modal-header {
+  position: relative;
+  padding: 24px 26px;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  border-radius: 18px 18px 0 0;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  overflow: hidden;
+}
+
+.worker-modal-header::before {
+  content: "";
+  position: absolute;
+  top: -60px;
+  right: -40px;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.worker-modal-header::after {
+  content: "";
+  position: absolute;
+  bottom: -70px;
+  right: 60px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.worker-modal-header > div {
+  position: relative;
+  z-index: 1;
+}
+
+.modal-label {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.18);
+  padding: 4px 10px;
+  border-radius: 20px;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.worker-modal-header h2 {
+  margin: 10px 0 0;
+  font-size: 22px;
+  color: white;
+}
+
+.modal-close {
+  position: relative;
+  z-index: 1;
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  color: white;
+  line-height: 1;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: rotate(90deg);
+}
+
+
+/* =================================
+   FORM
+================================= */
+
+.worker-form {
+  padding: 26px;
+}
+
+.form-group {
+  margin-bottom: 17px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 7px;
+  color: #1e1b2e;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  height: 42px;
+  border: 1px solid #e5e4f0;
+  background: #f7f7fb;
+  border-radius: 8px;
+  padding: 0 12px;
+  outline: none;
+  font-size: 13px;
+  color: #1e1b2e;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  border-color: #4f46e5;
+  background: white;
+}
+
+
+/* =================================
+   MODAL FOOTER
+================================= */
+
+.worker-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 25px;
+  padding-top: 18px;
+  border-top: 1px solid #edecf5;
+}
+
+.modal-cancel-btn,
+.modal-add-btn {
+  border: none;
+  border-radius: 9px;
+  padding: 10px 18px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.modal-cancel-btn {
+  background: #f0f0f6;
+  color: #4b4763;
+}
+
+.modal-cancel-btn:hover {
+  background: #e5e4f0;
+}
+
+.modal-add-btn {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: white;
+}
+
+.modal-add-btn:hover {
+  filter: brightness(1.08);
+}
+
+
+/* =================================
+   REMOVE MODAL
+================================= */
+
+.remove-modal {
+  width: 100%;
+  max-width: 430px;
+  background: white;
+  border-radius: 18px;
+  padding: 32px;
+  text-align: center;
+}
+
+.remove-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: #fee2e2;
+  color: #dc2626;
+  font-size: 26px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.remove-modal h2 {
+  margin: 0 0 10px;
+  font-size: 21px;
+  color: #1e1b2e;
+}
+
+.remove-modal p {
+  color: #57536b;
+  line-height: 1.5;
+  font-size: 13px;
+}
+
+.remove-modal p strong {
+  color: #1e1b2e;
+}
+
+.remove-warning {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #c2410c;
+  padding: 12px;
+  border-radius: 9px;
+  font-size: 12px;
+  margin-top: 15px;
+  text-align: left;
+}
+
+.remove-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 25px;
+}
+
+.cancel-remove-btn,
+.confirm-remove-btn {
+  border: none;
+  padding: 10px 18px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: 0.15s ease;
+}
+
+.cancel-remove-btn {
+  background: #f0f0f6;
+  color: #4b4763;
+}
+
+.cancel-remove-btn:hover {
+  background: #e5e4f0;
+}
+
+.confirm-remove-btn {
+  background: #dc2626;
+  color: white;
+}
+
+.confirm-remove-btn:hover {
+  background: #b91c1c;
+}
+
+
+/* =================================
+   RESPONSIVE
+================================= */
+
+@media (max-width: 1000px) {
+
+  .worker-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+}
+
+
+@media (max-width: 650px) {
+
+  .workers-page {
+    padding: 20px;
+  }
+
+  .workers-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+    padding: 22px;
+  }
+
+  .worker-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .worker-filters {
+    flex-direction: column;
+  }
+
+  .worker-filters select {
+    height: 42px;
+  }
+
+}

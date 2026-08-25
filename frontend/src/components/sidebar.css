@@ -1,0 +1,389 @@
+/* sidebar.css */
+* {
+  box-sizing: border-box;
+}
+
+.sidebar {
+  width: 250px;
+  height: 100vh;
+  position: fixed;
+  left: 0;
+  top: 0;
+  background: #ffffff;
+  border-right: 1px solid #edecf5;
+  box-shadow: 2px 0 12px rgba(30, 27, 46, 0.04);
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  font-family: "Segoe UI", Arial, sans-serif;
+  transition: width 0.2s ease;
+}
+
+
+/* =================================
+   BRAND
+================================= */
+
+.sidebar-brand {
+  height: 82px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  padding: 0 22px;
+
+  border-bottom: 1px solid #f2f1f8;
+}
+
+.brand-icon {
+  width: 38px;
+  height: 38px;
+
+  border-radius: 10px;
+
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+
+  color: white;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-text h2 {
+  margin: 0;
+
+  font-size: 17px;
+
+  color: #1e1b2e;
+}
+
+.brand-text span {
+  margin-top: 2px;
+
+  font-size: 10px;
+
+  color: #7b7794;
+}
+
+
+/* =================================
+   NAVIGATION
+================================= */
+
+.sidebar-nav {
+  padding: 25px 14px;
+
+  flex: 1;
+}
+
+.nav-title {
+  margin: 0 10px 12px;
+
+  font-size: 10px;
+
+  font-weight: 700;
+
+  color: #a9a5bd;
+
+  letter-spacing: 0.8px;
+}
+
+
+/* =================================
+   SIDEBAR LINK
+================================= */
+
+.sidebar-link {
+  width: 100%;
+
+  height: 45px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  padding: 0 12px;
+
+  margin-bottom: 5px;
+
+  border-radius: 9px;
+
+  text-decoration: none;
+
+  color: #57536b;
+
+  font-size: 13px;
+
+  transition: 0.2s ease;
+
+  position: relative;
+}
+
+.sidebar-link:hover {
+  background: #f7f7fb;
+
+  color: #1e1b2e;
+}
+
+
+/* =================================
+   ACTIVE LINK
+================================= */
+
+.sidebar-link.active {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+
+  color: white;
+
+  font-weight: 600;
+
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.28);
+}
+
+.sidebar-link.active .sidebar-icon {
+  color: white;
+}
+
+
+/* =================================
+   ICON
+================================= */
+
+.sidebar-icon {
+  width: 22px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 18px;
+
+  color: #a9a5bd;
+}
+
+
+/* =================================
+   LABEL
+================================= */
+
+.sidebar-label {
+  white-space: nowrap;
+}
+
+
+/* =================================
+   BOTTOM SECTION
+================================= */
+
+.sidebar-bottom {
+  padding: 0 14px 18px;
+}
+
+.sidebar-divider {
+  height: 1px;
+
+  background: #edecf5;
+
+  margin: 0 5px 12px;
+}
+
+
+/* =================================
+   LOGOUT
+================================= */
+
+.sidebar-logout {
+  width: 100%;
+
+  height: 45px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  padding: 0 12px;
+
+  border: none;
+
+  background: transparent;
+
+  border-radius: 9px;
+
+  color: #57536b;
+
+  font-size: 13px;
+
+  cursor: pointer;
+
+  text-align: left;
+
+  transition: 0.2s ease;
+}
+
+.sidebar-logout:hover {
+  background: #fef2f2;
+
+  color: #dc2626;
+}
+
+.sidebar-logout:hover .sidebar-icon {
+  color: #dc2626;
+}
+
+
+/* =================================
+   RESPONSIVE
+================================= */
+
+@media (max-width: 800px) {
+
+  .sidebar {
+    width: 70px;
+  }
+
+  .sidebar-brand {
+    justify-content: center;
+
+    padding: 0;
+  }
+
+  .brand-text {
+    display: none;
+  }
+
+  .sidebar-nav {
+    padding: 25px 10px;
+  }
+
+  .nav-title {
+    display: none;
+  }
+
+  .sidebar-link {
+    justify-content: center;
+
+    padding: 0;
+  }
+
+  .sidebar-label {
+    display: none;
+  }
+
+  .sidebar-bottom {
+    padding: 0 10px 15px;
+  }
+
+  .sidebar-divider {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .sidebar-logout {
+    justify-content: center;
+
+    padding: 0;
+  }
+}
+
+/* additional */
+
+/* =================================
+   TOGGLE BUTTON
+================================= */
+
+.sidebar-toggle {
+  position: absolute;
+  top: 32px;
+  right: -12px;
+
+  width: 24px;
+  height: 24px;
+
+  border-radius: 50%;
+  border: 1px solid #edecf5;
+
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(30, 27, 46, 0.12);
+
+  color: #57536b;
+  font-size: 14px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+  z-index: 101;
+
+  transition: 0.2s ease;
+}
+
+.sidebar-toggle:hover {
+  background: #f7f7fb;
+  color: #4f46e5;
+}
+
+
+/* =================================
+   COLLAPSED STATE (manual toggle)
+   Reuses the same rules as your
+   800px media query
+================================= */
+
+.sidebar.collapsed {
+  width: 70px;
+}
+
+.sidebar.collapsed .sidebar-brand {
+  justify-content: center;
+  padding: 0;
+}
+
+.sidebar.collapsed .brand-text {
+  display: none;
+}
+
+.sidebar.collapsed .sidebar-nav {
+  padding: 25px 10px;
+}
+
+.sidebar.collapsed .nav-title {
+  display: none;
+}
+
+.sidebar.collapsed .sidebar-link {
+  justify-content: center;
+  padding: 0;
+}
+
+.sidebar.collapsed .sidebar-label {
+  display: none;
+}
+
+.sidebar.collapsed .sidebar-bottom {
+  padding: 0 10px 15px;
+}
+
+.sidebar.collapsed .sidebar-divider {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.sidebar.collapsed .sidebar-logout {
+  justify-content: center;
+  padding: 0;
+}
