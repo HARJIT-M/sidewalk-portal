@@ -1,0 +1,29 @@
+/* WorkerLayout.css */
+.worker-layout-root {
+  min-height: 100vh;
+  background: #f8fafc;
+  display: flex;
+  width: 100%;
+}
+
+.worker-main-content {
+  margin-left: 250px;
+  min-height: 100vh;
+  flex: 1;
+  width: calc(100% - 250px);
+  background: #f8fafc;
+  transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-x: hidden;
+}
+
+.worker-layout-root.sidebar-collapsed .worker-main-content {
+  margin-left: 70px;
+  width: calc(100% - 70px);
+}
+
+@media (max-width: 850px) {
+  .worker-main-content {
+    margin-left: 70px;
+    width: calc(100% - 70px);
+  }
+}
