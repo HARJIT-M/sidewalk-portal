@@ -1,39 +1,29 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import api from "../../../services/api";
 import { useNavigate } from "react-router-dom";
 import "./userdashboard.css";
 
 const UserDashboard = () => {
   const navigate = useNavigate();
 
-  // Temporary sample data
-  const complaints = [
-    {
-      id: "CMP001",
-      issue: "Broken Footpath",
-      location: "Gandhi Road",
-      date: "22 Aug 2026",
-      status: "In Progress",
-      priority: "High",
-    },
-    {
-      id: "CMP002",
-      issue: "Footpath Crack",
-      location: "Main Street",
-      date: "20 Aug 2026",
-      status: "Not Assigned",
-      priority: "Not Set",
-    },
-    {
-      id: "CMP003",
-      issue: "Damaged Sidewalk",
-      location: "Bus Stand Road",
-      date: "15 Aug 2026",
-      status: "Completed",
-      priority: "Medium",
-    },
-  ];
+  const [complaints, setComplaints] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Statistics
+  useEffect(() => {
+    async function loadComplaints() {
+      try {
+        const res = await api.get("/user/complaints");
+        setComplaints(res.data.complaints || []);
+      } catch (err) {
+        console.warn("Could not fetch complaints:", err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadComplaints();
+  }, []);
+
   const totalComplaints = complaints.length;
 
   const notAssigned = complaints.filter(
@@ -50,11 +40,11 @@ const UserDashboard = () => {
 
   const badgeClass = (value) => value.toLowerCase().replace(" ", "-");
 
+  if (loading) return <div className="user-dashboard">Loading...</div>;
+
   return (
     <div className="user-dashboard">
-      {/* =========================
-          HEADER
-      ========================= */}
+
 
       <div className="user-dashboard-header">
         <div>
@@ -70,9 +60,6 @@ const UserDashboard = () => {
         </button>
       </div>
 
-      {/* =========================
-          STATISTICS
-      ========================= */}
 
       <div className="user-stat-grid">
         <div className="user-stat-card">
@@ -108,10 +95,6 @@ const UserDashboard = () => {
         </div>
       </div>
 
-      {/* =========================
-          QUICK ACTION
-      ========================= */}
-
       <div className="quick-report-card">
         <div className="quick-report-content">
           <div className="quick-report-icon">+</div>
@@ -130,9 +113,6 @@ const UserDashboard = () => {
         </button>
       </div>
 
-      {/* =========================
-          RECENT COMPLAINTS
-      ========================= */}
 
       <div className="recent-complaints">
         <div className="section-header">
@@ -149,7 +129,6 @@ const UserDashboard = () => {
           </button>
         </div>
 
-        {/* ---- DESKTOP / TABLET TABLE ---- */}
         <div className="complaints-table-container">
           <table className="user-complaints-table">
             <thead>
@@ -202,7 +181,6 @@ const UserDashboard = () => {
           </table>
         </div>
 
-        {/* ---- MOBILE CARD LIST ---- */}
         <div className="complaints-card-list">
           {complaints.map((complaint) => (
             <div className="complaint-mobile-card" key={complaint.id}>

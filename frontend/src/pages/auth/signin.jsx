@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import api from "../../services/api";
 import "./signin.css";
 
 const Signup = () => {
@@ -41,15 +42,19 @@ const Signup = () => {
       return;
     }
 
-    // Temporary — replace with real account creation
-    alert("Account created successfully!");
-    navigate("/login");
+    (async () => {
+      try {
+        await api.post("/auth/signup", { name: form.name, email: form.email, phone: form.phone, password: form.password });
+        alert("Account created successfully! Please sign in.");
+        navigate("/login");
+      } catch (err) {
+        alert(err.response?.data?.error || "Signup failed");
+      }
+    })();
   };
 
   return (
     <div className="auth-page">
-
-      {/* ================= LEFT PANEL ================= */}
 
       <div className="auth-side">
 
@@ -93,8 +98,6 @@ const Signup = () => {
 
       </div>
 
-
-      {/* ================= RIGHT PANEL ================= */}
 
       <div className="auth-form-side">
 

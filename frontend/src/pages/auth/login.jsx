@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import api from "../../services/api";
 import "./login.css";
 
 const Login = () => {
@@ -27,16 +28,23 @@ const Login = () => {
       alert("Please enter your email and password.");
       return;
     }
-
-    // Temporary — replace with real authentication
-    navigate("/dashboard");
+    (async () => {
+      try {
+        const res = await api.post("/auth/login", { email: form.email, password: form.password });
+        const { token, user } = res.data;
+        if (token) {
+          localStorage.setItem("token", token);
+          localStorage.setItem("user", JSON.stringify(user));
+        }
+        navigate("/dashboard");
+      } catch (err) {
+        alert(err.response?.data?.error || "Login failed");
+      }
+    })();
   };
 
   return (
     <div className="auth-page">
-
-      {/* ================= LEFT PANEL ================= */}
-
       <div className="auth-side">
 
         <div className="auth-side-circle circle-one"></div>
@@ -78,8 +86,6 @@ const Login = () => {
 
       </div>
 
-
-      {/* ================= RIGHT PANEL ================= */}
 
       <div className="auth-form-side">
 

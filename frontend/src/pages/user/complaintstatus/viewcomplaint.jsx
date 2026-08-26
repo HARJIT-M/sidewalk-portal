@@ -1,97 +1,23 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import api from "../../../services/api";
 import "./viewcomplaint.css";
 
 const ViewComplaints = () => {
-
-  // ============================
-  // SAMPLE DATA
-  // ============================
-
-  const complaints = [
-    {
-      id: "CMP001",
-      title: "Broken Footpath Near Bus Stand",
-      date: "24 Aug 2026",
-      location: "Main Road, Near Bus Stand",
-      priority: "High",
-      status: "In Progress",
-      issueType: "Broken Footpath",
-      description:
-        "The footpath has several broken tiles and is difficult for pedestrians to use safely.",
-      latitude: 11.2746,
-      longitude: 77.5871,
-    },
-
-    {
-      id: "CMP002",
-      title: "Large Pothole on Sidewalk",
-      date: "20 Aug 2026",
-      location: "Gandhi Road",
-      priority: "Critical",
-      status: "Not Assigned",
-      issueType: "Pothole",
-      description:
-        "A large pothole has developed on the pedestrian pathway near the road junction.",
-      latitude: 11.2751,
-      longitude: 77.5882,
-    },
-
-    {
-      id: "CMP003",
-      title: "Cracked Footpath",
-      date: "15 Aug 2026",
-      location: "Market Street",
-      priority: "Medium",
-      status: "Completed",
-      issueType: "Footpath Crack",
-      description:
-        "There is a long crack across the footpath which may cause pedestrians to trip.",
-      latitude: 11.2764,
-      longitude: 77.5890,
-    },
-
-    {
-      id: "CMP004",
-      title: "Uneven Sidewalk",
-      date: "10 Aug 2026",
-      location: "College Road",
-      priority: "Low",
-      status: "In Progress",
-      issueType: "Uneven Surface",
-      description:
-        "Several sections of the sidewalk are uneven and need repair.",
-      latitude: 11.2772,
-      longitude: 77.5901,
-    },
-
-    {
-      id: "CMP005",
-      title: "Damaged Sidewalk Tiles",
-      date: "05 Aug 2026",
-      location: "Temple Road",
-      priority: "Medium",
-      status: "Completed",
-      issueType: "Damaged Sidewalk",
-      description:
-        "Multiple sidewalk tiles are damaged and need to be replaced.",
-      latitude: 11.2781,
-      longitude: 77.5912,
-    },
-  ];
-
-
-  const [selectedComplaint, setSelectedComplaint] =
-    useState(null);
-
+  const [complaints, setComplaints] = useState([]);
+  const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
 
-  const [statusFilter, setStatusFilter] =
-    useState("All");
-
-
-  // ============================
-  // FILTER COMPLAINTS
-  // ============================
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get("/user/complaints");
+        setComplaints(res.data.complaints || []);
+      } catch (err) {
+        console.warn("Could not load complaints:", err.message || err);
+      }
+    })();
+  }, []);
 
   const filteredComplaints = complaints.filter(
     (complaint) => {
@@ -123,10 +49,6 @@ const ViewComplaints = () => {
   return (
     <div className="my-complaints-page">
 
-      {/* ============================
-          HEADER
-      ============================ */}
-
       <div className="complaints-header">
 
         <div>
@@ -151,12 +73,6 @@ const ViewComplaints = () => {
         </div>
 
       </div>
-
-
-      {/* ============================
-          SEARCH / FILTER
-      ============================ */}
-
       <div className="filter-section">
 
         <div className="search-box">
@@ -202,11 +118,6 @@ const ViewComplaints = () => {
 
       </div>
 
-
-      {/* ============================
-          COMPLAINT LIST
-      ============================ */}
-
       <div className="complaints-card">
 
         <div className="table-header">
@@ -232,9 +143,6 @@ const ViewComplaints = () => {
                 setSelectedComplaint(complaint)
               }
             >
-
-              {/* Complaint */}
-
               <div className="complaint-info">
 
                 <strong>
@@ -248,21 +156,15 @@ const ViewComplaints = () => {
               </div>
 
 
-              {/* Date */}
-
               <div className="date">
                 {complaint.date}
               </div>
 
 
-              {/* Location */}
 
               <div className="location">
                 📍 {complaint.location}
               </div>
-
-
-              {/* Priority */}
 
               <div>
 
@@ -276,7 +178,6 @@ const ViewComplaints = () => {
               </div>
 
 
-              {/* Status */}
 
               <div>
 
@@ -289,9 +190,6 @@ const ViewComplaints = () => {
                 </span>
 
               </div>
-
-
-              {/* View */}
 
               <div className="view-arrow">
                 →
@@ -316,10 +214,6 @@ const ViewComplaints = () => {
       </div>
 
 
-      {/* ============================
-          COMPLAINT DETAILS MODAL
-      ============================ */}
-
       {selectedComplaint && (
 
         <div
@@ -336,7 +230,6 @@ const ViewComplaints = () => {
             }
           >
 
-            {/* Modal Header */}
 
             <div className="modal-header">
 
@@ -364,7 +257,6 @@ const ViewComplaints = () => {
             </div>
 
 
-            {/* Status */}
 
             <div className="modal-status">
 
@@ -384,9 +276,6 @@ const ViewComplaints = () => {
               </span>
 
             </div>
-
-
-            {/* Details */}
 
             <div className="details-grid">
 
@@ -470,8 +359,6 @@ const ViewComplaints = () => {
             </div>
 
 
-            {/* Description */}
-
             <div className="description-section">
 
               <label>
@@ -483,9 +370,6 @@ const ViewComplaints = () => {
               </p>
 
             </div>
-
-
-            {/* Timeline */}
 
             <div className="timeline-section">
 

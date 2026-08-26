@@ -11,11 +11,10 @@ const ReportComplaint = () => {
   });
 
   const [images, setImages] = useState([]);
-  const [uploadMode, setUploadMode] = useState("upload"); // "upload" | "capture"
+  const [uploadMode, setUploadMode] = useState("upload");
 
-  const [coords, setCoords] = useState(null); // { lat, lng }
+  const [coords, setCoords] = useState(null); 
   const [locationStatus, setLocationStatus] = useState("idle");
-  // idle | loading | success | error
 
   const handleChange = (e) => {
     setFormData({
@@ -114,10 +113,27 @@ const ReportComplaint = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    console.log("Complaint:", { ...formData, coordinates: coords });
-    console.log("Images:", images);
+    (async () => {
+      try {
+        const payload = {
+          title: formData.title,
+          description: formData.description,
+          issueType: formData.issueType,
+          location: formData.location,
+          area: formData.area,
+          latitude: coords?.lat,
+          longitude: coords?.lng,
+        };
 
-    alert("Complaint submitted successfully!");
+        // send to backend
+        const api = (await import("../../../services/api")).default;
+        await api.post("/complaints", payload);
+        alert("Complaint submitted successfully!");
+      } catch (err) {
+        console.error(err);
+        alert(err.response?.data?.error || "Failed to submit complaint");
+      }
+    })();
   };
 
   return (
@@ -163,12 +179,12 @@ const ReportComplaint = () => {
               required
             >
               <option value="">Select issue type</option>
-              <option value="Broken Footpath">Broken Footpath</option>
-              <option value="Pothole">Pothole</option>
-              <option value="Crack">Footpath Crack</option>
-              <option value="Damaged Sidewalk">Damaged Sidewalk</option>
-              <option value="Uneven Surface">Uneven Surface</option>
-              <option value="Other">Other</option>
+              <option value="BROKEN_FOOTPATH">Broken Footpath</option>
+              <option value="POTHOLE">Pothole</option>
+              <option value="CRACK">Footpath Crack</option>
+              <option value="DAMAGED_PAVEMENT ">Damaged Sidewalk</option>
+              <option value="OBSTRUCTION">Uneven Surface</option>
+              <option value="OTHER">Other</option>
             </select>
           </div>
 
