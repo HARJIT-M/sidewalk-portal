@@ -1,0 +1,21 @@
+.app-layout {
+  min-height: 100vh;
+  background: #f4f5f9;
+}
+
+.main-content {
+  margin-left: 250px;
+  min-height: 100vh;
+  transition: margin-left 0.2s ease;
+}
+
+.app-layout.sidebar-collapsed .main-content {
+  margin-left: 70px;
+}
+
+/* Responsive fallback stays, but only applies when no manual state is set */
+@media (max-width: 800px) {
+  .main-content {
+    margin-left: 70px;
+  }
+}
