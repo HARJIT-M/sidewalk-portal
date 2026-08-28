@@ -31,7 +31,7 @@ const WorkerSidebar = ({ collapsed, setCollapsed }) => {
   ];
 
   const handleLogout = () => {
-    if (window.confirm("Are you sure you want to log out from the Worker Portal?")) {
+    if (window.confirm("Are you sure you want to log out?")) {
       navigate("/login");
     }
   };
@@ -40,7 +40,7 @@ const WorkerSidebar = ({ collapsed, setCollapsed }) => {
     <aside className={`worker-sidebar ${collapsed ? "collapsed" : ""}`}>
       {/* TOGGLE BUTTON */}
       <button
-        className="worker-sidebar-toggle"
+        className="sidebar-toggle"
         onClick={() => setCollapsed(!collapsed)}
         aria-expanded={!collapsed}
         aria-label="Toggle sidebar"
@@ -49,61 +49,47 @@ const WorkerSidebar = ({ collapsed, setCollapsed }) => {
       </button>
 
       {/* BRAND */}
-      <div className="worker-sidebar-brand">
-        <div className="worker-brand-icon">W</div>
-        <div className="worker-brand-text">
-          <div className="worker-brand-title">
-            <h2>Footpath</h2>
-            <span className="worker-role-pill">WORKER</span>
-          </div>
-          <span className="worker-brand-sub">Field Maintenance</span>
-        </div>
-      </div>
-
-      {/* WORKER QUICK STATUS PILL */}
-      <div className="worker-quick-user">
-        <div className="worker-avatar-mini">R</div>
-        <div className="worker-user-info">
-          <strong>Ravi Kumar</strong>
-          <span>
-            <span className="worker-status-dot online"></span> On Duty (WRK001)
-          </span>
+      <div className="sidebar-brand">
+        <div className="brand-icon">W</div>
+        <div className="brand-text">
+          <h2>Footpath</h2>
+          <span>Worker Portal</span>
         </div>
       </div>
 
       {/* NAVIGATION */}
-      <nav className="worker-sidebar-nav">
-        <p className="worker-nav-title">WORKER MENU</p>
+      <nav className="sidebar-nav">
+        <p className="nav-title">WORKER MENU</p>
 
         {menuItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
             className={({ isActive }) =>
-              isActive ? "worker-sidebar-link active" : "worker-sidebar-link"
+              isActive ? "sidebar-link active" : "sidebar-link"
             }
             title={collapsed ? item.name : undefined}
           >
-            <span className="worker-nav-icon">{item.icon}</span>
-            <span className="worker-nav-label">{item.name}</span>
+            <span className="sidebar-icon">{item.icon}</span>
+            <span className="sidebar-label">{item.name}</span>
             {item.badge && (
-              <span className="worker-nav-badge">{item.badge}</span>
+              <span className="sidebar-badge">{item.badge}</span>
             )}
           </NavLink>
         ))}
       </nav>
 
       {/* BOTTOM ACTIONS */}
-      <div className="worker-sidebar-bottom">
-        <div className="worker-sidebar-divider"></div>
+      <div className="sidebar-bottom">
+        <div className="sidebar-divider"></div>
 
         <button
-          className="worker-sidebar-logout"
+          className="sidebar-logout"
           onClick={handleLogout}
           title={collapsed ? "Logout" : undefined}
         >
-          <span className="worker-nav-icon">⇥</span>
-          <span className="worker-nav-label">Log Out</span>
+          <span className="sidebar-icon">⇥</span>
+          <span className="sidebar-label">Logout</span>
         </button>
       </div>
     </aside>

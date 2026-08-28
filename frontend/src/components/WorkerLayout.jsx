@@ -13,9 +13,9 @@ const WorkerLayout = () => {
   }, [collapsed]);
 
   return (
-    <div className={`worker-layout-root ${collapsed ? "sidebar-collapsed" : ""}`}>
+    <div className={`app-layout ${collapsed ? "sidebar-collapsed" : ""}`}>
       <WorkerSidebar collapsed={collapsed} setCollapsed={setCollapsed} />
-      <main className="worker-main-content">
+      <main className="main-content">
         <Outlet />
       </main>
     </div>

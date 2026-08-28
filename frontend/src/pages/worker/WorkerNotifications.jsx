@@ -9,7 +9,7 @@ import "./WorkerNotifications.css";
 const WorkerNotifications = () => {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
-  const [activeTab, setActiveTab] = useState("ALL"); // ALL, UNREAD, ASSIGNMENT, STATUS_UPDATE
+  const [filter, setFilter] = useState("All");
 
   useEffect(() => {
     setNotifications(getStoredNotifications());
@@ -42,157 +42,144 @@ const WorkerNotifications = () => {
     }
   };
 
-  // Filter
   const filteredNotifications = notifications.filter((n) => {
-    if (activeTab === "UNREAD") return !n.read;
-    if (activeTab === "ASSIGNMENT") return n.type === "ASSIGNMENT";
-    if (activeTab === "STATUS_UPDATE") return n.type === "STATUS_UPDATE";
+    if (filter === "Unread") return !n.read;
+    if (filter === "Assignments") return n.type === "ASSIGNMENT";
+    if (filter === "Updates") return n.type === "STATUS_UPDATE";
     return true;
   });
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const getNotifIcon = (type, urgent) => {
-    if (urgent) return "🚨";
-    switch (type) {
-      case "ASSIGNMENT":
-        return "📋";
-      case "STATUS_UPDATE":
-        return "⚙️";
-      case "SYSTEM":
-        return "📢";
-      default:
-        return "🔔";
-    }
-  };
-
   return (
-    <div className="worker-notifications-page">
-      {/* =========================================
-          HEADER
-      ========================================= */}
-      <div className="notif-header-row">
+    <div className="notifications-page">
+      {/* =========================
+          PAGE HEADER
+      ========================= */}
+      <div className="page-header">
         <div>
-          <h1>Notifications & Work Alerts</h1>
-          <p>
-            Stay updated with new task assignments, manager reviews, and status updates.
-          </p>
+          <h1>Worker Notifications</h1>
+          <p>Task assignments, manager reviews, and status alerts</p>
         </div>
 
-        <div className="notif-header-actions">
+        <div className="header-actions">
           {unreadCount > 0 && (
-            <button className="btn-mark-all-read" onClick={handleMarkAllRead}>
-              ✓ Mark All as Read ({unreadCount})
+            <button className="mark-all-btn" onClick={handleMarkAllRead}>
+              ✓ Mark All Read ({unreadCount})
             </button>
           )}
         </div>
       </div>
 
-      {/* =========================================
-          TABS
-      ========================================= */}
-      <div className="notif-tabs-bar">
+      {/* =========================
+          FILTERS
+      ========================= */}
+      <div className="filters-container">
         <button
-          className={`notif-tab ${activeTab === "ALL" ? "active" : ""}`}
-          onClick={() => setActiveTab("ALL")}
+          className={`filter-btn ${filter === "All" ? "active" : ""}`}
+          onClick={() => setFilter("All")}
         >
-          All
-          <span className="notif-pill">{notifications.length}</span>
+          All ({notifications.length})
         </button>
 
         <button
-          className={`notif-tab ${activeTab === "UNREAD" ? "active" : ""}`}
-          onClick={() => setActiveTab("UNREAD")}
+          className={`filter-btn ${filter === "Unread" ? "active" : ""}`}
+          onClick={() => setFilter("Unread")}
         >
-          Unread
-          {unreadCount > 0 && (
-            <span className="notif-pill unread">{unreadCount}</span>
-          )}
+          Unread {unreadCount > 0 && `(${unreadCount})`}
         </button>
 
         <button
-          className={`notif-tab ${activeTab === "ASSIGNMENT" ? "active" : ""}`}
-          onClick={() => setActiveTab("ASSIGNMENT")}
+          className={`filter-btn ${filter === "Assignments" ? "active" : ""}`}
+          onClick={() => setFilter("Assignments")}
         >
-          Task Assignments
+          Assignments
         </button>
 
         <button
-          className={`notif-tab ${activeTab === "STATUS_UPDATE" ? "active" : ""}`}
-          onClick={() => setActiveTab("STATUS_UPDATE")}
+          className={`filter-btn ${filter === "Updates" ? "active" : ""}`}
+          onClick={() => setFilter("Updates")}
         >
-          Status & Verification
+          Status Updates
         </button>
       </div>
 
-      {/* =========================================
-          NOTIFICATION LIST
-      ========================================= */}
-      <div className="notif-list-container">
-        {filteredNotifications.length === 0 ? (
-          <div className="no-notifs-box">
-            <div className="no-notif-icon">🔔</div>
-            <h3>No notifications in this category</h3>
-            <p>You are all caught up with your task assignments and alerts.</p>
-          </div>
-        ) : (
-          filteredNotifications.map((notif) => (
-            <div
-              key={notif.id}
-              className={`notif-card ${!notif.read ? "unread" : ""} ${
-                notif.urgent ? "urgent-card" : ""
-              }`}
-            >
-              <div className="notif-icon-col">
-                <div className={`notif-icon-box ${notif.type.toLowerCase()}`}>
-                  {getNotifIcon(notif.type, notif.urgent)}
+      {/* =========================
+          NOTIFICATIONS LIST
+      ========================= */}
+      <div className="notif-cards-container">
+        {filteredNotifications.map((notif) => (
+          <div
+            key={notif.id}
+            className={`notif-item-card ${!notif.read ? "unread" : ""}`}
+          >
+            <div className="notif-icon-col">
+              <div
+                className={`notif-avatar ${
+                  notif.type === "ASSIGNMENT"
+                    ? "assign"
+                    : notif.type === "STATUS_UPDATE"
+                    ? "update"
+                    : "system"
+                }`}
+              >
+                {notif.type === "ASSIGNMENT" ? "📋" : notif.type === "STATUS_UPDATE" ? "⚙️" : "🔔"}
+              </div>
+            </div>
+
+            <div className="notif-info-col">
+              <div className="notif-top-row">
+                <div className="title-box">
+                  {!notif.read && <span className="unread-dot"></span>}
+                  <h3>{notif.title}</h3>
+                  {notif.urgent && (
+                    <span className="priority high">Urgent</span>
+                  )}
                 </div>
+                <span className="notif-time">{notif.time}</span>
               </div>
 
-              <div className="notif-body-col">
-                <div className="notif-title-row">
-                  <div className="title-wrap">
-                    {!notif.read && <span className="unread-dot"></span>}
-                    <strong>{notif.title}</strong>
-                    {notif.urgent && (
-                      <span className="urgent-badge">URGENT</span>
-                    )}
-                  </div>
-                  <span className="notif-time">{notif.time}</span>
-                </div>
+              <p className="notif-body-text">{notif.message}</p>
 
-                <p className="notif-msg-text">{notif.message}</p>
+              <div className="notif-bottom-row">
+                {notif.complaintId ? (
+                  <button
+                    className="view-btn"
+                    onClick={() => handleNavigateToTask(notif)}
+                  >
+                    View Complaint ({notif.complaintId}) →
+                  </button>
+                ) : (
+                  <div></div>
+                )}
 
-                <div className="notif-footer-row">
-                  {notif.complaintId && (
+                <div className="item-actions">
+                  {!notif.read && (
                     <button
-                      className="btn-view-task"
-                      onClick={() => handleNavigateToTask(notif)}
+                      className="text-action-btn"
+                      onClick={() => handleMarkAsRead(notif.id)}
                     >
-                      View Complaint {notif.complaintId} →
+                      Mark read
                     </button>
                   )}
-
-                  <div className="notif-item-actions">
-                    {!notif.read && (
-                      <button
-                        className="btn-item-action read"
-                        onClick={() => handleMarkAsRead(notif.id)}
-                      >
-                        Mark as read
-                      </button>
-                    )}
-                    <button
-                      className="btn-item-action delete"
-                      onClick={() => handleDeleteNotif(notif.id)}
-                    >
-                      ✕ Dismiss
-                    </button>
-                  </div>
+                  <button
+                    className="text-action-btn delete"
+                    onClick={() => handleDeleteNotif(notif.id)}
+                  >
+                    Dismiss
+                  </button>
                 </div>
               </div>
             </div>
-          ))
+          </div>
+        ))}
+
+        {filteredNotifications.length === 0 && (
+          <div className="no-notifications-card">
+            <div className="no-notif-icon">🔔</div>
+            <h3>No notifications in this filter</h3>
+            <p>You're all caught up with your task assignments.</p>
+          </div>
         )}
       </div>
     </div>

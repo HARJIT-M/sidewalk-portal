@@ -4,25 +4,22 @@ import "./WorkerProfile.css";
 
 const WorkerProfile = () => {
   const [profile, setProfile] = useState(null);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [alertMessage, setAlertMessage] = useState("");
+  const [showEditPopup, setShowEditPopup] = useState(false);
+  const [showPasswordPopup, setShowPasswordPopup] = useState(false);
 
-  // Edit form state
   const [editForm, setEditForm] = useState({
     name: "",
     phone: "",
     email: "",
+    zone: "",
     emergencyContact: "",
     address: "",
-    zone: "",
   });
 
-  // Password form state
-  const [passwords, setPasswords] = useState({
-    current: "",
-    newPass: "",
-    confirmPass: "",
+  const [passForm, setPassForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   });
 
   useEffect(() => {
@@ -32,9 +29,9 @@ const WorkerProfile = () => {
       name: loaded.name,
       phone: loaded.phone,
       email: loaded.email,
+      zone: loaded.zone || "Zone 2 - Coimbatore Central",
       emergencyContact: loaded.emergencyContact || "9876543219",
       address: loaded.address || "42 Cross Road, Gandhipuram, Coimbatore",
-      zone: loaded.zone || "Zone 2 - Gandhipuram Central",
     });
   }, []);
 
@@ -45,273 +42,299 @@ const WorkerProfile = () => {
       name: editForm.name,
       phone: editForm.phone,
       email: editForm.email,
+      zone: editForm.zone,
       emergencyContact: editForm.emergencyContact,
       address: editForm.address,
-      zone: editForm.zone,
     };
     setProfile(updated);
     saveStoredProfile(updated);
-    setShowEditModal(false);
-    setAlertMessage("Profile updated successfully!");
-    setTimeout(() => setAlertMessage(""), 4000);
+    setShowEditPopup(false);
+    alert("Profile updated successfully!");
   };
 
   const handlePasswordSubmit = (e) => {
     e.preventDefault();
-    if (!passwords.current || !passwords.newPass || !passwords.confirmPass) {
+    if (!passForm.currentPassword || !passForm.newPassword) {
       alert("Please fill all password fields.");
       return;
     }
-    if (passwords.newPass !== passwords.confirmPass) {
-      alert("New password and confirm password do not match.");
+    if (passForm.newPassword !== passForm.confirmPassword) {
+      alert("New passwords do not match.");
       return;
     }
-    setShowPasswordModal(false);
-    setPasswords({ current: "", newPass: "", confirmPass: "" });
-    setAlertMessage("Password changed successfully!");
-    setTimeout(() => setAlertMessage(""), 4000);
+    setShowPasswordPopup(false);
+    setPassForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    alert("Password updated successfully!");
   };
 
   if (!profile) return null;
 
   return (
-    <div className="worker-profile-page">
-      {alertMessage && (
-        <div className="profile-alert-banner">
-          <span>✅ {alertMessage}</span>
-        </div>
-      )}
-
-      {/* =========================================
-          PROFILE HERO BANNER
-      ========================================= */}
-      <div className="profile-hero-card">
-        <div className="profile-avatar-box">
-          <div className="profile-avatar-large">
-            {profile.name.charAt(0)}
-          </div>
-          <span className="profile-status-indicator active"></span>
+    <div className="workers-page">
+      {/* =================================
+          HEADER
+      ================================= */}
+      <div className="workers-header">
+        <div>
+          <h1>My Profile</h1>
+          <p>View and manage worker account details and availability</p>
         </div>
 
-        <div className="profile-hero-text">
-          <div className="profile-title-row">
-            <h1>{profile.name}</h1>
-            <span className="worker-id-pill">{profile.id}</span>
-            <span className="role-tag">{profile.role}</span>
-          </div>
-          <p className="profile-meta-sub">
-            🏢 {profile.zone} • Joined {profile.joinedDate}
-          </p>
-          <div className="profile-stats-chips">
-            <span className="stat-chip">
-              ⭐ <strong>4.9/5</strong> Rating
-            </span>
-            <span className="stat-chip">
-              ⏱️ <strong>96%</strong> On-Time Rate
-            </span>
-            <span className="stat-chip">
-              🛠️ <strong>18</strong> Total Repairs Completed
-            </span>
-          </div>
-        </div>
-
-        <div className="profile-header-actions">
+        <div className="header-btn-row">
           <button
-            className="btn-edit-profile"
-            onClick={() => setShowEditModal(true)}
+            className="add-worker-btn"
+            onClick={() => setShowEditPopup(true)}
           >
-            ✏️ Edit Profile
+            Edit Profile
           </button>
           <button
-            className="btn-change-pass"
-            onClick={() => setShowPasswordModal(true)}
+            className="password-worker-btn"
+            onClick={() => setShowPasswordPopup(true)}
           >
-            🔒 Change Password
+            Change Password
           </button>
         </div>
       </div>
 
-      {/* =========================================
-          INFORMATION DETAILS GRID
-      ========================================= */}
-      <div className="profile-details-grid">
-        {/* Contact & Personal Info */}
-        <div className="profile-card">
-          <div className="profile-card-header">
-            <h3>👤 Personal & Contact Information</h3>
+      {/* =================================
+          STATISTICS
+      ================================= */}
+      <div className="worker-stats">
+        <div className="worker-stat-card">
+          <div className="worker-stat-icon total">👤</div>
+          <div>
+            <span>Worker ID</span>
+            <strong>{profile.id}</strong>
+          </div>
+        </div>
+
+        <div className="worker-stat-card">
+          <div className="worker-stat-icon active">✓</div>
+          <div>
+            <span>Status</span>
+            <strong>{profile.status}</strong>
+          </div>
+        </div>
+
+        <div className="worker-stat-card">
+          <div className="worker-stat-icon available">⭐</div>
+          <div>
+            <span>Performance Rating</span>
+            <strong>4.9 / 5.0</strong>
+          </div>
+        </div>
+
+        <div className="worker-stat-card">
+          <div className="worker-stat-icon inactive">🛠️</div>
+          <div>
+            <span>Total Completed</span>
+            <strong>18 Tasks</strong>
+          </div>
+        </div>
+      </div>
+
+      {/* =================================
+          DETAILS CONTAINER
+      ================================= */}
+      <div className="profile-content-grid">
+        {/* Contact Info */}
+        <div className="profile-details-card">
+          <div className="details-card-header">
+            <h2>Personal & Contact Information</h2>
           </div>
 
-          <div className="profile-info-list">
-            <div className="info-row">
-              <span className="info-label">Full Name:</span>
-              <strong className="info-value">{profile.name}</strong>
+          <div className="profile-info-table">
+            <div className="info-item">
+              <span className="label">Full Name:</span>
+              <strong className="value">{profile.name}</strong>
             </div>
 
-            <div className="info-row">
-              <span className="info-label">Worker ID:</span>
-              <strong className="info-value id-val">{profile.id}</strong>
+            <div className="info-item">
+              <span className="label">Worker ID:</span>
+              <strong className="value id-text">{profile.id}</strong>
             </div>
 
-            <div className="info-row">
-              <span className="info-label">Official Email:</span>
-              <strong className="info-value">✉️ {profile.email}</strong>
+            <div className="info-item">
+              <span className="label">Email Address:</span>
+              <strong className="value">✉ {profile.email}</strong>
             </div>
 
-            <div className="info-row">
-              <span className="info-label">Primary Phone:</span>
-              <strong className="info-value">📞 {profile.phone}</strong>
+            <div className="info-item">
+              <span className="label">Phone Number:</span>
+              <strong className="value">📞 {profile.phone}</strong>
             </div>
 
-            <div className="info-row">
-              <span className="info-label">Emergency Contact:</span>
-              <strong className="info-value">🚨 {profile.emergencyContact || "9876543219"}</strong>
+            <div className="info-item">
+              <span className="label">Emergency Contact:</span>
+              <strong className="value">🚨 {profile.emergencyContact || "9876543219"}</strong>
             </div>
 
-            <div className="info-row">
-              <span className="info-label">Operational Zone:</span>
-              <strong className="info-value">📍 {profile.zone}</strong>
+            <div className="info-item">
+              <span className="label">Assigned Zone:</span>
+              <strong className="value">📍 {profile.zone || "Zone 2 - Coimbatore Central"}</strong>
             </div>
 
-            <div className="info-row">
-              <span className="info-label">Residential Address:</span>
-              <strong className="info-value">{profile.address}</strong>
+            <div className="info-item">
+              <span className="label">Residential Address:</span>
+              <strong className="value">{profile.address}</strong>
             </div>
           </div>
         </div>
 
-        {/* Work & Deployment Details */}
-        <div className="profile-card">
-          <div className="profile-card-header">
-            <h3>🧰 Deployment & Equipment</h3>
+        {/* Work & Deployment */}
+        <div className="profile-details-card">
+          <div className="details-card-header">
+            <h2>Deployment & Equipment</h2>
           </div>
 
-          <div className="profile-info-list">
-            <div className="info-row">
-              <span className="info-label">Work Shift:</span>
-              <strong className="info-value">🕒 {profile.shift}</strong>
+          <div className="profile-info-table">
+            <div className="info-item">
+              <span className="label">Role:</span>
+              <strong className="value">{profile.role}</strong>
             </div>
 
-            <div className="info-row">
-              <span className="info-label">Employment Status:</span>
-              <strong className="info-value status-active">🟢 Active / On Duty</strong>
+            <div className="info-item">
+              <span className="label">Joining Date:</span>
+              <strong className="value">{profile.joinedDate}</strong>
             </div>
 
-            <div className="info-row">
-              <span className="info-label">Assigned Supervisor:</span>
-              <strong className="info-value">Harjit Singh (Field Manager)</strong>
+            <div className="info-item">
+              <span className="label">Shift:</span>
+              <strong className="value">{profile.shift}</strong>
             </div>
 
-            <div className="info-row">
-              <span className="info-label">Assigned Gear:</span>
-              <strong className="info-value">{profile.assignedEquipment}</strong>
+            <div className="info-item">
+              <span className="label">Supervisor:</span>
+              <strong className="value">Harjit Singh (Field Manager)</strong>
             </div>
 
-            <div className="info-row">
-              <span className="info-label">Safety Clearance:</span>
-              <strong className="info-value">Level 2 Field Infrastructure Certified</strong>
+            <div className="info-item">
+              <span className="label">Assigned Kit & Van:</span>
+              <strong className="value">{profile.assignedEquipment}</strong>
             </div>
           </div>
 
-          <div className="skills-section">
-            <h4>Certified Skills & Specializations</h4>
-            <div className="skills-tags-wrap">
-              {profile.skills && profile.skills.map((skill) => (
-                <span key={skill} className="skill-tag">
-                  ✓ {skill}
-                </span>
-              ))}
+          <div className="skills-block">
+            <h3>Certified Specializations</h3>
+            <div className="skill-pills-wrap">
+              {profile.skills &&
+                profile.skills.map((s) => (
+                  <span key={s} className="skill-pill">
+                    ✓ {s}
+                  </span>
+                ))}
             </div>
           </div>
         </div>
       </div>
 
-      {/* =========================================
+      {/* =================================
           EDIT PROFILE MODAL
-      ========================================= */}
-      {showEditModal && (
-        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-top">
-              <h2>Edit Worker Profile</h2>
+      ================================= */}
+      {showEditPopup && (
+        <div
+          className="worker-modal-overlay"
+          onClick={() => setShowEditPopup(false)}
+        >
+          <div
+            className="worker-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="worker-modal-header">
+              <div>
+                <span className="modal-label">WORKER ACCOUNT</span>
+                <h2>Edit Profile Details</h2>
+              </div>
               <button
-                className="modal-close-btn"
-                onClick={() => setShowEditModal(false)}
+                className="modal-close"
+                onClick={() => setShowEditPopup(false)}
               >
                 ×
               </button>
             </div>
 
-            <form onSubmit={handleEditSubmit} className="modal-form">
-              <div className="modal-field">
-                <label>Full Name</label>
+            <form onSubmit={handleEditSubmit} className="worker-form">
+              <div className="form-group">
+                <label>Full Name *</label>
                 <input
                   type="text"
                   value={editForm.name}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, name: e.target.value })
+                  }
                   required
                 />
               </div>
 
-              <div className="modal-field-grid">
-                <div className="modal-field">
-                  <label>Phone Number</label>
-                  <input
-                    type="text"
-                    value={editForm.phone}
-                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className="modal-field">
-                  <label>Emergency Contact</label>
-                  <input
-                    type="text"
-                    value={editForm.emergencyContact}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, emergencyContact: e.target.value })
-                    }
-                  />
-                </div>
+              <div className="form-group">
+                <label>Phone Number *</label>
+                <input
+                  type="text"
+                  value={editForm.phone}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, phone: e.target.value })
+                  }
+                  required
+                />
               </div>
 
-              <div className="modal-field">
-                <label>Email Address</label>
+              <div className="form-group">
+                <label>Emergency Contact</label>
+                <input
+                  type="text"
+                  value={editForm.emergencyContact}
+                  onChange={(e) =>
+                    setEditForm({
+                      ...editForm,
+                      emergencyContact: e.target.value,
+                    })
+                  }
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Email Address *</label>
                 <input
                   type="email"
                   value={editForm.email}
-                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, email: e.target.value })
+                  }
                   required
                 />
               </div>
 
-              <div className="modal-field">
+              <div className="form-group">
                 <label>Assigned Zone</label>
                 <input
                   type="text"
                   value={editForm.zone}
-                  onChange={(e) => setEditForm({ ...editForm, zone: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, zone: e.target.value })
+                  }
                 />
               </div>
 
-              <div className="modal-field">
+              <div className="form-group">
                 <label>Address</label>
                 <input
                   type="text"
                   value={editForm.address}
-                  onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, address: e.target.value })
+                  }
                 />
               </div>
 
-              <div className="modal-actions">
+              <div className="worker-modal-footer">
                 <button
                   type="button"
-                  className="btn-modal-cancel"
-                  onClick={() => setShowEditModal(false)}
+                  className="modal-cancel-btn"
+                  onClick={() => setShowEditPopup(false)}
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn-modal-save">
+                <button type="submit" className="modal-add-btn">
                   Save Changes
                 </button>
               </div>
@@ -320,71 +343,89 @@ const WorkerProfile = () => {
         </div>
       )}
 
-      {/* =========================================
+      {/* =================================
           CHANGE PASSWORD MODAL
-      ========================================= */}
-      {showPasswordModal && (
-        <div className="modal-overlay" onClick={() => setShowPasswordModal(false)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-top">
-              <h2>Change Password</h2>
+      ================================= */}
+      {showPasswordPopup && (
+        <div
+          className="worker-modal-overlay"
+          onClick={() => setShowPasswordPopup(false)}
+        >
+          <div
+            className="worker-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="worker-modal-header">
+              <div>
+                <span className="modal-label">SECURITY SETTINGS</span>
+                <h2>Change Password</h2>
+              </div>
               <button
-                className="modal-close-btn"
-                onClick={() => setShowPasswordModal(false)}
+                className="modal-close"
+                onClick={() => setShowPasswordPopup(false)}
               >
                 ×
               </button>
             </div>
 
-            <form onSubmit={handlePasswordSubmit} className="modal-form">
-              <div className="modal-field">
-                <label>Current Password</label>
+            <form onSubmit={handlePasswordSubmit} className="worker-form">
+              <div className="form-group">
+                <label>Current Password *</label>
                 <input
                   type="password"
                   placeholder="Enter current password"
-                  value={passwords.current}
+                  value={passForm.currentPassword}
                   onChange={(e) =>
-                    setPasswords({ ...passwords, current: e.target.value })
+                    setPassForm({
+                      ...passForm,
+                      currentPassword: e.target.value,
+                    })
                   }
                   required
                 />
               </div>
 
-              <div className="modal-field">
-                <label>New Password</label>
+              <div className="form-group">
+                <label>New Password *</label>
                 <input
                   type="password"
-                  placeholder="Enter new password (min. 6 characters)"
-                  value={passwords.newPass}
+                  placeholder="Enter new password"
+                  value={passForm.newPassword}
                   onChange={(e) =>
-                    setPasswords({ ...passwords, newPass: e.target.value })
+                    setPassForm({
+                      ...passForm,
+                      newPassword: e.target.value,
+                    })
                   }
                   required
                 />
               </div>
 
-              <div className="modal-field">
-                <label>Confirm New Password</label>
+              <div className="form-group">
+                <label>Confirm New Password *</label>
                 <input
                   type="password"
-                  placeholder="Re-enter new password"
-                  value={passwords.confirmPass}
+                  placeholder="Confirm new password"
+                  value={passForm.confirmPassword}
                   onChange={(e) =>
-                    setPasswords({ ...passwords, confirmPass: e.target.value })
+                    setPassForm({
+                      ...passForm,
+                      confirmPassword: e.target.value,
+                    })
                   }
                   required
                 />
               </div>
 
-              <div className="modal-actions">
+              <div className="worker-modal-footer">
                 <button
                   type="button"
-                  className="btn-modal-cancel"
-                  onClick={() => setShowPasswordModal(false)}
+                  className="modal-cancel-btn"
+                  onClick={() => setShowPasswordPopup(false)}
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn-modal-save">
+                <button type="submit" className="modal-add-btn">
                   Update Password
                 </button>
               </div>

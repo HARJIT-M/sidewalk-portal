@@ -1,10 +1,10 @@
+// WorkerDashboard.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getStoredComplaints,
   getStoredProfile,
   getStoredNotifications,
-  saveStoredComplaints
 } from "./workerData";
 import "./WorkerDashboard.css";
 
@@ -13,392 +13,581 @@ const WorkerDashboard = () => {
   const [complaints, setComplaints] = useState([]);
   const [profile, setProfile] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [dutyStatus, setDutyStatus] = useState("On Duty");
+  const [activeBarIndex, setActiveBarIndex] = useState(4); // Friday default
+
+  const loadData = () => {
+    setComplaints(getStoredComplaints());
+    setProfile(getStoredProfile());
+    const notifs = getStoredNotifications();
+    setUnreadCount(notifs.filter((n) => !n.read).length);
+  };
 
   useEffect(() => {
-    const loadedComplaints = getStoredComplaints();
-    const loadedProfile = getStoredProfile();
-    const loadedNotifs = getStoredNotifications();
-    setComplaints(loadedComplaints);
-    setProfile(loadedProfile);
-    setUnreadCount(loadedNotifs.filter((n) => !n.read).length);
+    loadData();
   }, []);
 
-  // Stats calculation
-  const totalAssigned = complaints.length;
-  const pendingCount = complaints.filter(
-    (c) => c.status === "ASSIGNED" || c.status === "PENDING"
-  ).length;
-  const inProgressCount = complaints.filter(
-    (c) => c.status === "IN_PROGRESS"
-  ).length;
-  const completedCount = complaints.filter(
-    (c) => c.status === "RESOLVED" || c.status === "COMPLETED"
-  ).length;
+  // Summary counts
+  const totalAssigned = complaints.length || 12;
+  const inProgressCount =
+    complaints.filter((c) => c.status === "IN_PROGRESS").length || 4;
+  const completedCount = 28;
+  const highPriorityCount =
+    complaints.filter((c) => c.priority === "HIGH").length || 2;
 
-  // Active or top priority complaint
+  // Active spotlight task
   const activeTask =
+    complaints.find((c) => c.id === "CMP001") ||
     complaints.find((c) => c.status === "IN_PROGRESS") ||
-    complaints.find((c) => c.status === "ASSIGNED" && c.priority === "HIGH") ||
-    complaints[0];
+    complaints[0] || {
+      id: "CMP001",
+      issue: "Broken Footpath & Sunk Paver Blocks",
+      location: "Gandhipuram, Coimbatore",
+      landmark: "Opposite City Bus Stand Gate #2",
+      priority: "High",
+      status: "In Progress",
+      progress: 80,
+    };
 
-  const handleStartWork = (id) => {
-    const updated = complaints.map((c) => {
-      if (c.id === id) {
-        return {
-          ...c,
-          status: "IN_PROGRESS",
-          statusHistory: [
-            ...c.statusHistory,
-            {
-              status: "IN_PROGRESS",
-              date: new Date().toLocaleString("en-GB", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              }),
-              note: `Work initiated on-site by ${profile?.name || "Worker"}.`,
-            },
-          ],
-        };
-      }
-      return c;
-    });
-    setComplaints(updated);
-    saveStoredComplaints(updated);
-    navigate(`/worker/complaints/${id}`);
-  };
+  // High priority tasks list
+  const highPriorityTasks = complaints.filter(
+    (c) => c.priority === "HIGH" || c.id === "CMP001" || c.id === "CMP004"
+  );
 
-  const getPriorityClass = (priority) => {
-    switch (priority?.toUpperCase()) {
-      case "HIGH":
-        return "priority-high";
-      case "MEDIUM":
-        return "priority-medium";
-      case "LOW":
-        return "priority-low";
-      default:
-        return "priority-medium";
-    }
-  };
+  // Weekly performance bar chart data (Mon - Sat)
+  const weeklyData = [
+    { day: "Mon", count: 4, label: "4 Tasks" },
+    { day: "Tue", count: 6, label: "6 Tasks" },
+    { day: "Wed", count: 5, label: "5 Tasks" },
+    { day: "Thu", count: 7, label: "7 Tasks" },
+    { day: "Fri", count: 8, label: "8 Tasks" },
+    { day: "Sat", count: 3, label: "3 Tasks" },
+  ];
 
-  const getStatusBadge = (status) => {
-    switch (status?.toUpperCase()) {
-      case "ASSIGNED":
-        return { label: "Assigned (Pending)", className: "status-assigned" };
-      case "IN_PROGRESS":
-        return { label: "In Progress", className: "status-inprogress" };
-      case "RESOLVED":
-      case "COMPLETED":
-        return { label: "Completed / Resolved", className: "status-resolved" };
-      default:
-        return { label: status, className: "status-default" };
-    }
-  };
+  // Donut chart status data
+  const statusData = [
+    { label: "Resolved", count: 8, color: "#16a34a", percent: 47 },
+    { label: "In Progress", count: 4, color: "#4f46e5", percent: 24 },
+    { label: "Assigned", count: 5, color: "#d97706", percent: 29 },
+  ];
 
   return (
-    <div className="worker-dashboard-container">
+    <div className="worker-dashboard">
       {/* =========================================
-          WELCOME HERO BANNER
+          1. HEADER (Manager Gradient Banner)
       ========================================= */}
-      <div className="worker-hero-card">
-        <div className="worker-hero-content">
-          <div className="worker-badge-pill">
-            <span className="live-dot"></span> FIELD WORKER PORTAL
-          </div>
-          <h1>
-            Welcome back, {profile?.name || "Ravi Kumar"}! 👋
-          </h1>
+      <div className="dashboard-header">
+        <div>
+          <h1>Worker Dashboard</h1>
           <p>
-            You have <strong>{pendingCount + inProgressCount} active repair tasks</strong> requiring your attention today.
+            Good Morning, {profile?.name || "Ravi Kumar"} 👋 • Here’s your work summary for today
           </p>
-
-          <div className="worker-hero-meta">
-            <span className="hero-meta-item">
-              <strong>ID:</strong> {profile?.id || "WRK001"}
-            </span>
-            <span className="hero-meta-divider">•</span>
-            <span className="hero-meta-item">
-              <strong>Zone:</strong> {profile?.zone || "Zone 2 - Gandhipuram"}
-            </span>
-            <span className="hero-meta-divider">•</span>
-            <span className="hero-meta-item">
-              <strong>Shift:</strong> {profile?.shift || "08:00 AM - 05:00 PM"}
-            </span>
-          </div>
         </div>
 
-        <div className="worker-hero-controls">
-          <div className="status-toggle-wrapper">
-            <label>Duty Status:</label>
-            <select
-              value={dutyStatus}
-              onChange={(e) => setDutyStatus(e.target.value)}
-              className={`duty-select ${dutyStatus.toLowerCase().replace(" ", "-")}`}
-            >
-              <option value="On Duty">🟢 On Duty</option>
-              <option value="On Break">🟡 On Break</option>
-              <option value="Off Duty">⚪ Off Duty</option>
-            </select>
+        <div className="worker-info">
+          <div className="worker-avatar">
+            {profile?.name ? profile.name.charAt(0) : "R"}
           </div>
+          <div>
+            <h3>{profile?.name || "Ravi Kumar"}</h3>
+            <span>{profile?.zone || "Coimbatore"} ({profile?.id || "WRK001"})</span>
+          </div>
+        </div>
+      </div>
 
+      {/* =========================================
+          2. QUICK ACTIONS BAR
+      ========================================= */}
+      <div className="quick-actions-card">
+        <span className="quick-actions-title">⚡ Quick Actions:</span>
+        <div className="quick-buttons-row">
           <button
-            className="hero-action-btn"
+            className="action-pill-btn"
             onClick={() => navigate("/worker/my-complaints")}
           >
-            View All Tasks (📋 {totalAssigned})
+            📋 My Assigned Tasks
+          </button>
+          <button
+            className="action-pill-btn"
+            onClick={() =>
+              navigate(`/worker/complaints/${activeTask.id || "CMP001"}`)
+            }
+          >
+            🔧 Update Active Task
+          </button>
+          <button
+            className="action-pill-btn"
+            onClick={() =>
+              navigate(
+                `/worker/complaints/${activeTask.id || "CMP001"}#work-update-section`
+              )
+            }
+          >
+            📷 Upload Repair Proof
+          </button>
+          <button
+            className="action-pill-btn"
+            onClick={() =>
+              navigate("/worker/my-complaints?filter=RESOLVED")
+            }
+          >
+            📜 Completed History
+          </button>
+          <button
+            className="action-pill-btn notif"
+            onClick={() => navigate("/worker/notifications")}
+          >
+            🔔 Notifications {unreadCount > 0 && `(${unreadCount})`}
           </button>
         </div>
       </div>
 
       {/* =========================================
-          STATISTICS COUNTERS
+          3. FOUR STATISTICS CARDS (Manager Design)
       ========================================= */}
-      <div className="worker-stats-grid">
+      <div className="stats-container">
         <div
-          className="worker-stat-card card-total"
+          className="stat-card"
           onClick={() => navigate("/worker/my-complaints")}
         >
-          <div className="stat-icon-box total">📋</div>
-          <div className="stat-text-box">
-            <span className="stat-label">Assigned Works</span>
-            <strong className="stat-value">{totalAssigned}</strong>
-            <span className="stat-subtext">Total tasks assigned</span>
+          <div className="stat-icon total">📋</div>
+          <div>
+            <p>Assigned Tasks</p>
+            <h2>{totalAssigned}</h2>
+
           </div>
         </div>
 
         <div
-          className="worker-stat-card card-pending"
-          onClick={() => navigate("/worker/my-complaints?filter=ASSIGNED")}
-        >
-          <div className="stat-icon-box pending">⏳</div>
-          <div className="stat-text-box">
-            <span className="stat-label">Pending / Assigned</span>
-            <strong className="stat-value">{pendingCount}</strong>
-            <span className="stat-subtext">Ready to start</span>
-          </div>
-        </div>
-
-        <div
-          className="worker-stat-card card-progress"
+          className="stat-card"
           onClick={() => navigate("/worker/my-complaints?filter=IN_PROGRESS")}
         >
-          <div className="stat-icon-box progress">⚙️</div>
-          <div className="stat-text-box">
-            <span className="stat-label">In Progress</span>
-            <strong className="stat-value">{inProgressCount}</strong>
-            <span className="stat-subtext">Active repairs</span>
+          <div className="stat-icon progress">🔧</div>
+          <div>
+            <p>In Progress</p>
+            <h2>{inProgressCount}</h2>
+
           </div>
         </div>
 
         <div
-          className="worker-stat-card card-completed"
+          className="stat-card"
           onClick={() => navigate("/worker/my-complaints?filter=RESOLVED")}
         >
-          <div className="stat-icon-box completed">✅</div>
-          <div className="stat-text-box">
-            <span className="stat-label">Completed</span>
-            <strong className="stat-value">{completedCount}</strong>
-            <span className="stat-subtext">Awaiting verification</span>
+          <div className="stat-icon resolved">✓</div>
+          <div>
+            <p>Completed</p>
+            <h2>{completedCount}</h2>
+
+          </div>
+        </div>
+
+        <div
+          className="stat-card"
+          onClick={() => navigate("/worker/my-complaints?filter=ASSIGNED")}
+        >
+          <div className="stat-icon pending">🚨</div>
+          <div>
+            <p>High Priority</p>
+            <h2>{highPriorityCount}</h2>
+
           </div>
         </div>
       </div>
 
       {/* =========================================
-          ACTIVE TASK SPOTLIGHT & QUICK TOOLS
+          4. TODAY'S WORK — FEATURED WORK ORDER
       ========================================= */}
-      <div className="worker-dashboard-row">
-        {/* Active Task Spotlight */}
-        {activeTask && (
-          <div className="active-task-banner">
-            <div className="active-task-header">
-              <div className="active-task-tag">
-                <span>⚡ CURRENT SPOTLIGHT TASK</span>
-              </div>
-              <span className={`priority-tag ${getPriorityClass(activeTask.priority)}`}>
-                {activeTask.priority} PRIORITY
+      <div className="complaints-section featured-work-box">
+        <div className="section-header">
+          <div>
+            <h2>📋 Today's Assigned Work</h2>
+            <p>Current active on-site repair task</p>
+          </div>
+          <span className="priority high">High Priority</span>
+        </div>
+
+        <div className="featured-task-body">
+          <div className="featured-task-info">
+            <div className="task-header-line">
+              <span className="complaint-id">#{activeTask.id || "CMP001"}</span>
+              <span className="issue-title">
+                {activeTask.issue || "Broken Footpath & Sunk Paver Blocks"}
               </span>
             </div>
+            <p className="location">
+              📍 {activeTask.location || "Gandhipuram, Coimbatore"}{" "}
+              {activeTask.landmark && `(${activeTask.landmark})`}
+            </p>
+            <p className="featured-desc">
+              {activeTask.description ||
+                "Multiple interlock tiles have sunk or broken creating an 8-inch trip hazard for daily pedestrians near the main bus stop."}
+            </p>
+          </div>
 
-            <div className="active-task-body">
-              <div className="active-task-main">
-                <span className="active-task-id">{activeTask.id}</span>
-                <h2>{activeTask.issue}</h2>
-                <p className="active-task-location">
-                  📍 {activeTask.location} {activeTask.landmark && `(${activeTask.landmark})`}
-                </p>
-                <p className="active-task-desc">{activeTask.description}</p>
-              </div>
-
-              <div className="active-task-actions">
-                <div className="active-status-preview">
-                  <span className="status-label">Current Status:</span>
-                  <span className={`status-pill ${getStatusBadge(activeTask.status).className}`}>
-                    {getStatusBadge(activeTask.status).label}
-                  </span>
-                </div>
-
-                <div className="action-buttons-group">
-                  {activeTask.status === "ASSIGNED" ? (
-                    <button
-                      className="btn-start-work"
-                      onClick={() => handleStartWork(activeTask.id)}
-                    >
-                      🚀 Start Work Now
-                    </button>
-                  ) : (
-                    <button
-                      className="btn-update-work"
-                      onClick={() => navigate(`/worker/complaints/${activeTask.id}`)}
-                    >
-                      🛠️ Update Work Details
-                    </button>
-                  )}
-                  <button
-                    className="btn-view-details"
-                    onClick={() => navigate(`/worker/complaints/${activeTask.id}`)}
-                  >
-                    View Details →
-                  </button>
-                </div>
-              </div>
+          <div className="progress-box">
+            <div className="progress-label-row">
+              <span className="progress-text-label">Repair Progress</span>
+              <strong>{activeTask.progress || 80}% Complete</strong>
+            </div>
+            <div className="progress-bar-container">
+              <div
+                className="progress-bar-indicator"
+                style={{ width: `${activeTask.progress || 80}%` }}
+              ></div>
+            </div>
+            <div className="progress-footer-note">
+              <span>Status:</span>{" "}
+              <span className="status in-progress">In Progress</span> •
+              Excavation done, laying interlock pavers
             </div>
           </div>
-        )}
 
-        {/* Safety & Shift Checklist */}
-        <div className="worker-side-card">
-          <div className="side-card-header">
-            <h3>🧰 Daily Field Checklist</h3>
-            <span className="side-card-badge">Safety 1st</span>
-          </div>
-          <ul className="field-checklist">
-            <li>
-              <label>
-                <input type="checkbox" defaultChecked />
-                <span>Wear High-Visibility Safety Vest</span>
-              </label>
-            </li>
-            <li>
-              <label>
-                <input type="checkbox" defaultChecked />
-                <span>Place Barricade / Traffic Cones</span>
-              </label>
-            </li>
-            <li>
-              <label>
-                <input type="checkbox" defaultChecked />
-                <span>Take "Before" photo on arrival</span>
-              </label>
-            </li>
-            <li>
-              <label>
-                <input type="checkbox" />
-                <span>Level and compact sub-base surface</span>
-              </label>
-            </li>
-            <li>
-              <label>
-                <input type="checkbox" />
-                <span>Take clear "After" photo & mark resolved</span>
-              </label>
-            </li>
-          </ul>
-
-          <div className="manager-contact-box">
-            <span>Need Materials / Support?</span>
-            <strong>Manager Harjit: 📞 98765-43200</strong>
+          <div className="featured-actions-row">
+            <button
+              className="view-btn"
+              onClick={() =>
+                navigate(`/worker/complaints/${activeTask.id || "CMP001"}`)
+              }
+            >
+              View Details
+            </button>
+            <button
+              className="refresh-btn"
+              onClick={() =>
+                navigate(
+                  `/worker/complaints/${activeTask.id || "CMP001"}#work-update-section`
+                )
+              }
+            >
+              Update Progress →
+            </button>
           </div>
         </div>
       </div>
 
       {/* =========================================
-          RECENT ASSIGNMENTS SECTION
+          5. CHARTS GRID (Weekly Performance + Status Donut)
       ========================================= */}
-      <div className="recent-assignments-section">
-        <div className="section-title-bar">
-          <div>
-            <h2>Recent Assigned Complaints</h2>
-            <p>Direct assignments queue for maintenance & repairs</p>
+      <div className="dashboard-grid-two">
+        {/* Weekly Performance Bar Chart */}
+        <div className="complaints-section">
+          <div className="section-header">
+            <div>
+              <h2>📊 Weekly Work Performance</h2>
+              <p>Tasks completed each day this week</p>
+            </div>
+            <span className="count-pill">Total: 33 Tasks</span>
           </div>
-          <button
-            className="btn-see-all"
-            onClick={() => navigate("/worker/my-complaints")}
-          >
-            See All Complaints ({totalAssigned}) →
-          </button>
-        </div>
 
-        <div className="assignments-table-container">
-          <table className="worker-assignments-table">
-            <thead>
-              <tr>
-                <th>Complaint ID</th>
-                <th>Issue Details</th>
-                <th>Location</th>
-                <th>Priority</th>
-                <th>Status</th>
-                <th>Assigned Date</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {complaints.slice(0, 5).map((complaint) => {
-                const statusInfo = getStatusBadge(complaint.status);
+          <div className="bar-chart-container">
+            <div className="y-axis-labels">
+              <span>8</span>
+              <span>6</span>
+              <span>4</span>
+              <span>2</span>
+              <span>0</span>
+            </div>
+
+            <div className="bars-area">
+              {weeklyData.map((item, index) => {
+                const heightPercent = (item.count / 8) * 100;
+                const isHovered = activeBarIndex === index;
                 return (
-                  <tr key={complaint.id}>
-                    <td>
-                      <span className="table-id-badge">{complaint.id}</span>
-                    </td>
-                    <td>
-                      <div className="table-issue-cell">
-                        <strong>{complaint.issue}</strong>
-                        <span className="table-reporter">Rep: {complaint.reporterName}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="table-location">📍 {complaint.location}</span>
-                    </td>
-                    <td>
-                      <span className={`priority-badge ${getPriorityClass(complaint.priority)}`}>
-                        {complaint.priority}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`status-pill ${statusInfo.className}`}>
-                        <span className="status-dot"></span>
-                        {statusInfo.label}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="table-date">{complaint.assignedDate}</span>
-                    </td>
-                    <td>
-                      <div className="table-action-cell">
-                        {complaint.status === "ASSIGNED" ? (
-                          <button
-                            className="table-btn-start"
-                            onClick={() => handleStartWork(complaint.id)}
-                          >
-                            Start Work
-                          </button>
-                        ) : (
-                          <button
-                            className="table-btn-view"
-                            onClick={() => navigate(`/worker/complaints/${complaint.id}`)}
-                          >
-                            {complaint.status === "IN_PROGRESS" ? "Update" : "View"}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                  <div
+                    key={item.day}
+                    className="bar-item"
+                    onMouseEnter={() => setActiveBarIndex(index)}
+                  >
+                    <div className="tooltip-slot">
+                      {isHovered && (
+                        <div className="bar-tooltip-popup">{item.label}</div>
+                      )}
+                    </div>
+                    <div className="bar-slot">
+                      <div
+                        className={`bar-column-fill ${isHovered ? "active" : ""}`}
+                        style={{ height: `${heightPercent}%` }}
+                      ></div>
+                    </div>
+                    <span className={`bar-day-label ${isHovered ? "active" : ""}`}>
+                      {item.day}
+                    </span>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Task Status Donut Distribution */}
+        <div className="complaints-section">
+          <div className="section-header">
+            <div>
+              <h2>🥧 Task Status Distribution</h2>
+              <p>Current workload breakdown</p>
+            </div>
+            <span className="count-pill">17 Total</span>
+          </div>
+
+          <div className="donut-chart-container">
+            <div className="donut-svg-wrapper">
+              <svg width="140" height="140" viewBox="0 0 42 42" className="donut-svg">
+                <circle
+                  className="donut-bg-ring"
+                  cx="21"
+                  cy="21"
+                  r="15.91549430918954"
+                  fill="transparent"
+                  stroke="#f7f7fb"
+                  strokeWidth="5"
+                />
+                {/* Resolved (47%) */}
+                <circle
+                  cx="21"
+                  cy="21"
+                  r="15.91549430918954"
+                  fill="transparent"
+                  stroke="#16a34a"
+                  strokeWidth="5"
+                  strokeDasharray="47 53"
+                  strokeDashoffset="25"
+                />
+                {/* In Progress (24%) */}
+                <circle
+                  cx="21"
+                  cy="21"
+                  r="15.91549430918954"
+                  fill="transparent"
+                  stroke="#4f46e5"
+                  strokeWidth="5"
+                  strokeDasharray="24 76"
+                  strokeDashoffset="78"
+                />
+                {/* Assigned (29%) */}
+                <circle
+                  cx="21"
+                  cy="21"
+                  r="15.91549430918954"
+                  fill="transparent"
+                  stroke="#d97706"
+                  strokeWidth="5"
+                  strokeDasharray="29 71"
+                  strokeDashoffset="54"
+                />
+              </svg>
+              <div className="donut-label-center">
+                <strong>17</strong>
+                <span>Tasks</span>
+              </div>
+            </div>
+
+            <div className="donut-legend-list">
+              {statusData.map((item) => (
+                <div key={item.label} className="legend-item">
+                  <div className="legend-left">
+                    <span
+                      className="legend-dot"
+                      style={{ backgroundColor: item.color }}
+                    ></span>
+                    <span className="legend-title">{item.label}</span>
+                  </div>
+                  <div className="legend-right">
+                    <strong>{item.count}</strong>
+                    <span className="legend-pct">({item.percent}%)</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* =========================================
+          6. HIGH PRIORITY TASKS & MONTHLY PROGRESS
+      ========================================= */}
+      <div className="dashboard-grid-two">
+        {/* High Priority Tasks */}
+        <div className="complaints-section">
+          <div className="section-header">
+            <div>
+              <h2>🚨 High Priority Tasks</h2>
+              <p>Complaints needing immediate inspection & repair</p>
+            </div>
+            <span className="priority high">{highPriorityTasks.length} Urgent</span>
+          </div>
+
+          <div className="priority-items-list">
+            {highPriorityTasks.map((task) => (
+              <div key={task.id} className="priority-row-card">
+                <div className="priority-row-info">
+                  <div className="task-header-line">
+                    <span className="complaint-id">#{task.id}</span>
+                    <span className="issue-title">{task.issue}</span>
+                  </div>
+                  <p className="location">📍 {task.location}</p>
+                  <span className="due-badge">⏳ Due: Today</span>
+                </div>
+
+                <button
+                  className="refresh-btn"
+                  onClick={() => navigate(`/worker/complaints/${task.id}`)}
+                >
+                  View Task →
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Overall Completion & Monthly Stats */}
+        <div className="complaints-section">
+          <div className="section-header">
+            <div>
+              <h2>📈 Overall Completion Progress</h2>
+              <p>Monthly target and performance metrics</p>
+            </div>
+            <span className="status resolved">80% Rate</span>
+          </div>
+
+          <div className="completion-card-body">
+            <div className="big-target-box">
+              <div className="target-top-line">
+                <span>Month Target Progress</span>
+                <strong>28 / 35 Tasks Completed</strong>
+              </div>
+              <div className="progress-bar-container">
+                <div
+                  className="progress-bar-indicator"
+                  style={{ width: "80%" }}
+                ></div>
+              </div>
+            </div>
+
+            <div className="month-stats-grid">
+              <div className="month-box">
+                <p>Completed</p>
+                <h3 className="text-green">28</h3>
+              </div>
+              <div className="month-box">
+                <p>In Progress</p>
+                <h3 className="text-purple">4</h3>
+              </div>
+              <div className="month-box">
+                <p>Assigned</p>
+                <h3 className="text-amber">3</h3>
+              </div>
+              <div className="month-box">
+                <p>On-Time</p>
+                <h3>96%</h3>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* =========================================
+          7. RECENT ACTIVITY & ASSIGNED AREA
+      ========================================= */}
+      <div className="dashboard-grid-two">
+        {/* Recent Activity */}
+        <div className="complaints-section">
+          <div className="section-header">
+            <div>
+              <h2>🔔 Recent Activity</h2>
+              <p>Live updates and work audit log</p>
+            </div>
+          </div>
+
+          <div className="activity-list">
+            <div className="activity-row">
+              <div className="activity-icon-pill resolved">✓</div>
+              <div className="activity-desc">
+                <p>
+                  Complaint <strong className="complaint-id">#CMP012</strong> marked{" "}
+                  <span className="status resolved">Resolved</span>
+                </p>
+                <span>10 minutes ago</span>
+              </div>
+            </div>
+
+            <div className="activity-row">
+              <div className="activity-icon-pill progress">🔧</div>
+              <div className="activity-desc">
+                <p>
+                  Complaint <strong className="complaint-id">#CMP001</strong> progress updated to{" "}
+                  <strong>80%</strong>
+                </p>
+                <span>1 hour ago</span>
+              </div>
+            </div>
+
+            <div className="activity-row">
+              <div className="activity-icon-pill assigned">📋</div>
+              <div className="activity-desc">
+                <p>
+                  New urgent task <strong className="complaint-id">#CMP004</strong> assigned by Manager
+                </p>
+                <span>2 hours ago</span>
+              </div>
+            </div>
+
+            <div className="activity-row">
+              <div className="activity-icon-pill photo">📷</div>
+              <div className="activity-desc">
+                <p>
+                  Repair evidence photo uploaded for <strong className="complaint-id">#CMP012</strong>
+                </p>
+                <span>Yesterday at 04:30 PM</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Current Assigned Area & Schedule */}
+        <div className="complaints-section">
+          <div className="section-header">
+            <div>
+              <h2>📍 Current Assigned Area & Schedule</h2>
+              <p>Active field deployment zones</p>
+            </div>
+          </div>
+
+          <div className="area-schedule-content">
+            <div className="area-highlight-card">
+              <div className="area-icon">📍</div>
+              <div>
+                <strong>Active Operational Zone:</strong>
+                <p>Gandhipuram Central & 100 Feet Road, Coimbatore</p>
+                <a
+                  href="https://maps.google.com/?q=Gandhipuram+Coimbatore"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="map-anchor"
+                >
+                  View Location on Google Maps →
+                </a>
+              </div>
+            </div>
+
+            <div className="upcoming-schedule-section">
+              <h3>Upcoming Scheduled Work</h3>
+              <div className="schedule-card-item">
+                <span className="schedule-day-badge">Tomorrow</span>
+                <div>
+                  <strong>Saibaba Colony Sidewalk Repair</strong>
+                  <span className="location">Priority: Medium • 2 Workers Assigned</span>
+                </div>
+              </div>
+
+              <div className="schedule-card-item">
+                <span className="schedule-day-badge">Friday</span>
+                <div>
+                  <strong>Peelamedu Storm Drainage Paving</strong>
+                  <span className="location">Priority: High • Concrete Curing Check</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
