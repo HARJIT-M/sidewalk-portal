@@ -1,11 +1,33 @@
 import React, { useState, useEffect } from "react";
 import { getStoredProfile, saveStoredProfile } from "./workerData";
+import {
+  User,
+  IdCard,
+  Mail,
+  Phone,
+  Siren,
+  MapPin,
+  Home,
+  Star,
+  CheckCircle2,
+  Wrench,
+  Calendar,
+  Clock,
+  UserRound,
+  Truck,
+  ShieldCheck,
+  Lock,
+  X,
+  Pencil,
+  KeyRound,
+} from "lucide-react";
 import "./WorkerProfile.css";
 
 const WorkerProfile = () => {
   const [profile, setProfile] = useState(null);
   const [showEditPopup, setShowEditPopup] = useState(false);
   const [showPasswordPopup, setShowPasswordPopup] = useState(false);
+  const [activeTab, setActiveTab] = useState("personal"); // personal | work
 
   const [editForm, setEditForm] = useState({
     name: "",
@@ -69,15 +91,25 @@ const WorkerProfile = () => {
 
   if (!profile) return null;
 
+  const initial = profile.name ? profile.name.charAt(0).toUpperCase() : "W";
+
   return (
     <div className="workers-page">
+
       {/* =================================
           HEADER
       ================================= */}
+
       <div className="workers-header">
-        <div>
-          <h1>My Profile</h1>
-          <p>View and manage worker account details and availability</p>
+
+        <div className="header-identity">
+          <div className="header-avatar">{initial}</div>
+
+          <div>
+            <span className="header-eyebrow">Worker Profile</span>
+            <h1>{profile.name}</h1>
+            <p>{profile.role} · {profile.zone || "Zone 2 - Coimbatore Central"}</p>
+          </div>
         </div>
 
         <div className="header-btn-row">
@@ -85,12 +117,14 @@ const WorkerProfile = () => {
             className="add-worker-btn"
             onClick={() => setShowEditPopup(true)}
           >
+            <Pencil size={14} strokeWidth={2.5} />
             Edit Profile
           </button>
           <button
             className="password-worker-btn"
             onClick={() => setShowPasswordPopup(true)}
           >
+            <KeyRound size={14} strokeWidth={2.5} />
             Change Password
           </button>
         </div>
@@ -99,9 +133,12 @@ const WorkerProfile = () => {
       {/* =================================
           STATISTICS
       ================================= */}
+
       <div className="worker-stats">
         <div className="worker-stat-card">
-          <div className="worker-stat-icon total">👤</div>
+          <div className="worker-stat-icon total">
+            <IdCard size={20} strokeWidth={2} />
+          </div>
           <div>
             <span>Worker ID</span>
             <strong>{profile.id}</strong>
@@ -109,7 +146,9 @@ const WorkerProfile = () => {
         </div>
 
         <div className="worker-stat-card">
-          <div className="worker-stat-icon active">✓</div>
+          <div className="worker-stat-icon active">
+            <CheckCircle2 size={20} strokeWidth={2} />
+          </div>
           <div>
             <span>Status</span>
             <strong>{profile.status}</strong>
@@ -117,7 +156,9 @@ const WorkerProfile = () => {
         </div>
 
         <div className="worker-stat-card">
-          <div className="worker-stat-icon available">⭐</div>
+          <div className="worker-stat-icon available">
+            <Star size={20} strokeWidth={2} />
+          </div>
           <div>
             <span>Performance Rating</span>
             <strong>4.9 / 5.0</strong>
@@ -125,7 +166,9 @@ const WorkerProfile = () => {
         </div>
 
         <div className="worker-stat-card">
-          <div className="worker-stat-icon inactive">🛠️</div>
+          <div className="worker-stat-icon inactive">
+            <Wrench size={20} strokeWidth={2} />
+          </div>
           <div>
             <span>Total Completed</span>
             <strong>18 Tasks</strong>
@@ -134,98 +177,170 @@ const WorkerProfile = () => {
       </div>
 
       {/* =================================
-          DETAILS CONTAINER
+          MAIN CONTENT
       ================================= */}
-      <div className="profile-content-grid">
-        {/* Contact Info */}
-        <div className="profile-details-card">
-          <div className="details-card-header">
-            <h2>Personal & Contact Information</h2>
+
+      <div className="profile-main-grid">
+
+        {/* -------- LEFT: QUICK CONTACT CARD -------- */}
+
+        <div className="profile-side-card">
+
+          <div className="side-avatar">{initial}</div>
+
+          <h3>{profile.name}</h3>
+          <span className="side-role">{profile.role}</span>
+
+          <span className="side-status-pill">
+            <CheckCircle2 size={12} strokeWidth={2.5} />
+            {profile.status}
+          </span>
+
+          <div className="side-divider"></div>
+
+          <div className="side-contact-list">
+
+            <div className="side-contact-item">
+              <Mail size={15} strokeWidth={2} />
+              <span>{profile.email}</span>
+            </div>
+
+            <div className="side-contact-item">
+              <Phone size={15} strokeWidth={2} />
+              <span>{profile.phone}</span>
+            </div>
+
+            <div className="side-contact-item">
+              <Siren size={15} strokeWidth={2} />
+              <span>{profile.emergencyContact || "9876543219"}</span>
+            </div>
+
+            <div className="side-contact-item">
+              <MapPin size={15} strokeWidth={2} />
+              <span>{profile.zone || "Zone 2 - Coimbatore Central"}</span>
+            </div>
+
           </div>
 
-          <div className="profile-info-table">
-            <div className="info-item">
-              <span className="label">Full Name:</span>
-              <strong className="value">{profile.name}</strong>
-            </div>
+          <div className="side-divider"></div>
 
-            <div className="info-item">
-              <span className="label">Worker ID:</span>
-              <strong className="value id-text">{profile.id}</strong>
-            </div>
-
-            <div className="info-item">
-              <span className="label">Email Address:</span>
-              <strong className="value">✉ {profile.email}</strong>
-            </div>
-
-            <div className="info-item">
-              <span className="label">Phone Number:</span>
-              <strong className="value">📞 {profile.phone}</strong>
-            </div>
-
-            <div className="info-item">
-              <span className="label">Emergency Contact:</span>
-              <strong className="value">🚨 {profile.emergencyContact || "9876543219"}</strong>
-            </div>
-
-            <div className="info-item">
-              <span className="label">Assigned Zone:</span>
-              <strong className="value">📍 {profile.zone || "Zone 2 - Coimbatore Central"}</strong>
-            </div>
-
-            <div className="info-item">
-              <span className="label">Residential Address:</span>
-              <strong className="value">{profile.address}</strong>
-            </div>
+          <div className="side-security-note">
+            <ShieldCheck size={15} strokeWidth={2} />
+            Your details are only visible to your supervisor and admin team.
           </div>
+
         </div>
 
-        {/* Work & Deployment */}
+
+        {/* -------- RIGHT: TABBED DETAILS -------- */}
+
         <div className="profile-details-card">
-          <div className="details-card-header">
-            <h2>Deployment & Equipment</h2>
+
+          <div className="details-tabs">
+            <button
+              className={`details-tab ${activeTab === "personal" ? "active" : ""}`}
+              onClick={() => setActiveTab("personal")}
+            >
+              <User size={15} strokeWidth={2} />
+              Personal & Contact
+            </button>
+
+            <button
+              className={`details-tab ${activeTab === "work" ? "active" : ""}`}
+              onClick={() => setActiveTab("work")}
+            >
+              <Truck size={15} strokeWidth={2} />
+              Deployment & Equipment
+            </button>
           </div>
 
-          <div className="profile-info-table">
-            <div className="info-item">
-              <span className="label">Role:</span>
-              <strong className="value">{profile.role}</strong>
+          {activeTab === "personal" ? (
+
+            <div className="profile-info-table">
+              <div className="info-item">
+                <span className="label"><User size={14} strokeWidth={2} /> Full Name</span>
+                <strong className="value">{profile.name}</strong>
+              </div>
+
+              <div className="info-item">
+                <span className="label"><IdCard size={14} strokeWidth={2} /> Worker ID</span>
+                <strong className="value id-text">{profile.id}</strong>
+              </div>
+
+              <div className="info-item">
+                <span className="label"><Mail size={14} strokeWidth={2} /> Email Address</span>
+                <strong className="value">{profile.email}</strong>
+              </div>
+
+              <div className="info-item">
+                <span className="label"><Phone size={14} strokeWidth={2} /> Phone Number</span>
+                <strong className="value">{profile.phone}</strong>
+              </div>
+
+              <div className="info-item">
+                <span className="label"><Siren size={14} strokeWidth={2} /> Emergency Contact</span>
+                <strong className="value">{profile.emergencyContact || "9876543219"}</strong>
+              </div>
+
+              <div className="info-item">
+                <span className="label"><MapPin size={14} strokeWidth={2} /> Assigned Zone</span>
+                <strong className="value">{profile.zone || "Zone 2 - Coimbatore Central"}</strong>
+              </div>
+
+              <div className="info-item">
+                <span className="label"><Home size={14} strokeWidth={2} /> Residential Address</span>
+                <strong className="value">{profile.address}</strong>
+              </div>
             </div>
 
-            <div className="info-item">
-              <span className="label">Joining Date:</span>
-              <strong className="value">{profile.joinedDate}</strong>
-            </div>
+          ) : (
 
-            <div className="info-item">
-              <span className="label">Shift:</span>
-              <strong className="value">{profile.shift}</strong>
-            </div>
+            <>
+              <div className="profile-info-table">
+                <div className="info-item">
+                  <span className="label"><Wrench size={14} strokeWidth={2} /> Role</span>
+                  <strong className="value">{profile.role}</strong>
+                </div>
 
-            <div className="info-item">
-              <span className="label">Supervisor:</span>
-              <strong className="value">Harjit Singh (Field Manager)</strong>
-            </div>
+                <div className="info-item">
+                  <span className="label"><Calendar size={14} strokeWidth={2} /> Joining Date</span>
+                  <strong className="value">{profile.joinedDate}</strong>
+                </div>
 
-            <div className="info-item">
-              <span className="label">Assigned Kit & Van:</span>
-              <strong className="value">{profile.assignedEquipment}</strong>
-            </div>
-          </div>
+                <div className="info-item">
+                  <span className="label"><Clock size={14} strokeWidth={2} /> Shift</span>
+                  <strong className="value">{profile.shift}</strong>
+                </div>
 
-          <div className="skills-block">
-            <h3>Certified Specializations</h3>
-            <div className="skill-pills-wrap">
-              {profile.skills &&
-                profile.skills.map((s) => (
-                  <span key={s} className="skill-pill">
-                    ✓ {s}
-                  </span>
-                ))}
-            </div>
-          </div>
+                <div className="info-item">
+                  <span className="label"><UserRound size={14} strokeWidth={2} /> Supervisor</span>
+                  <strong className="value">Harjit Singh (Field Manager)</strong>
+                </div>
+
+                <div className="info-item">
+                  <span className="label"><Truck size={14} strokeWidth={2} /> Assigned Kit & Van</span>
+                  <strong className="value">{profile.assignedEquipment}</strong>
+                </div>
+              </div>
+
+              <div className="skills-block">
+                <h3>Certified Specializations</h3>
+                <div className="skill-pills-wrap">
+                  {profile.skills &&
+                    profile.skills.map((s) => (
+                      <span key={s} className="skill-pill">
+                        <CheckCircle2 size={12} strokeWidth={2.5} />
+                        {s}
+                      </span>
+                    ))}
+                </div>
+              </div>
+            </>
+
+          )}
+
         </div>
+
       </div>
 
       {/* =================================
@@ -249,7 +364,7 @@ const WorkerProfile = () => {
                 className="modal-close"
                 onClick={() => setShowEditPopup(false)}
               >
-                ×
+                <X size={18} strokeWidth={2.5} />
               </button>
             </div>
 
@@ -364,13 +479,13 @@ const WorkerProfile = () => {
                 className="modal-close"
                 onClick={() => setShowPasswordPopup(false)}
               >
-                ×
+                <X size={18} strokeWidth={2.5} />
               </button>
             </div>
 
             <form onSubmit={handlePasswordSubmit} className="worker-form">
               <div className="form-group">
-                <label>Current Password *</label>
+                <label><Lock size={12} strokeWidth={2.5} /> Current Password *</label>
                 <input
                   type="password"
                   placeholder="Enter current password"
@@ -386,7 +501,7 @@ const WorkerProfile = () => {
               </div>
 
               <div className="form-group">
-                <label>New Password *</label>
+                <label><Lock size={12} strokeWidth={2.5} /> New Password *</label>
                 <input
                   type="password"
                   placeholder="Enter new password"
@@ -402,7 +517,7 @@ const WorkerProfile = () => {
               </div>
 
               <div className="form-group">
-                <label>Confirm New Password *</label>
+                <label><Lock size={12} strokeWidth={2.5} /> Confirm New Password *</label>
                 <input
                   type="password"
                   placeholder="Confirm new password"

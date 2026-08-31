@@ -1,20 +1,25 @@
+
 import React, { useState, useEffect } from "react";
 import { Outlet } from "react-router-dom";
-import WorkerSidebar from "./WorkerSidebar";
-import "./WorkerLayout.css";
+import UserSidebar from "./usersidebar";
+import "./UserLayout.css";
 
-const WorkerLayout = () => {
+const UserLayout = () => {
   const [collapsed, setCollapsed] = useState(() => {
-    return localStorage.getItem("worker-sidebar-collapsed") === "true";
+    return localStorage.getItem("user-sidebar-collapsed") === "true";
   });
 
   useEffect(() => {
-    localStorage.setItem("worker-sidebar-collapsed", collapsed);
+    localStorage.setItem("user-sidebar-collapsed", collapsed);
   }, [collapsed]);
 
   return (
     <div className={`app-layout ${collapsed ? "sidebar-collapsed" : ""}`}>
-      <WorkerSidebar collapsed={collapsed} setCollapsed={setCollapsed} />
+      <UserSidebar
+        collapsed={collapsed}
+        setCollapsed={setCollapsed}
+      />
+
       <main className="main-content">
         <Outlet />
       </main>
@@ -22,4 +27,4 @@ const WorkerLayout = () => {
   );
 };
 
-export default WorkerLayout;
+export default UserLayout;

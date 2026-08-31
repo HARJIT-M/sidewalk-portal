@@ -1,5 +1,14 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  ClipboardList,
+  CircleDot,
+  RefreshCw,
+  CheckCircle2,
+  Plus,
+  MapPin,
+  Calendar,
+} from "lucide-react";
 import "./userdashboard.css";
 
 const UserDashboard = () => {
@@ -64,9 +73,9 @@ const UserDashboard = () => {
 
         <button
           className="report-btn"
-          onClick={() => navigate("/add-complaint")}
+          onClick={() => navigate("/user/add-complaint")}
         >
-          + Report an Issue
+          <Plus size={16} strokeWidth={2.5} /> Report an Issue
         </button>
       </div>
 
@@ -76,7 +85,9 @@ const UserDashboard = () => {
 
       <div className="user-stat-grid">
         <div className="user-stat-card">
-          <div className="user-stat-icon total-icon">📋</div>
+          <div className="user-stat-icon total-icon">
+            <ClipboardList size={22} strokeWidth={2} />
+          </div>
           <div>
             <span>Total Complaints</span>
             <strong>{totalComplaints}</strong>
@@ -84,7 +95,9 @@ const UserDashboard = () => {
         </div>
 
         <div className="user-stat-card">
-          <div className="user-stat-icon pending-icon">○</div>
+          <div className="user-stat-icon pending-icon">
+            <CircleDot size={22} strokeWidth={2} />
+          </div>
           <div>
             <span>Not Assigned</span>
             <strong>{notAssigned}</strong>
@@ -92,7 +105,9 @@ const UserDashboard = () => {
         </div>
 
         <div className="user-stat-card">
-          <div className="user-stat-icon progress-icon">↻</div>
+          <div className="user-stat-icon progress-icon">
+            <RefreshCw size={22} strokeWidth={2} />
+          </div>
           <div>
             <span>In Progress</span>
             <strong>{inProgress}</strong>
@@ -100,7 +115,9 @@ const UserDashboard = () => {
         </div>
 
         <div className="user-stat-card">
-          <div className="user-stat-icon completed-icon">✓</div>
+          <div className="user-stat-icon completed-icon">
+            <CheckCircle2 size={22} strokeWidth={2} />
+          </div>
           <div>
             <span>Completed</span>
             <strong>{completed}</strong>
@@ -114,7 +131,9 @@ const UserDashboard = () => {
 
       <div className="quick-report-card">
         <div className="quick-report-content">
-          <div className="quick-report-icon">+</div>
+          <div className="quick-report-icon">
+            <Plus size={22} strokeWidth={2.5} />
+          </div>
 
           <div>
             <h2>Report a Footpath Issue</h2>
@@ -172,7 +191,10 @@ const UserDashboard = () => {
 
                   <td>{complaint.issue}</td>
 
-                  <td>📍 {complaint.location}</td>
+                  <td>
+                    <MapPin size={13} strokeWidth={2} className="inline-icon" />{" "}
+                    {complaint.location}
+                  </td>
 
                   <td>{complaint.date}</td>
 
@@ -219,8 +241,14 @@ const UserDashboard = () => {
               <h3 className="complaint-mobile-title">{complaint.issue}</h3>
 
               <div className="complaint-mobile-meta">
-                <span>📍 {complaint.location}</span>
-                <span>📅 {complaint.date}</span>
+                <span>
+                  <MapPin size={13} strokeWidth={2} className="inline-icon" />{" "}
+                  {complaint.location}
+                </span>
+                <span>
+                  <Calendar size={13} strokeWidth={2} className="inline-icon" />{" "}
+                  {complaint.date}
+                </span>
               </div>
 
               <div className="complaint-mobile-bottom">

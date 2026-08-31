@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { getStoredNotifications } from "../pages/worker/workerData";
+import {
+  Home,
+  ClipboardList,
+  Bell,
+  User,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { getStoredNotifications } from "../../pages/worker/workerData";
 import "./WorkerSidebar.css";
 
 const WorkerSidebar = ({ collapsed, setCollapsed }) => {
@@ -19,15 +28,15 @@ const WorkerSidebar = ({ collapsed, setCollapsed }) => {
   }, []);
 
   const menuItems = [
-    { name: "Dashboard", path: "/worker/dashboard", icon: "⌂" },
-    { name: "My Complaints", path: "/worker/my-complaints", icon: "📋" },
+    { name: "Dashboard", path: "/worker/dashboard", icon: Home },
+    { name: "My Complaints", path: "/worker/my-complaints", icon: ClipboardList },
     {
       name: "Notifications",
       path: "/worker/notifications",
-      icon: "🔔",
+      icon: Bell,
       badge: unreadCount > 0 ? unreadCount : null,
     },
-    { name: "My Profile", path: "/worker/profile", icon: "👤" },
+    { name: "My Profile", path: "/worker/profile", icon: User },
   ];
 
   const handleLogout = () => {
@@ -45,7 +54,7 @@ const WorkerSidebar = ({ collapsed, setCollapsed }) => {
         aria-expanded={!collapsed}
         aria-label="Toggle sidebar"
       >
-        {collapsed ? "›" : "‹"}
+        {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
       </button>
 
       {/* BRAND */}
@@ -61,22 +70,28 @@ const WorkerSidebar = ({ collapsed, setCollapsed }) => {
       <nav className="sidebar-nav">
         <p className="nav-title">WORKER MENU</p>
 
-        {menuItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              isActive ? "sidebar-link active" : "sidebar-link"
-            }
-            title={collapsed ? item.name : undefined}
-          >
-            <span className="sidebar-icon">{item.icon}</span>
-            <span className="sidebar-label">{item.name}</span>
-            {item.badge && (
-              <span className="sidebar-badge">{item.badge}</span>
-            )}
-          </NavLink>
-        ))}
+        {menuItems.map((item) => {
+          const Icon = item.icon;
+
+          return (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) =>
+                isActive ? "sidebar-link active" : "sidebar-link"
+              }
+              title={collapsed ? item.name : undefined}
+            >
+              <span className="sidebar-icon">
+                <Icon size={19} strokeWidth={2} />
+              </span>
+              <span className="sidebar-label">{item.name}</span>
+              {item.badge && (
+                <span className="sidebar-badge">{item.badge}</span>
+              )}
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* BOTTOM ACTIONS */}
@@ -88,7 +103,9 @@ const WorkerSidebar = ({ collapsed, setCollapsed }) => {
           onClick={handleLogout}
           title={collapsed ? "Logout" : undefined}
         >
-          <span className="sidebar-icon">⇥</span>
+          <span className="sidebar-icon">
+            <LogOut size={19} strokeWidth={2} />
+          </span>
           <span className="sidebar-label">Logout</span>
         </button>
       </div>

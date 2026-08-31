@@ -1,5 +1,15 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import {
+  HardHat,
+  Building2,
+  UserRound,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  MapPinned,
+  Timer,
+} from "lucide-react";
 import "./login.css";
 
 const Login = () => {
@@ -33,7 +43,7 @@ const Login = () => {
     if (emailLower.includes("ravi") || emailLower.includes("worker") || emailLower.includes("wrk")) {
       navigate("/worker/dashboard");
     } else if (emailLower.includes("user") || emailLower.includes("citizen")) {
-      navigate("/user-dashboard");
+      navigate("/user/dashboard");
     } else {
       navigate("/dashboard");
     }
@@ -45,7 +55,7 @@ const Login = () => {
       navigate("/worker/dashboard");
     } else if (role === "user") {
       setForm({ email: "citizen@example.com", password: "password123" });
-      navigate("/user-dashboard");
+      navigate("/user/dashboard");
     } else {
       setForm({ email: "manager@smartfootpath.gov", password: "password123" });
       navigate("/dashboard");
@@ -54,148 +64,108 @@ const Login = () => {
 
   return (
     <div className="auth-page">
-      {/* ================= LEFT PANEL ================= */}
-      <div className="auth-side">
-        <div className="auth-side-circle circle-one"></div>
-        <div className="auth-side-circle circle-two"></div>
 
-        <div className="auth-side-content">
-          <div className="auth-brand">
-            <div className="auth-brand-icon">F</div>
-            <div>
-              <h2>Footpath</h2>
-              <span>Repair Portal</span>
-            </div>
+      {/* Decorative background */}
+      <div className="auth-bg-blob blob-one"></div>
+      <div className="auth-bg-blob blob-two"></div>
+      <div className="auth-bg-blob blob-three"></div>
+
+      <div className="auth-shell">
+
+        {/* ================= BRAND ================= */}
+
+        <div className="auth-brand-center">
+          <div className="auth-brand-icon">F</div>
+          <div>
+            <h2>Footpath</h2>
+            <span>Repair Portal</span>
           </div>
-
-          <h1>Welcome back</h1>
-          <p>
-            Sign in to manage complaints, execute on-site repairs, and track infrastructure progress in real time.
-          </p>
-
-          <ul className="auth-highlights">
-            <li>
-              <span className="highlight-dot"></span>
-              Task-focused field interface for Maintenance Staff
-            </li>
-            <li>
-              <span className="highlight-dot"></span>
-              Live repair updates, photo evidence & material logs
-            </li>
-            <li>
-              <span className="highlight-dot"></span>
-              End-to-end status tracking from report to verification
-            </li>
-          </ul>
         </div>
-      </div>
 
-      {/* ================= RIGHT PANEL ================= */}
-      <div className="auth-form-side">
-        <div className="auth-form-card">
-          <h2 className="auth-title">Sign in to your account</h2>
-          <p className="auth-subtitle">
-            Enter your details below or choose a role to test
-          </p>
 
-          {/* Quick Role Switcher for Testing */}
-          <div
-            style={{
-              display: "flex",
-              gap: "6px",
-              marginBottom: "20px",
-              background: "#f1f5f9",
-              padding: "4px",
-              borderRadius: "10px",
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => handleQuickLogin("worker")}
-              style={{
-                flex: 1,
-                padding: "8px 4px",
-                border: "none",
-                borderRadius: "8px",
-                background: "#0284c7",
-                color: "white",
-                fontSize: "11px",
-                fontWeight: "700",
-                cursor: "pointer",
-              }}
-            >
-              👷 Worker Portal
-            </button>
+        {/* ================= CARD ================= */}
 
-            <button
-              type="button"
-              onClick={() => handleQuickLogin("manager")}
-              style={{
-                flex: 1,
-                padding: "8px 4px",
-                border: "none",
-                borderRadius: "8px",
-                background: "#4f46e5",
-                color: "white",
-                fontSize: "11px",
-                fontWeight: "700",
-                cursor: "pointer",
-              }}
-            >
-              🏢 Manager
-            </button>
+        <div className="auth-card">
 
-            <button
-              type="button"
-              onClick={() => handleQuickLogin("user")}
-              style={{
-                flex: 1,
-                padding: "8px 4px",
-                border: "none",
-                borderRadius: "8px",
-                background: "#16a34a",
-                color: "white",
-                fontSize: "11px",
-                fontWeight: "700",
-                cursor: "pointer",
-              }}
-            >
-              👤 Citizen
-            </button>
+          <div className="auth-card-head">
+            <h1>Welcome back</h1>
+            <p>Sign in to continue to your dashboard</p>
           </div>
+
+          {/* Role Switcher */}
+
+          <div className="role-switch">
+
+            <button
+              type="button"
+              className="role-option worker"
+              onClick={() => handleQuickLogin("worker")}
+            >
+              <HardHat size={18} strokeWidth={2} />
+              <span>Worker</span>
+            </button>
+
+            <button
+              type="button"
+              className="role-option manager"
+              onClick={() => handleQuickLogin("manager")}
+            >
+              <Building2 size={18} strokeWidth={2} />
+              <span>Manager</span>
+            </button>
+
+            <button
+              type="button"
+              className="role-option citizen"
+              onClick={() => handleQuickLogin("user")}
+            >
+              <UserRound size={18} strokeWidth={2} />
+              <span>Citizen</span>
+            </button>
+
+          </div>
+
+          <div className="auth-divider">
+            <span>or sign in manually</span>
+          </div>
+
+          {/* Form */}
 
           <form onSubmit={handleSubmit} className="auth-form">
-            <div className="form-group">
-              <label>Email Address</label>
+
+            <div className="float-group">
               <input
                 type="email"
                 name="email"
-                placeholder="ravi@gmail.com (Worker) or manager@..."
+                placeholder=" "
                 value={form.email}
                 onChange={handleChange}
               />
+              <label>Email Address</label>
             </div>
 
-            <div className="form-group">
+            <div className="float-group">
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                placeholder=" "
+                value={form.password}
+                onChange={handleChange}
+              />
               <label>Password</label>
 
-              <div className="password-field">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  placeholder="Enter your password"
-                  value={form.password}
-                  onChange={handleChange}
-                />
-
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? "🙈" : "👁"}
-                </button>
-              </div>
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <EyeOff size={17} strokeWidth={2} />
+                ) : (
+                  <Eye size={17} strokeWidth={2} />
+                )}
+              </button>
             </div>
 
             <div className="form-row">
@@ -221,8 +191,33 @@ const Login = () => {
           <p className="auth-switch">
             Don't have an account? <Link to="/signup">Create one</Link>
           </p>
+
         </div>
+
+
+        {/* ================= TRUST STRIP ================= */}
+
+        <div className="trust-strip">
+
+          <div className="trust-item">
+            <ShieldCheck size={16} strokeWidth={2} />
+            <span>Secure sign-in</span>
+          </div>
+
+          <div className="trust-item">
+            <MapPinned size={16} strokeWidth={2} />
+            <span>Live issue tracking</span>
+          </div>
+
+          <div className="trust-item">
+            <Timer size={16} strokeWidth={2} />
+            <span>Fast repair updates</span>
+          </div>
+
+        </div>
+
       </div>
+
     </div>
   );
 };
