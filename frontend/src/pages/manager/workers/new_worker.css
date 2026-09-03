@@ -182,13 +182,13 @@
 .workers-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 1050px;
+  min-width: 820px;
 }
 
 .workers-table th {
   background: #f7f7fb;
   text-align: left;
-  padding: 15px 14px;
+  padding: 14px 10px;
   border-bottom: 1px solid #edecf5;
   color: #7b7794;
   font-size: 11px;
@@ -198,7 +198,7 @@
 }
 
 .workers-table td {
-  padding: 16px 14px;
+  padding: 14px 10px;
   border-bottom: 1px solid #f2f1f8;
   font-size: 13px;
 }

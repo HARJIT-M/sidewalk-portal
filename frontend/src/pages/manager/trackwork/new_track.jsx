@@ -1,9 +1,22 @@
 import React, { useState } from "react";
+import {
+  ClipboardList,
+  Pin,
+  Wrench,
+  CheckCircle2,
+  Search,
+  MapPin,
+  Users,
+  Calendar,
+  Flag,
+  RefreshCw,
+  Clock,
+} from "lucide-react";
 import "./new_track.css";
 
 const WorkTracking = () => {
   // Temporary work tracking data
-  const [works, setWorks] = useState([
+  const [works] = useState([
     {
       id: "CMP001",
       title: "Broken Footpath",
@@ -159,8 +172,7 @@ const WorkTracking = () => {
     },
   ]);
 
-  const [selectedWork, setSelectedWork] = useState(null);
-  const [showDetails, setShowDetails] = useState(false);
+  const [selectedId, setSelectedId] = useState(works[0]?.id || null);
   const [statusFilter, setStatusFilter] = useState("All");
   const [search, setSearch] = useState("");
 
@@ -177,6 +189,9 @@ const WorkTracking = () => {
     return matchesSearch && matchesStatus;
   });
 
+  const selectedWork =
+    works.find((w) => w.id === selectedId) || filteredWorks[0] || null;
+
   // Counts
   const totalWorks = works.length;
 
@@ -192,11 +207,7 @@ const WorkTracking = () => {
     (work) => work.status === "Completed"
   ).length;
 
-  // Open details
-  const handleViewDetails = (work) => {
-    setSelectedWork(work);
-    setShowDetails(true);
-  };
+  const statusClass = (status) => status.toLowerCase().replace(" ", "-");
 
   return (
     <div className="work-tracking-page">
@@ -206,9 +217,7 @@ const WorkTracking = () => {
       <div className="tracking-header">
         <div>
           <h1>Work Tracking</h1>
-          <p>
-            Monitor assigned complaints and repair progress
-          </p>
+          <p>Monitor assigned complaints and repair progress</p>
         </div>
       </div>
 
@@ -219,45 +228,38 @@ const WorkTracking = () => {
 
         <div className="tracking-stat">
           <div className="stat-icon total-icon">
-            📋
+            <ClipboardList size={22} strokeWidth={2} />
           </div>
-
           <div>
             <span>Total Works</span>
             <strong>{totalWorks}</strong>
           </div>
         </div>
 
-
         <div className="tracking-stat">
           <div className="stat-icon assigned-icon">
-            📌
+            <Pin size={22} strokeWidth={2} />
           </div>
-
           <div>
             <span>Assigned</span>
             <strong>{assignedWorks}</strong>
           </div>
         </div>
 
-
         <div className="tracking-stat">
           <div className="stat-icon progress-icon">
-            🔧
+            <Wrench size={22} strokeWidth={2} />
           </div>
-
           <div>
             <span>In Progress</span>
             <strong>{inProgressWorks}</strong>
           </div>
         </div>
 
-
         <div className="tracking-stat">
           <div className="stat-icon completed-icon">
-            ✓
+            <CheckCircle2 size={22} strokeWidth={2} />
           </div>
-
           <div>
             <span>Completed</span>
             <strong>{completedWorks}</strong>
@@ -267,246 +269,132 @@ const WorkTracking = () => {
       </div>
 
 
-      {/* ================= FILTERS ================= */}
+      {/* ================= SPLIT LAYOUT ================= */}
 
-      <div className="tracking-filters">
+      <div className="tracking-split">
 
-        <div className="tracking-search">
-          🔍
+        {/* -------- LEFT: WORK LIST -------- */}
 
-          <input
-            type="text"
-            placeholder="Search complaint or location..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+        <div className="tracking-list-panel">
 
+          <div className="tracking-search">
+            <Search size={16} strokeWidth={2} />
 
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="All">All Status</option>
-          <option value="Assigned">Assigned</option>
-          <option value="In Progress">In Progress</option>
-          <option value="Completed">Completed</option>
-        </select>
+            <input
+              type="text"
+              placeholder="Search complaint or location..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
 
-      </div>
-
-
-      {/* ================= WORK CARDS ================= */}
-
-      <div className="work-list">
-
-        {filteredWorks.map((work) => (
-
-          <div className="work-card" key={work.id}>
-
-            {/* Card Header */}
-
-            <div className="work-card-header">
-
-              <div>
-                <span className="work-id">
-                  {work.id}
-                </span>
-
-                <h2>{work.title}</h2>
-
-                <p className="work-location">
-                  📍 {work.location}
-                </p>
-              </div>
-
-
-              <div className="work-status-area">
-
-                <span
-                  className={`work-status ${work.status
-                    .toLowerCase()
-                    .replace(" ", "-")}`}
-                >
-                  {work.status}
-                </span>
-
-                <span
-                  className={`priority-small ${work.priority.toLowerCase()}`}
-                >
-                  {work.priority}
-                </span>
-
-              </div>
-
-            </div>
-
-
-            {/* Progress */}
-
-            <div className="progress-section">
-
-              <div className="progress-header">
-                <span>Repair Progress</span>
-
-                <strong>
-                  {work.progress}%
-                </strong>
-              </div>
-
-
-              <div className="progress-bar">
-
-                <div
-                  className={`progress-fill ${work.status
-                    .toLowerCase()
-                    .replace(" ", "-")}`}
-                  style={{
-                    width: `${work.progress}%`,
-                  }}
-                ></div>
-
-              </div>
-
-            </div>
-
-
-            {/* Work Details */}
-
-            <div className="work-details-grid">
-
-              <div>
-                <span>Assigned Team</span>
-
-                <div className="worker-list">
-
-                  {work.assignedWorkers.map((worker) => (
-                    <span key={worker}>
-                      👤 {worker}
-                    </span>
-                  ))}
-
-                </div>
-              </div>
-
-
-              <div>
-                <span>Expected Completion</span>
-                <strong>{work.expectedDate}</strong>
-              </div>
-
-
-              <div>
-                <span>Last Updated By</span>
-                <strong>{work.updatedBy}</strong>
-              </div>
-
-            </div>
-
-
-            {/* Last Update */}
-
-            <div className="last-update">
-
-              <div className="update-icon">
-                ↻
-              </div>
-
-              <div>
-                <span>Latest Update</span>
-
-                <p>
-                  {work.lastUpdate}
-                </p>
-
-                <small>
-                  {work.updatedAt}
-                </small>
-              </div>
-
-            </div>
-
-
-            {/* Footer */}
-
-            <div className="work-card-footer">
-
-              <span>
-                Assigned on {work.assignedDate}
-              </span>
-
+          <div className="status-pill-filters">
+            {["All", "Assigned", "In Progress", "Completed"].map((s) => (
               <button
-                className="view-work-btn"
-                onClick={() => handleViewDetails(work)}
+                key={s}
+                className={`status-pill-filter ${
+                  statusFilter === s ? "active" : ""
+                }`}
+                onClick={() => setStatusFilter(s)}
               >
-                View Work Details →
+                {s}
               </button>
+            ))}
+          </div>
 
-            </div>
+          <div className="work-list-scroll">
+
+            {filteredWorks.length > 0 ? (
+
+              filteredWorks.map((work) => (
+
+                <button
+                  key={work.id}
+                  className={`work-list-item ${
+                    selectedWork && selectedWork.id === work.id
+                      ? "active"
+                      : ""
+                  }`}
+                  onClick={() => setSelectedId(work.id)}
+                >
+
+                  <div className="work-list-item-top">
+                    <span className="work-id-tag">{work.id}</span>
+                    <span
+                      className={`work-status ${statusClass(work.status)}`}
+                    >
+                      {work.status}
+                    </span>
+                  </div>
+
+                  <h3>{work.title}</h3>
+
+                  <p className="work-list-location">
+                    <MapPin size={12} strokeWidth={2} />
+                    {work.location}
+                  </p>
+
+                  <div className="work-list-progress">
+                    <div className="work-list-progress-track">
+                      <div
+                        className={`work-list-progress-fill ${statusClass(
+                          work.status
+                        )}`}
+                        style={{ width: `${work.progress}%` }}
+                      ></div>
+                    </div>
+                    <span>{work.progress}%</span>
+                  </div>
+
+                </button>
+
+              ))
+
+            ) : (
+
+              <div className="work-list-empty">No matching work items.</div>
+
+            )}
 
           </div>
 
-        ))}
-
-      </div>
+        </div>
 
 
-      {/* ================= DETAILS POPUP ================= */}
+        {/* -------- RIGHT: DETAIL PANEL -------- */}
 
-      {showDetails && selectedWork && (
+        <div className="tracking-detail-panel">
 
-        <div className="tracking-modal-overlay">
+          {selectedWork ? (
 
-          <div className="tracking-modal">
+            <>
+              {/* Detail Header */}
 
-            {/* Modal Header */}
-
-            <div className="tracking-modal-header">
-
-              <div>
-                <span className="work-id">
-                  {selectedWork.id}
-                </span>
-
-                <h2>
-                  {selectedWork.title}
-                </h2>
-              </div>
-
-              <button
-                className="tracking-close"
-                onClick={() => setShowDetails(false)}
-              >
-                ×
-              </button>
-
-            </div>
-
-
-            {/* Modal Content */}
-
-            <div className="tracking-modal-content">
-
-              {/* Current Status */}
-
-              <div className="current-status-box">
+              <div className="detail-header">
 
                 <div>
-
-                  <span>Current Status</span>
-
-                  <strong
-                    className={`modal-status ${selectedWork.status
-                      .toLowerCase()
-                      .replace(" ", "-")}`}
-                  >
-                    {selectedWork.status}
-                  </strong>
-
+                  <span className="work-id-tag">{selectedWork.id}</span>
+                  <h2>{selectedWork.title}</h2>
+                  <p className="work-list-location">
+                    <MapPin size={13} strokeWidth={2} />
+                    {selectedWork.location}
+                  </p>
                 </div>
 
-                <div className="modal-progress-number">
-                  {selectedWork.progress}%
+                <div className="detail-header-badges">
+                  <span
+                    className={`work-status ${statusClass(
+                      selectedWork.status
+                    )}`}
+                  >
+                    {selectedWork.status}
+                  </span>
+                  <span
+                    className={`priority-small ${selectedWork.priority.toLowerCase()}`}
+                  >
+                    <Flag size={11} strokeWidth={2.5} />
+                    {selectedWork.priority}
+                  </span>
                 </div>
 
               </div>
@@ -514,54 +402,55 @@ const WorkTracking = () => {
 
               {/* Progress */}
 
-              <div className="modal-progress">
+              <div className="detail-progress-box">
 
-                <div className="modal-progress-bar">
+                <div className="detail-progress-top">
+                  <span>Repair Progress</span>
+                  <strong>{selectedWork.progress}%</strong>
+                </div>
 
+                <div className="progress-bar">
                   <div
-                    style={{
-                      width: `${selectedWork.progress}%`,
-                    }}
+                    className={`progress-fill ${statusClass(
+                      selectedWork.status
+                    )}`}
+                    style={{ width: `${selectedWork.progress}%` }}
                   ></div>
-
                 </div>
 
               </div>
 
 
-              {/* Information */}
+              {/* Info Grid */}
 
-              <div className="modal-info-grid">
+              <div className="detail-info-grid">
 
-                <div>
-                  <span>Location</span>
-                  <strong>
-                    📍 {selectedWork.location}
-                  </strong>
+                <div className="detail-info-item">
+                  <span>
+                    <Calendar size={13} strokeWidth={2} /> Assigned Date
+                  </span>
+                  <strong>{selectedWork.assignedDate}</strong>
                 </div>
 
-                <div>
-                  <span>Priority</span>
-
-                  <strong
-                    className={`priority-small ${selectedWork.priority.toLowerCase()}`}
-                  >
-                    {selectedWork.priority}
-                  </strong>
+                <div className="detail-info-item">
+                  <span>
+                    <Clock size={13} strokeWidth={2} /> Started Date
+                  </span>
+                  <strong>{selectedWork.startedDate}</strong>
                 </div>
 
-                <div>
-                  <span>Started Date</span>
-                  <strong>
-                    {selectedWork.startedDate}
-                  </strong>
+                <div className="detail-info-item">
+                  <span>
+                    <Calendar size={13} strokeWidth={2} /> Expected Completion
+                  </span>
+                  <strong>{selectedWork.expectedDate}</strong>
                 </div>
 
-                <div>
-                  <span>Expected Completion</span>
-                  <strong>
-                    {selectedWork.expectedDate}
-                  </strong>
+                <div className="detail-info-item">
+                  <span>
+                    <RefreshCw size={13} strokeWidth={2} /> Last Updated By
+                  </span>
+                  <strong>{selectedWork.updatedBy}</strong>
                 </div>
 
               </div>
@@ -569,97 +458,78 @@ const WorkTracking = () => {
 
               {/* Assigned Team */}
 
-              <div className="modal-team">
+              <div className="detail-team-block">
+                <h3>
+                  <Users size={15} strokeWidth={2} /> Assigned Team
+                </h3>
 
-                <h3>Assigned Team</h3>
+                <div className="worker-list">
+                  {selectedWork.assignedWorkers.map((worker) => (
+                    <span key={worker}>👤 {worker}</span>
+                  ))}
+                </div>
+              </div>
 
-                <div>
 
-                  {selectedWork.assignedWorkers.map(
-                    (worker) => (
-                      <span key={worker}>
-                        👤 {worker}
-                      </span>
-                    )
-                  )}
+              {/* Latest Update */}
 
+              <div className="last-update">
+                <div className="update-icon">
+                  <RefreshCw size={18} strokeWidth={2} />
                 </div>
 
+                <div>
+                  <span>Latest Update</span>
+                  <p>{selectedWork.lastUpdate}</p>
+                  <small>{selectedWork.updatedAt}</small>
+                </div>
               </div>
 
 
               {/* Update History */}
 
               <div className="work-history">
-
                 <h3>Work Updates</h3>
 
-                {selectedWork.history.map(
-                  (update, index) => (
+                {selectedWork.history.map((update, index) => (
+                  <div className="history-item" key={index}>
 
-                    <div
-                      className="history-item"
-                      key={index}
-                    >
+                    <div className="history-line">
+                      <div className="history-dot"></div>
+                    </div>
 
-                      <div className="history-line">
+                    <div className="history-content">
 
-                        <div className="history-dot"></div>
-
+                      <div className="history-top">
+                        <strong>{update.worker}</strong>
+                        <span>{update.date}</span>
                       </div>
 
-                      <div className="history-content">
+                      <p>{update.message}</p>
 
-                        <div className="history-top">
-
-                          <strong>
-                            {update.worker}
-                          </strong>
-
-                          <span>
-                            {update.date}
-                          </span>
-
-                        </div>
-
-                        <p>
-                          {update.message}
-                        </p>
-
-                        <span className="history-progress">
-                          Progress: {update.progress}%
-                        </span>
-
-                      </div>
+                      <span className="history-progress">
+                        Progress: {update.progress}%
+                      </span>
 
                     </div>
 
-                  )
-                )}
-
+                  </div>
+                ))}
               </div>
 
+            </>
+
+          ) : (
+
+            <div className="detail-empty">
+              Select a work item from the list to view its details.
             </div>
 
-
-            {/* Footer */}
-
-            <div className="tracking-modal-footer">
-
-              <button
-                className="close-modal-btn"
-                onClick={() => setShowDetails(false)}
-              >
-                Close
-              </button>
-
-            </div>
-
-          </div>
+          )}
 
         </div>
 
-      )}
+      </div>
 
     </div>
   );

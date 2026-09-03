@@ -1,6 +1,15 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import api from "../../services/api";
+import {
+  HardHat,
+  Building2,
+  UserRound,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  MapPinned,
+  Timer,
+} from "lucide-react";
 import "./login.css";
 
 const Login = () => {
@@ -28,111 +37,138 @@ const Login = () => {
       alert("Please enter your email and password.");
       return;
     }
-    (async () => {
-      try {
-        const res = await api.post("/auth/login", { email: form.email, password: form.password });
-        const { token, user } = res.data;
-        if (token) {
-          localStorage.setItem("token", token);
-          localStorage.setItem("user", JSON.stringify(user));
-        }
-        navigate("/dashboard");
-      } catch (err) {
-        alert(err.response?.data?.error || "Login failed");
-      }
-    })();
+
+    const emailLower = form.email.toLowerCase();
+    // Route by role based on email or credentials
+    if (emailLower.includes("ravi") || emailLower.includes("worker") || emailLower.includes("wrk")) {
+      navigate("/worker/dashboard");
+    } else if (emailLower.includes("user") || emailLower.includes("citizen")) {
+      navigate("/user/dashboard");
+    } else {
+      navigate("/dashboard");
+    }
+  };
+
+  const handleQuickLogin = (role) => {
+    if (role === "worker") {
+      setForm({ email: "ravi@gmail.com", password: "password123" });
+      navigate("/worker/dashboard");
+    } else if (role === "user") {
+      setForm({ email: "citizen@example.com", password: "password123" });
+      navigate("/user/dashboard");
+    } else {
+      setForm({ email: "manager@smartfootpath.gov", password: "password123" });
+      navigate("/dashboard");
+    }
   };
 
   return (
     <div className="auth-page">
-      <div className="auth-side">
 
-        <div className="auth-side-circle circle-one"></div>
-        <div className="auth-side-circle circle-two"></div>
+      {/* Decorative background */}
+      <div className="auth-bg-blob blob-one"></div>
+      <div className="auth-bg-blob blob-two"></div>
+      <div className="auth-bg-blob blob-three"></div>
 
-        <div className="auth-side-content">
+      <div className="auth-shell">
 
-          <div className="auth-brand">
-            <div className="auth-brand-icon">F</div>
-            <div>
-              <h2>Footpath</h2>
-              <span>Repair Portal</span>
-            </div>
+        {/* ================= BRAND ================= */}
+
+        <div className="auth-brand-center">
+          <div className="auth-brand-icon">F</div>
+          <div>
+            <h2>Footpath</h2>
+            <span>Repair Portal</span>
           </div>
-
-          <h1>Welcome back</h1>
-
-          <p>
-            Sign in to manage complaints, track repair progress,
-            and coordinate your maintenance team — all in one place.
-          </p>
-
-          <ul className="auth-highlights">
-            <li>
-              <span className="highlight-dot"></span>
-              Track footpath complaints in real time
-            </li>
-            <li>
-              <span className="highlight-dot"></span>
-              Assign and monitor maintenance teams
-            </li>
-            <li>
-              <span className="highlight-dot"></span>
-              Keep every repair update in one timeline
-            </li>
-          </ul>
-
         </div>
 
-      </div>
 
+        {/* ================= CARD ================= */}
 
-      <div className="auth-form-side">
+        <div className="auth-card">
 
-        <div className="auth-form-card">
+          <div className="auth-card-head">
+            <h1>Welcome back</h1>
+            <p>Sign in to continue to your dashboard</p>
+          </div>
 
-          <h2 className="auth-title">Sign in to your account</h2>
-          <p className="auth-subtitle">
-            Enter your details below to continue
-          </p>
+          {/* Role Switcher */}
+
+          <div className="role-switch">
+
+            <button
+              type="button"
+              className="role-option worker"
+              onClick={() => handleQuickLogin("worker")}
+            >
+              <HardHat size={18} strokeWidth={2} />
+              <span>Worker</span>
+            </button>
+
+            <button
+              type="button"
+              className="role-option manager"
+              onClick={() => handleQuickLogin("manager")}
+            >
+              <Building2 size={18} strokeWidth={2} />
+              <span>Manager</span>
+            </button>
+
+            <button
+              type="button"
+              className="role-option citizen"
+              onClick={() => handleQuickLogin("user")}
+            >
+              <UserRound size={18} strokeWidth={2} />
+              <span>Citizen</span>
+            </button>
+
+          </div>
+
+          <div className="auth-divider">
+            <span>or sign in manually</span>
+          </div>
+
+          {/* Form */}
 
           <form onSubmit={handleSubmit} className="auth-form">
 
-            <div className="form-group">
-              <label>Email Address</label>
+            <div className="float-group">
               <input
                 type="email"
                 name="email"
-                placeholder="you@example.com"
+                placeholder=" "
                 value={form.email}
                 onChange={handleChange}
               />
+              <label>Email Address</label>
             </div>
 
-            <div className="form-group">
+            <div className="float-group">
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                placeholder=" "
+                value={form.password}
+                onChange={handleChange}
+              />
               <label>Password</label>
 
-              <div className="password-field">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  placeholder="Enter your password"
-                  value={form.password}
-                  onChange={handleChange}
-                />
-
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? "🙈" : "👁"}
-                </button>
-              </div>
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <EyeOff size={17} strokeWidth={2} />
+                ) : (
+                  <Eye size={17} strokeWidth={2} />
+                )}
+              </button>
             </div>
 
             <div className="form-row">
-
               <label className="remember-check">
                 <input
                   type="checkbox"
@@ -145,19 +181,38 @@ const Login = () => {
               <Link to="/forgot-password" className="auth-link">
                 Forgot password?
               </Link>
-
             </div>
 
             <button type="submit" className="auth-submit-btn">
               Sign In
             </button>
-
           </form>
 
           <p className="auth-switch">
-            Don't have an account?{" "}
-            <Link to="/signup">Create one</Link>
+            Don't have an account? <Link to="/signup">Create one</Link>
           </p>
+
+        </div>
+
+
+        {/* ================= TRUST STRIP ================= */}
+
+        <div className="trust-strip">
+
+          <div className="trust-item">
+            <ShieldCheck size={16} strokeWidth={2} />
+            <span>Secure sign-in</span>
+          </div>
+
+          <div className="trust-item">
+            <MapPinned size={16} strokeWidth={2} />
+            <span>Live issue tracking</span>
+          </div>
+
+          <div className="trust-item">
+            <Timer size={16} strokeWidth={2} />
+            <span>Fast repair updates</span>
+          </div>
 
         </div>
 

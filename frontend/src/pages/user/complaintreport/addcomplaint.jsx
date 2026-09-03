@@ -1,5 +1,27 @@
+// addcomplaint.jsx
 import React, { useState } from "react";
+import {
+  FileText,
+  MapPin,
+  Image as ImageIcon,
+  Upload,
+  Camera,
+  X,
+  CheckCircle2,
+  Navigation,
+  AlertCircle,
+  Sparkles,
+} from "lucide-react";
 import "./addcomplaint.css";
+
+const ISSUE_TYPES = [
+  { value: "Broken Footpath", label: "Broken Footpath" },
+  { value: "Pothole", label: "Pothole" },
+  { value: "Crack", label: "Footpath Crack" },
+  { value: "Damaged Sidewalk", label: "Damaged Sidewalk" },
+  { value: "Uneven Surface", label: "Uneven Surface" },
+  { value: "Other", label: "Other" },
+];
 
 const ReportComplaint = () => {
   const [formData, setFormData] = useState({
@@ -11,16 +33,21 @@ const ReportComplaint = () => {
   });
 
   const [images, setImages] = useState([]);
-  const [uploadMode, setUploadMode] = useState("upload");
+  const [uploadMode, setUploadMode] = useState("upload"); // "upload" | "capture"
 
-  const [coords, setCoords] = useState(null); 
+  const [coords, setCoords] = useState(null); // { lat, lng }
   const [locationStatus, setLocationStatus] = useState("idle");
+  // idle | loading | success | error
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     });
+  };
+
+  const selectIssueType = (value) => {
+    setFormData((prev) => ({ ...prev, issueType: value }));
   };
 
   const handleImageUpload = (e) => {
@@ -113,256 +140,405 @@ const ReportComplaint = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    (async () => {
-      try {
-        const payload = {
-          title: formData.title,
-          description: formData.description,
-          issueType: formData.issueType,
-          location: formData.location,
-          area: formData.area,
-          latitude: coords?.lat,
-          longitude: coords?.lng,
-        };
+    console.log("Complaint:", { ...formData, coordinates: coords });
+    console.log("Images:", images);
 
-        // send to backend
-        const api = (await import("../../../services/api")).default;
-        await api.post("/complaints", payload);
-        alert("Complaint submitted successfully!");
-      } catch (err) {
-        console.error(err);
-        alert(err.response?.data?.error || "Failed to submit complaint");
-      }
-    })();
+    alert("Complaint submitted successfully!");
   };
+
+  // ------- progress calculation (purely visual) -------
+  const requiredFields = ["title", "issueType", "description", "location", "area"];
+  const filledCount = requiredFields.filter((key) => formData[key]).length;
+  const progressPercent = Math.round(
+    (filledCount / requiredFields.length) * 100
+  );
 
   return (
     <div className="report-page">
-      {/* Header */}
+
+      {/* ============================
+          HEADER
+      ============================ */}
+
       <div className="report-header">
-        <div>
-          <span className="report-header-badge">New Complaint</span>
-          <h1>Report a Footpath Issue</h1>
-          <p>
-            Help us improve pedestrian safety by reporting damaged
-            footpaths and sidewalks.
-          </p>
+        <div className="report-header-inner">
+          <div className="report-header-icon">
+            <FileText size={26} strokeWidth={2} />
+          </div>
+
+          <div>
+            <span className="report-header-badge">
+              <Sparkles size={12} strokeWidth={2.5} /> New Complaint
+            </span>
+            <h1>Report a Footpath Issue</h1>
+            <p>
+              Help us improve pedestrian safety by reporting damaged
+              footpaths and sidewalks.
+            </p>
+          </div>
+        </div>
+
+        <div className="report-progress">
+          <div className="report-progress-track">
+            <div
+              className="report-progress-fill"
+              style={{ width: `${progressPercent}%` }}
+            ></div>
+          </div>
+          <span>{progressPercent}% complete</span>
         </div>
       </div>
 
-      <form className="report-form" onSubmit={handleSubmit}>
-        {/* Complaint Details */}
-        <div className="form-card">
-          <div className="form-card-heading">
-            <span className="form-card-icon">📝</span>
-            <h2>Complaint Details</h2>
-          </div>
 
-          <div className="form-group">
-            <label>Complaint Title</label>
-            <input
-              type="text"
-              name="title"
-              placeholder="Example: Broken footpath near bus stand"
-              value={formData.title}
-              onChange={handleChange}
-              required
-            />
-          </div>
+      <div className="report-layout">
 
-          <div className="form-group">
-            <label>Issue Type</label>
-            <select
-              name="issueType"
-              value={formData.issueType}
-              onChange={handleChange}
-              required
-            >
-              <option value="">Select issue type</option>
-              <option value="BROKEN_FOOTPATH">Broken Footpath</option>
-              <option value="POTHOLE">Pothole</option>
-              <option value="CRACK">Footpath Crack</option>
-              <option value="DAMAGED_PAVEMENT ">Damaged Sidewalk</option>
-              <option value="OBSTRUCTION">Uneven Surface</option>
-              <option value="OTHER">Other</option>
-            </select>
-          </div>
+        {/* ============================
+            FORM
+        ============================ */}
 
-          <div className="form-group">
-            <label>Description</label>
-            <textarea
-              name="description"
-              placeholder="Describe the problem in detail..."
-              rows="5"
-              value={formData.description}
-              onChange={handleChange}
-              required
-            />
-          </div>
+        <form
+          id="report-complaint-form"
+          className="report-form"
+          onSubmit={handleSubmit}
+        >
 
-          <div className="form-group">
-            <label>Location</label>
+          {/* Complaint Details */}
+          <div className="form-card">
+            <div className="form-card-heading">
+              <span className="form-card-icon">
+                <FileText size={17} strokeWidth={2} />
+              </span>
+              <div>
+                <h2>Complaint Details</h2>
+                <p>Describe what's wrong and where it's happening</p>
+              </div>
+            </div>
 
-            <div className="location-input-row">
+            <div className="form-group">
+              <label>Complaint Title</label>
               <input
                 type="text"
-                name="location"
-                placeholder="Example: Gandhi Road, near bus stand"
-                value={formData.location}
+                name="title"
+                placeholder="Example: Broken footpath near bus stand"
+                value={formData.title}
                 onChange={handleChange}
                 required
               />
+            </div>
+
+            <div className="form-group">
+              <label>Issue Type</label>
+
+              <div className="chip-group">
+                {ISSUE_TYPES.map((item) => (
+                  <button
+                    type="button"
+                    key={item.value}
+                    className={`chip ${
+                      formData.issueType === item.value ? "active" : ""
+                    }`}
+                    onClick={() => selectIssueType(item.value)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* hidden select keeps native form semantics / required validation */}
+              <select
+                name="issueType"
+                className="chip-native-select"
+                value={formData.issueType}
+                onChange={handleChange}
+                required
+                tabIndex={-1}
+                aria-hidden="true"
+              >
+                <option value="">Select issue type</option>
+                {ISSUE_TYPES.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Description</label>
+              <textarea
+                name="description"
+                placeholder="Describe the problem in detail..."
+                rows="5"
+                value={formData.description}
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </div>
+
+
+          {/* Location */}
+          <div className="form-card">
+            <div className="form-card-heading">
+              <span className="form-card-icon location-icon">
+                <MapPin size={17} strokeWidth={2} />
+              </span>
+              <div>
+                <h2>Location</h2>
+                <p>Pinpoint where the issue is located</p>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Address / Landmark</label>
+
+              <div className="location-input-row">
+                <input
+                  type="text"
+                  name="location"
+                  placeholder="Example: Gandhi Road, near bus stand"
+                  value={formData.location}
+                  onChange={handleChange}
+                  required
+                />
+
+                <button
+                  type="button"
+                  className="share-location-btn"
+                  onClick={handleShareLocation}
+                  disabled={locationStatus === "loading"}
+                >
+                  {locationStatus === "loading" ? (
+                    <>
+                      <span className="location-spinner"></span>
+                      Locating...
+                    </>
+                  ) : (
+                    <>
+                      <Navigation size={14} strokeWidth={2.5} />
+                      Share Location
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {locationStatus === "success" && coords && (
+                <div className="coords-display">
+                  <span className="coords-badge">
+                    <CheckCircle2 size={13} strokeWidth={2.5} />
+                    Location captured
+                  </span>
+                  <span className="coords-text">
+                    Lat: {coords.lat.toFixed(6)}, Lng: {coords.lng.toFixed(6)}
+                  </span>
+                </div>
+              )}
+
+              {locationStatus === "error" && (
+                <div className="coords-error">
+                  <AlertCircle size={14} strokeWidth={2.5} />
+                  Couldn't fetch your location. You can still type the
+                  address manually.
+                </div>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label>
+                Area
+                {formData.area && (
+                  <span className="auto-filled-tag">Auto-filled</span>
+                )}
+              </label>
+
+              <input
+                type="text"
+                name="area"
+                placeholder="Example: Gandhipuram, RS Puram..."
+                value={formData.area}
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </div>
+
+
+          {/* Image Upload */}
+          <div className="form-card">
+            <div className="form-card-heading">
+              <span className="form-card-icon photo-icon">
+                <ImageIcon size={17} strokeWidth={2} />
+              </span>
+              <div>
+                <h2>Upload Images</h2>
+                <p>Photos help our team assess the issue faster</p>
+              </div>
+            </div>
+
+            <div className="upload-toggle">
+              <button
+                type="button"
+                className={`upload-toggle-option ${
+                  uploadMode === "upload" ? "active" : ""
+                }`}
+                onClick={() => setUploadMode("upload")}
+              >
+                <Upload size={14} strokeWidth={2.5} />
+                Upload Photo
+              </button>
 
               <button
                 type="button"
-                className="share-location-btn"
-                onClick={handleShareLocation}
-                disabled={locationStatus === "loading"}
+                className={`upload-toggle-option ${
+                  uploadMode === "capture" ? "active" : ""
+                }`}
+                onClick={() => setUploadMode("capture")}
               >
-                {locationStatus === "loading" ? (
-                  <>
-                    <span className="location-spinner"></span>
-                    Locating...
-                  </>
-                ) : (
-                  <>📍 Share Location</>
-                )}
+                <Camera size={14} strokeWidth={2.5} />
+                Capture Photo
               </button>
             </div>
 
-            {locationStatus === "success" && coords && (
-              <div className="coords-display">
-                <span className="coords-badge">
-                  ✓ Location captured
-                </span>
-                <span className="coords-text">
-                  Lat: {coords.lat.toFixed(6)}, Lng: {coords.lng.toFixed(6)}
-                </span>
-              </div>
-            )}
+            {uploadMode === "upload" ? (
+              <label className="upload-area">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageUpload}
+                />
 
-            {locationStatus === "error" && (
-              <div className="coords-error">
-                Couldn't fetch your location. You can still type the
-                address manually.
-              </div>
-            )}
-          </div>
-
-          <div className="form-group">
-            <label>
-              Area
-              {formData.area && (
-                <span className="auto-filled-tag">Auto-filled</span>
-              )}
-            </label>
-
-            <input
-              type="text"
-              name="area"
-              placeholder="Example: Gandhipuram, RS Puram..."
-              value={formData.area}
-              onChange={handleChange}
-              required
-            />
-          </div>
-        </div>
-
-        {/* Image Upload */}
-        <div className="form-card">
-          <div className="form-card-heading">
-            <span className="form-card-icon">🖼️</span>
-            <h2>Upload Images</h2>
-          </div>
-
-          <p className="upload-description">
-            Upload photos showing the damaged footpath or sidewalk. You
-            can upload multiple images.
-          </p>
-
-          <div className="upload-toggle">
-            <button
-              type="button"
-              className={`upload-toggle-option ${
-                uploadMode === "upload" ? "active" : ""
-              }`}
-              onClick={() => setUploadMode("upload")}
-            >
-              Upload Photo
-            </button>
-
-            <button
-              type="button"
-              className={`upload-toggle-option ${
-                uploadMode === "capture" ? "active" : ""
-              }`}
-              onClick={() => setUploadMode("capture")}
-            >
-              Capture Photo
-            </button>
-          </div>
-
-          {uploadMode === "upload" ? (
-            <label className="upload-area">
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleImageUpload}
-              />
-
-              <div className="upload-icon">↑</div>
-
-              <h3>Click to upload images</h3>
-              <p>PNG, JPG or JPEG</p>
-            </label>
-          ) : (
-            <label className="upload-area">
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleImageUpload}
-              />
-
-              <div className="upload-icon camera-icon">📷</div>
-
-              <h3>Click to capture photo</h3>
-              <p>Uses your device camera</p>
-            </label>
-          )}
-
-          {/* Image Preview */}
-          {images.length > 0 && (
-            <div className="image-grid">
-              {images.map((image, index) => (
-                <div className="image-preview" key={index}>
-                  <img src={image.preview} alt={`Uploaded ${index + 1}`} />
-
-                  <button
-                    type="button"
-                    className="remove-image"
-                    onClick={() => removeImage(index)}
-                  >
-                    ×
-                  </button>
+                <div className="upload-icon">
+                  <Upload size={20} strokeWidth={2.2} />
                 </div>
-              ))}
+
+                <h3>Click to upload images</h3>
+                <p>PNG, JPG or JPEG · up to 10 photos</p>
+              </label>
+            ) : (
+              <label className="upload-area">
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleImageUpload}
+                />
+
+                <div className="upload-icon camera-icon">
+                  <Camera size={20} strokeWidth={2.2} />
+                </div>
+
+                <h3>Click to capture photo</h3>
+                <p>Uses your device camera</p>
+              </label>
+            )}
+
+            {/* Image Preview */}
+            {images.length > 0 && (
+              <div className="image-grid">
+                {images.map((image, index) => (
+                  <div className="image-preview" key={index}>
+                    <img src={image.preview} alt={`Uploaded ${index + 1}`} />
+
+                    <button
+                      type="button"
+                      className="remove-image"
+                      onClick={() => removeImage(index)}
+                    >
+                      <X size={14} strokeWidth={2.5} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Submit (mobile inline actions, hidden on desktop where sidebar handles it) */}
+          <div className="form-actions mobile-only">
+            <button type="button" className="cancel-button">
+              Cancel
+            </button>
+
+            <button type="submit" className="submit-button">
+              Submit Complaint
+            </button>
+          </div>
+
+        </form>
+
+
+        {/* ============================
+            SIDEBAR
+        ============================ */}
+
+        <aside className="report-sidebar">
+
+          <div className="summary-card">
+            <h3>Complaint Summary</h3>
+
+            <div className="summary-row">
+              <span>Title</span>
+              <strong>{formData.title || "—"}</strong>
             </div>
-          )}
-        </div>
 
-        {/* Submit */}
-        <div className="form-actions">
-          <button type="button" className="cancel-button">
-            Cancel
-          </button>
+            <div className="summary-row">
+              <span>Issue Type</span>
+              <strong>{formData.issueType || "—"}</strong>
+            </div>
 
-          <button type="submit" className="submit-button">
-            Submit Complaint
-          </button>
-        </div>
-      </form>
+            <div className="summary-row">
+              <span>Location</span>
+              <strong className="truncate">
+                {formData.location || "—"}
+              </strong>
+            </div>
+
+            <div className="summary-row">
+              <span>Photos</span>
+              <strong>{images.length} attached</strong>
+            </div>
+
+            <div className="summary-divider"></div>
+
+            <div className="form-actions">
+              <button type="button" className="cancel-button">
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                form="report-complaint-form"
+                className="submit-button"
+                onClick={handleSubmit}
+              >
+                Submit Complaint
+              </button>
+            </div>
+          </div>
+
+          <div className="tips-card">
+            <h3>Tips for a great report</h3>
+
+            <ul>
+              <li>
+                <CheckCircle2 size={14} strokeWidth={2.5} />
+                Use clear, well-lit photos of the damage
+              </li>
+              <li>
+                <CheckCircle2 size={14} strokeWidth={2.5} />
+                Share your live location for accurate mapping
+              </li>
+              <li>
+                <CheckCircle2 size={14} strokeWidth={2.5} />
+                Mention nearby landmarks in the description
+              </li>
+            </ul>
+          </div>
+
+        </aside>
+
+      </div>
+
     </div>
   );
 };

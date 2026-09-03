@@ -4,162 +4,221 @@
 
 .auth-page {
   min-height: 100vh;
-  display: flex;
+  position: relative;
+  overflow: hidden;
+  background: #f4f5f9;
   font-family: "Segoe UI", Arial, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
 }
 
 
 /* =================================
-   LEFT PANEL (gradient brand side)
+   DECORATIVE BACKGROUND
 ================================= */
 
-.auth-side {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
-  color: white;
-  display: flex;
-  align-items: center;
-  padding: 60px;
-  overflow: hidden;
-}
-
-.auth-side-circle {
+.auth-bg-blob {
   position: absolute;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
+  filter: blur(4px);
+  z-index: 0;
 }
 
-.circle-one {
-  width: 340px;
-  height: 340px;
-  top: -100px;
-  right: -80px;
+.blob-one {
+  width: 460px;
+  height: 460px;
+  top: -160px;
+  left: -140px;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  opacity: 0.16;
 }
 
-.circle-two {
+.blob-two {
+  width: 380px;
+  height: 380px;
+  bottom: -160px;
+  right: -120px;
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  opacity: 0.14;
+}
+
+.blob-three {
   width: 220px;
   height: 220px;
-  bottom: -60px;
-  left: -60px;
-  background: rgba(255, 255, 255, 0.06);
+  top: 55%;
+  left: 6%;
+  background: #4f46e5;
+  opacity: 0.08;
 }
 
-.auth-side-content {
+
+/* =================================
+   SHELL / WRAPPER
+================================= */
+
+.auth-shell {
   position: relative;
   z-index: 1;
-  max-width: 440px;
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-.auth-brand {
+
+/* =================================
+   BRAND (centered, above card)
+================================= */
+
+.auth-brand-center {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 48px;
+  margin-bottom: 26px;
 }
 
 .auth-brand-icon {
-  width: 42px;
-  height: 42px;
-  min-width: 42px;
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.18);
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 20px;
   font-weight: 700;
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);
 }
 
-.auth-brand h2 {
+.auth-brand-center h2 {
   margin: 0;
   font-size: 17px;
+  color: #1e1b2e;
 }
 
-.auth-brand span {
-  font-size: 11px;
-  color: #e0e0fb;
-}
-
-.auth-side-content h1 {
-  margin: 0 0 16px;
-  font-size: 34px;
-  font-weight: 700;
-  line-height: 1.25;
-}
-
-.auth-side-content > p {
-  margin: 0 0 32px;
-  color: #e5e2fc;
-  font-size: 15px;
-  line-height: 1.6;
-}
-
-.auth-highlights {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.auth-highlights li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 14px;
-  color: #f2f0ff;
-}
-
-.highlight-dot {
-  width: 8px;
-  height: 8px;
-  min-width: 8px;
-  border-radius: 50%;
-  background: white;
+.auth-brand-center span {
+  font-size: 11.5px;
+  color: #7b7794;
 }
 
 
 /* =================================
-   RIGHT PANEL (form side)
+   CARD
 ================================= */
 
-.auth-form-side {
-  flex: 1;
-  min-width: 0;
-  background: #f4f5f9;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 40px;
-}
-
-.auth-form-card {
+.auth-card {
   width: 100%;
-  max-width: 400px;
-  background: white;
-  border-radius: 18px;
-  box-shadow: 0 8px 30px rgba(30, 27, 46, 0.08);
-  padding: 40px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 22px;
+  box-shadow: 0 20px 45px rgba(30, 27, 46, 0.12);
+  padding: 34px 32px;
 }
 
-.auth-title {
+.auth-card-head {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.auth-card-head h1 {
   margin: 0 0 6px;
   font-size: 23px;
   color: #1e1b2e;
 }
 
-.auth-subtitle {
-  margin: 0 0 28px;
+.auth-card-head p {
+  margin: 0;
   color: #7b7794;
-  font-size: 13.5px;
+  font-size: 13px;
 }
 
 
 /* =================================
-   FORM
+   ROLE SWITCH (segmented control)
+================================= */
+
+.role-switch {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.role-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 6px;
+  border-radius: 12px;
+  border: 1.5px solid #edecf5;
+  background: #fafaff;
+  color: #57536b;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.role-option:hover {
+  border-color: #c7c3f0;
+  transform: translateY(-2px);
+}
+
+.role-option.worker:hover {
+  color: #0284c7;
+  border-color: #0284c7;
+  background: #f0f9ff;
+}
+
+.role-option.manager:hover {
+  color: #4f46e5;
+  border-color: #4f46e5;
+  background: #eef2ff;
+}
+
+.role-option.citizen:hover {
+  color: #16a34a;
+  border-color: #16a34a;
+  background: #f0fdf4;
+}
+
+
+/* =================================
+   DIVIDER
+================================= */
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 22px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #edecf5;
+}
+
+.auth-divider span {
+  padding: 0 12px;
+  font-size: 11px;
+  color: #a9a5bd;
+  white-space: nowrap;
+}
+
+
+/* =================================
+   FORM — FLOATING LABELS
 ================================= */
 
 .auth-form {
@@ -168,60 +227,73 @@
   gap: 18px;
 }
 
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
+.float-group {
+  position: relative;
 }
 
-.form-group label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #1e1b2e;
-}
-
-.form-group input {
-  height: 44px;
-  border: 1px solid #e5e4f0;
-  background: #f7f7fb;
-  border-radius: 9px;
-  padding: 0 14px;
+.float-group input {
+  width: 100%;
+  height: 50px;
+  border: 1.5px solid #e5e4f0;
+  background: #fafaff;
+  border-radius: 11px;
+  padding: 18px 14px 0;
   font-size: 13.5px;
   color: #1e1b2e;
   outline: none;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
-.form-group input:focus {
+.float-group input:focus {
   border-color: #4f46e5;
   background: white;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
-.form-group input::placeholder {
-  color: #b3afc4;
+.float-group label {
+  position: absolute;
+  left: 14px;
+  top: 15px;
+  font-size: 13.5px;
+  color: #a9a5bd;
+  pointer-events: none;
+  transition: 0.15s ease;
 }
 
-.password-field {
-  position: relative;
-  display: flex;
-  align-items: center;
+.float-group input:focus + label,
+.float-group input:not(:placeholder-shown) + label {
+  top: 7px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #4f46e5;
 }
 
-.password-field input {
-  width: 100%;
+.float-group input[name="password"] {
   padding-right: 42px;
 }
 
 .password-toggle {
   position: absolute;
   right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
   border: none;
   background: transparent;
+  color: #9c99b4;
   cursor: pointer;
-  font-size: 15px;
   padding: 6px;
-  line-height: 1;
+  display: flex;
+  align-items: center;
 }
+
+.password-toggle:hover {
+  color: #4f46e5;
+}
+
+
+/* =================================
+   FORM ROW
+================================= */
 
 .form-row {
   display: flex;
@@ -262,15 +334,16 @@
 ================================= */
 
 .auth-submit-btn {
-  height: 46px;
+  height: 48px;
   border: none;
-  border-radius: 10px;
+  border-radius: 11px;
   background: linear-gradient(135deg, #4f46e5, #7c3aed);
   color: white;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  margin-top: 6px;
+  margin-top: 4px;
+  box-shadow: 0 10px 22px rgba(79, 70, 229, 0.28);
   transition: filter 0.15s ease, transform 0.15s ease;
 }
 
@@ -303,6 +376,32 @@
 
 
 /* =================================
+   TRUST STRIP (below card)
+================================= */
+
+.trust-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.trust-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #7b7794;
+}
+
+.trust-item svg {
+  color: #4f46e5;
+}
+
+
+/* =================================
    FORM ROW (used by signup)
 ================================= */
 
@@ -312,26 +411,66 @@
   gap: 14px;
 }
 
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e1b2e;
+}
+
+.form-group input {
+  height: 44px;
+  border: 1px solid #e5e4f0;
+  background: #f7f7fb;
+  border-radius: 9px;
+  padding: 0 14px;
+  font-size: 13.5px;
+  color: #1e1b2e;
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.form-group input:focus {
+  border-color: #4f46e5;
+  background: white;
+}
+
+.form-group input::placeholder {
+  color: #b3afc4;
+}
+
 
 /* =================================
    RESPONSIVE
 ================================= */
 
-@media (max-width: 900px) {
-
-  .auth-side {
-    display: none;
-  }
-
-  .auth-form-side {
-    padding: 24px;
-  }
-}
-
 @media (max-width: 480px) {
 
-  .auth-form-card {
-    padding: 28px 22px;
+  .auth-page {
+    padding: 24px 16px;
+  }
+
+  .auth-card {
+    padding: 26px 22px;
+    border-radius: 18px;
+  }
+
+  .role-switch {
+    gap: 6px;
+  }
+
+  .role-option {
+    padding: 10px 4px;
+    font-size: 10.5px;
+  }
+
+  .trust-strip {
+    gap: 12px;
   }
 
   .form-group-row {

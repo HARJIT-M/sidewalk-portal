@@ -1,29 +1,48 @@
-import React, { useEffect, useState } from "react";
-import api from "../../../services/api";
+import React from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  ClipboardList,
+  CircleDot,
+  RefreshCw,
+  CheckCircle2,
+  Plus,
+  MapPin,
+  Calendar,
+} from "lucide-react";
 import "./userdashboard.css";
 
 const UserDashboard = () => {
   const navigate = useNavigate();
 
-  const [complaints, setComplaints] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Temporary sample data
+  const complaints = [
+    {
+      id: "CMP001",
+      issue: "Broken Footpath",
+      location: "Gandhi Road",
+      date: "22 Aug 2026",
+      status: "In Progress",
+      priority: "High",
+    },
+    {
+      id: "CMP002",
+      issue: "Footpath Crack",
+      location: "Main Street",
+      date: "20 Aug 2026",
+      status: "Not Assigned",
+      priority: "Not Set",
+    },
+    {
+      id: "CMP003",
+      issue: "Damaged Sidewalk",
+      location: "Bus Stand Road",
+      date: "15 Aug 2026",
+      status: "Completed",
+      priority: "Medium",
+    },
+  ];
 
-  useEffect(() => {
-    async function loadComplaints() {
-      try {
-        const res = await api.get("/user/complaints");
-        setComplaints(res.data.complaints || []);
-      } catch (err) {
-        console.warn("Could not fetch complaints:", err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadComplaints();
-  }, []);
-
+  // Statistics
   const totalComplaints = complaints.length;
 
   const notAssigned = complaints.filter(
@@ -40,11 +59,11 @@ const UserDashboard = () => {
 
   const badgeClass = (value) => value.toLowerCase().replace(" ", "-");
 
-  if (loading) return <div className="user-dashboard">Loading...</div>;
-
   return (
     <div className="user-dashboard">
-
+      {/* =========================
+          HEADER
+      ========================= */}
 
       <div className="user-dashboard-header">
         <div>
@@ -54,16 +73,21 @@ const UserDashboard = () => {
 
         <button
           className="report-btn"
-          onClick={() => navigate("/add-complaint")}
+          onClick={() => navigate("/user/add-complaint")}
         >
-          + Report an Issue
+          <Plus size={16} strokeWidth={2.5} /> Report an Issue
         </button>
       </div>
 
+      {/* =========================
+          STATISTICS
+      ========================= */}
 
       <div className="user-stat-grid">
         <div className="user-stat-card">
-          <div className="user-stat-icon total-icon">📋</div>
+          <div className="user-stat-icon total-icon">
+            <ClipboardList size={22} strokeWidth={2} />
+          </div>
           <div>
             <span>Total Complaints</span>
             <strong>{totalComplaints}</strong>
@@ -71,7 +95,9 @@ const UserDashboard = () => {
         </div>
 
         <div className="user-stat-card">
-          <div className="user-stat-icon pending-icon">○</div>
+          <div className="user-stat-icon pending-icon">
+            <CircleDot size={22} strokeWidth={2} />
+          </div>
           <div>
             <span>Not Assigned</span>
             <strong>{notAssigned}</strong>
@@ -79,7 +105,9 @@ const UserDashboard = () => {
         </div>
 
         <div className="user-stat-card">
-          <div className="user-stat-icon progress-icon">↻</div>
+          <div className="user-stat-icon progress-icon">
+            <RefreshCw size={22} strokeWidth={2} />
+          </div>
           <div>
             <span>In Progress</span>
             <strong>{inProgress}</strong>
@@ -87,7 +115,9 @@ const UserDashboard = () => {
         </div>
 
         <div className="user-stat-card">
-          <div className="user-stat-icon completed-icon">✓</div>
+          <div className="user-stat-icon completed-icon">
+            <CheckCircle2 size={22} strokeWidth={2} />
+          </div>
           <div>
             <span>Completed</span>
             <strong>{completed}</strong>
@@ -95,9 +125,15 @@ const UserDashboard = () => {
         </div>
       </div>
 
+      {/* =========================
+          QUICK ACTION
+      ========================= */}
+
       <div className="quick-report-card">
         <div className="quick-report-content">
-          <div className="quick-report-icon">+</div>
+          <div className="quick-report-icon">
+            <Plus size={22} strokeWidth={2.5} />
+          </div>
 
           <div>
             <h2>Report a Footpath Issue</h2>
@@ -113,6 +149,9 @@ const UserDashboard = () => {
         </button>
       </div>
 
+      {/* =========================
+          RECENT COMPLAINTS
+      ========================= */}
 
       <div className="recent-complaints">
         <div className="section-header">
@@ -129,6 +168,7 @@ const UserDashboard = () => {
           </button>
         </div>
 
+        {/* ---- DESKTOP / TABLET TABLE ---- */}
         <div className="complaints-table-container">
           <table className="user-complaints-table">
             <thead>
@@ -151,7 +191,10 @@ const UserDashboard = () => {
 
                   <td>{complaint.issue}</td>
 
-                  <td>📍 {complaint.location}</td>
+                  <td>
+                    <MapPin size={13} strokeWidth={2} className="inline-icon" />{" "}
+                    {complaint.location}
+                  </td>
 
                   <td>{complaint.date}</td>
 
@@ -181,6 +224,7 @@ const UserDashboard = () => {
           </table>
         </div>
 
+        {/* ---- MOBILE CARD LIST ---- */}
         <div className="complaints-card-list">
           {complaints.map((complaint) => (
             <div className="complaint-mobile-card" key={complaint.id}>
@@ -197,8 +241,14 @@ const UserDashboard = () => {
               <h3 className="complaint-mobile-title">{complaint.issue}</h3>
 
               <div className="complaint-mobile-meta">
-                <span>📍 {complaint.location}</span>
-                <span>📅 {complaint.date}</span>
+                <span>
+                  <MapPin size={13} strokeWidth={2} className="inline-icon" />{" "}
+                  {complaint.location}
+                </span>
+                <span>
+                  <Calendar size={13} strokeWidth={2} className="inline-icon" />{" "}
+                  {complaint.date}
+                </span>
               </div>
 
               <div className="complaint-mobile-bottom">

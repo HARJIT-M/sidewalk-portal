@@ -1,0 +1,258 @@
+/* UserSidebar.css */
+* {
+  box-sizing: border-box;
+}
+
+
+/* ==========================================
+   DESKTOP / TABLET SIDEBAR
+========================================== */
+
+.user-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 250px;
+  background: white;
+  border-right: 1px solid #edecf5;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 14px;
+  z-index: 100;
+  transition: width 0.2s ease;
+}
+
+.user-sidebar.collapsed {
+  width: 78px;
+}
+
+.sidebar-toggle {
+  position: absolute;
+  top: 26px;
+  right: -13px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid #edecf5;
+  background: white;
+  color: #4f46e5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(30, 27, 46, 0.1);
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px 24px;
+  border-bottom: 1px solid #f5f4fb;
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+
+.brand-icon {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 17px;
+}
+
+.brand-text h2 {
+  margin: 0;
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+.brand-text span {
+  font-size: 11px;
+  color: #9c99b4;
+  white-space: nowrap;
+}
+
+.user-sidebar.collapsed .brand-text {
+  display: none;
+}
+
+.sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.nav-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #b3affc;
+  letter-spacing: 0.06em;
+  padding: 0 10px;
+  margin: 0 0 10px;
+}
+
+.user-sidebar.collapsed .nav-title {
+  display: none;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  color: #57536b;
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  transition: 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar-link:hover {
+  background: #f5f4fb;
+  color: #4f46e5;
+}
+
+.sidebar-link.active {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: white;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.28);
+}
+
+.sidebar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 19px;
+}
+
+.user-sidebar.collapsed .sidebar-label {
+  display: none;
+}
+
+.sidebar-bottom {
+  margin-top: auto;
+}
+
+.sidebar-divider {
+  height: 1px;
+  background: #f5f4fb;
+  margin-bottom: 10px;
+}
+
+.sidebar-logout {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  color: #dc2626;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar-logout:hover {
+  background: #fef2f2;
+}
+
+
+/* ==========================================
+   MOBILE BOTTOM NAV BAR (Flipkart-style)
+========================================== */
+
+.mobile-bottom-nav {
+  display: none; /* hidden on desktop */
+}
+
+@media (max-width: 768px) {
+
+  /* Hide the sidebar entirely on mobile — bottom nav takes over */
+  .user-sidebar {
+    display: none;
+  }
+
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 62px;
+    background: white;
+    border-top: 1px solid #edecf5;
+    box-shadow: 0 -4px 16px rgba(30, 27, 46, 0.08);
+    z-index: 200;
+    padding: 6px 4px;
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
+  }
+
+  .bottom-nav-link {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    text-decoration: none;
+    color: #9c99b4;
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .bottom-nav-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 22px;
+    transition: transform 0.15s ease;
+  }
+
+  .bottom-nav-label {
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .bottom-nav-link.active {
+    color: #4f46e5;
+  }
+
+  .bottom-nav-link.active .bottom-nav-icon {
+    transform: translateY(-1px);
+  }
+
+  /* small active "pill" indicator, Flipkart-esque */
+  .bottom-nav-link.active .bottom-nav-icon::after {
+    content: "";
+    display: block;
+  }
+
+  .bottom-nav-link.logout-link {
+    color: #dc2626;
+  }
+
+  /* Push page content up so the bottom nav never covers it.
+     Add this class to your main layout wrapper on mobile. */
+  .has-bottom-nav {
+    padding-bottom: 74px;
+  }
+
+}

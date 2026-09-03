@@ -6,6 +6,6 @@ router.post("/signup", authController.signup);
 
 router.post("/login", authController.login);
 
-router.get("/verify", authController.verifyToken);
+// router.get("/verify", authController.verifyToken);
 
 module.exports = router;
