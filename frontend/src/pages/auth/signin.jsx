@@ -49,13 +49,18 @@ const Signup = () => {
       return;
     }
     try{
-      const res = await axios.post("http://localhost:5000/sigin",{
-        form
+      const res = await axios.post("http://localhost:5000/api/auth/signup",{
+        name:form?.name,
+        email:form?.email,
+        phone:form?.phone,
+        password:form?.password
       })
+    }catch(err){
+      console.log("An Error Occured")
     }
-    // Temporary — replace with real account creation
-    alert("Account created successfully!");
-    navigate("/login");
+    // Temporary — replace with real accsount creation
+    // alert("Account created successfully!");
+    // navigate("/login");
   };
 
   return (

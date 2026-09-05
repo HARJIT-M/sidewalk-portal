@@ -11,6 +11,7 @@ import {
   Timer,
 } from "lucide-react";
 import "./login.css";
+import axios from "axios";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -30,7 +31,7 @@ const Login = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async(e) => {
     e.preventDefault();
 
     if (!form.email || !form.password) {
@@ -39,14 +40,27 @@ const Login = () => {
     }
 
     const emailLower = form.email.toLowerCase();
+
+    try{
+      const res = await axios.post("http://localhost:5000/api/auth/login",{
+        email:form?.email,
+        password:form?.password
+      })
+    const role = res?.data?.role;
     // Route by role based on email or credentials
-    if (emailLower.includes("ravi") || emailLower.includes("worker") || emailLower.includes("wrk")) {
+    if (role==='WORKER') {
       navigate("/worker/dashboard");
-    } else if (emailLower.includes("user") || emailLower.includes("citizen")) {
+    } else if (role==='CITIZEN') {
       navigate("/user/dashboard");
-    } else {
+    } else if(role==='MANAGER'){
       navigate("/dashboard");
+    }else{
+      navigate("/landing")
     }
+  }
+  catch(err){
+    console.log("An error Occured",err.message)
+  }
   };
 
   const handleQuickLogin = (role) => {

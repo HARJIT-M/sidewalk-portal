@@ -2,10 +2,6 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../schemas/User");
 
-// ===============================
-// Generate JWT Token
-// ===============================
-
 const generateToken = (user) => {
   return jwt.sign(
     {
@@ -19,14 +15,10 @@ const generateToken = (user) => {
   );
 };
 
-// ===============================
-// SIGNUP
-// ===============================
-
 const signup = async (req, res) => {
   try {
     const { name, email, phone, password } = req.body;
-
+    console.log("Request body from backend :",req.body)
     // Check required fields
     if (!name || !email || !phone || !password) {
       return res.status(400).json({
@@ -65,16 +57,7 @@ const signup = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "Account created successfully.",
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-        status: user.status,
-      },
+      message: "Account created successfully."
     });
   } catch (error) {
     console.error("Signup error:", error);
@@ -85,10 +68,6 @@ const signup = async (req, res) => {
     });
   }
 };
-
-// ===============================
-// LOGIN
-// ===============================
 
 const login = async (req, res) => {
   try {
@@ -141,15 +120,7 @@ const login = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Login successful.",
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-        status: user.status,
-      },
+      role:user?.role
     });
   } catch (error) {
     console.error("Login error:", error);
