@@ -24,6 +24,38 @@ const workerSchema = new mongoose.Schema(
       enum: ["ACTIVE", "INACTIVE", "ON_LEAVE"],
       default: "ACTIVE",
     },
+    shift: {
+      type: String,
+      default: "Day Shift (08:00 AM - 05:00 PM)",
+    },
+    zone: {
+      type: String,
+      default: "Zone 2 - Gandhipuram Central",
+    },
+    emergency_contact: {
+      type: String,
+      trim: true,
+    },
+    address: {
+      type: String,
+      trim: true,
+    },
+    skills: {
+      type: [String],
+      default: [],
+    },
+    assigned_equipment: {
+      type: String,
+      trim: true,
+    },
+    rating: {
+      type: Number,
+      default: 4.8,
+    },
+    on_time_rate: {
+      type: Number,
+      default: 95,
+    },
     joined_date: {
       type: Date,
       default: Date.now,

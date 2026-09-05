@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getStoredComplaints, getStoredProfile } from "./workerData";
+import { getWorkerComplaints, getWorkerProfile } from "../../services/workerApi";
 import {
   Search,
   MapPin,
@@ -19,15 +19,40 @@ const MyComplaints = () => {
   const [searchParams] = useSearchParams();
   const [complaints, setComplaints] = useState([]);
   const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
 
-  useEffect(() => {
-    setComplaints(getStoredComplaints());
-    setProfile(getStoredProfile());
-  }, []);
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const [complaintsRes, profileRes] = await Promise.allSettled([
+        getWorkerComplaints({
+          status: statusFilter !== "All" ? statusFilter : undefined,
+          priority: priorityFilter !== "All" ? priorityFilter : undefined,
+          search: search.trim() ? search.trim() : undefined,
+        }),
+        getWorkerProfile(),
+      ]);
+
+      if (complaintsRes.status === "fulfilled" && complaintsRes.value.success) {
+        setComplaints(complaintsRes.value.complaints);
+      }
+      if (profileRes.status === "fulfilled" && profileRes.value.success) {
+        setProfile(profileRes.value.profile);
+      }
+    } catch (err) {
+      console.error("Failed to fetch complaints:", err);
+      setError("Failed to load assigned complaints from database.");
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter, priorityFilter, search]);
 
   useEffect(() => {
     const qFilter = searchParams.get("filter");
@@ -38,16 +63,25 @@ const MyComplaints = () => {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      loadData();
+    }, 200);
+    return () => clearTimeout(timeoutId);
+  }, [loadData]);
+
   const getStatusDisplay = (status) => {
     if (status === "ASSIGNED" || status === "PENDING") return "Pending";
     if (status === "IN_PROGRESS") return "In Progress";
-    if (status === "RESOLVED" || status === "COMPLETED") return "Completed";
+    if (status === "RESOLVED" || status === "COMPLETED" || status === "CLOSED") return "Completed";
     return status;
   };
 
+  // Client-side quick filter / safety pass
   const filteredComplaints = complaints.filter((complaint) => {
     const displayStatus = getStatusDisplay(complaint.status);
     const matchesSearch =
+      search === "" ||
       complaint.id.toLowerCase().includes(search.toLowerCase()) ||
       complaint.issue.toLowerCase().includes(search.toLowerCase()) ||
       complaint.location.toLowerCase().includes(search.toLowerCase());
@@ -62,17 +96,14 @@ const MyComplaints = () => {
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
-  // ---- Stats ----
+  // Stats
   const totalCount = complaints.length;
-
   const pendingCount = complaints.filter(
     (c) => getStatusDisplay(c.status) === "Pending"
   ).length;
-
   const progressCount = complaints.filter(
     (c) => getStatusDisplay(c.status) === "In Progress"
   ).length;
-
   const completedCount = complaints.filter(
     (c) => getStatusDisplay(c.status) === "Completed"
   ).length;
@@ -106,12 +137,17 @@ const MyComplaints = () => {
         </div>
       </div>
 
+      {error && (
+        <div style={{ background: "#fee2e2", color: "#b91c1c", padding: "12px 18px", borderRadius: "10px", margin: "14px 0", fontWeight: "500" }}>
+          ⚠️ {error}
+        </div>
+      )}
+
       {/* =========================
           STATS STRIP
       ========================= */}
       <div className="stats-strip">
-
-        <div className="stat-pill">
+        <div className="stat-pill" onClick={() => setStatusFilter("All")} style={{ cursor: "pointer" }}>
           <div className="stat-pill-icon total">
             <ClipboardList size={17} strokeWidth={2} />
           </div>
@@ -121,7 +157,7 @@ const MyComplaints = () => {
           </div>
         </div>
 
-        <div className="stat-pill">
+        <div className="stat-pill" onClick={() => setStatusFilter("Pending")} style={{ cursor: "pointer" }}>
           <div className="stat-pill-icon pending">
             <Clock size={17} strokeWidth={2} />
           </div>
@@ -131,7 +167,7 @@ const MyComplaints = () => {
           </div>
         </div>
 
-        <div className="stat-pill">
+        <div className="stat-pill" onClick={() => setStatusFilter("In Progress")} style={{ cursor: "pointer" }}>
           <div className="stat-pill-icon progress">
             <Wrench size={17} strokeWidth={2} />
           </div>
@@ -141,7 +177,7 @@ const MyComplaints = () => {
           </div>
         </div>
 
-        <div className="stat-pill">
+        <div className="stat-pill" onClick={() => setStatusFilter("Completed")} style={{ cursor: "pointer" }}>
           <div className="stat-pill-icon completed">
             <CheckCircle2 size={17} strokeWidth={2} />
           </div>
@@ -150,7 +186,6 @@ const MyComplaints = () => {
             <span>Completed</span>
           </div>
         </div>
-
       </div>
 
       {/* =========================
@@ -191,23 +226,22 @@ const MyComplaints = () => {
       {/* =========================
           COMPLAINTS CARD GRID
       ========================= */}
-
-      {filteredComplaints.length > 0 ? (
-
+      {loading && complaints.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>
+          <p>Loading complaints from MongoDB...</p>
+        </div>
+      ) : filteredComplaints.length > 0 ? (
         <div className="complaint-cards-grid">
-
           {filteredComplaints.map((complaint) => {
             const statusDisplay = getStatusDisplay(complaint.status);
             const statusClass = statusDisplay.toLowerCase().replace(" ", "-");
-            const priorityClass = complaint.priority?.toLowerCase();
+            const priorityClass = complaint.priority?.toLowerCase() || "medium";
 
             return (
               <div className="complaint-card" key={complaint.id}>
-
                 <div className={`complaint-card-accent ${statusClass}`}></div>
 
                 <div className="complaint-card-body">
-
                   <div className="complaint-card-top">
                     <span className="complaint-id">{complaint.id}</span>
                     <span className={`status ${statusClass}`}>
@@ -224,7 +258,6 @@ const MyComplaints = () => {
                   </p>
 
                   <div className="complaint-card-meta">
-
                     <span className="meta-item">
                       <Calendar size={12} strokeWidth={2} />
                       {complaint.reportedDate}
@@ -234,7 +267,6 @@ const MyComplaints = () => {
                       <Flag size={11} strokeWidth={2.5} />
                       {complaint.priority}
                     </span>
-
                   </div>
 
                   <button
@@ -246,17 +278,12 @@ const MyComplaints = () => {
                     {statusDisplay === "Pending" ? "Start / View" : "View Details"}
                     <ArrowRight size={14} strokeWidth={2.5} />
                   </button>
-
                 </div>
-
               </div>
             );
           })}
-
         </div>
-
       ) : (
-
         <div className="no-complaints">
           <div className="no-complaint-icon">
             <ClipboardList size={30} strokeWidth={1.5} />
@@ -264,9 +291,7 @@ const MyComplaints = () => {
           <h3>No complaints found</h3>
           <p>Try changing your search or filter criteria.</p>
         </div>
-
       )}
-
     </div>
   );
 };

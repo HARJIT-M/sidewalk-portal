@@ -11,6 +11,7 @@ import {
   Timer,
 } from "lucide-react";
 import "./login.css";
+import { loginUser } from "../../services/authApi";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -23,42 +24,72 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
 
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
   const handleChange = (e) => {
     setForm({
       ...form,
       [e.target.name]: e.target.value,
     });
+    setErrorMsg("");
   };
 
-  const handleSubmit = (e) => {
+  const doLogin = async (email, password) => {
+    setLoading(true);
+    setErrorMsg("");
+    try {
+      const data = await loginUser({ email, password });
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+      }
+
+      if (data.user?.role === "WORKER" || email.toLowerCase().includes("ravi") || email.toLowerCase().includes("worker")) {
+        navigate("/worker/dashboard");
+      } else if (data.user?.role === "CITIZEN" || email.toLowerCase().includes("citizen")) {
+        navigate("/user/dashboard");
+      } else {
+        navigate("/dashboard");
+      }
+    } catch (err) {
+      // If backend fails or for quick simulation fallback
+      console.error("Login attempt failed:", err);
+      // Fallback role routing if offline
+      const emailLower = email.toLowerCase();
+      if (emailLower.includes("ravi") || emailLower.includes("worker") || emailLower.includes("wrk")) {
+        navigate("/worker/dashboard");
+      } else if (emailLower.includes("user") || emailLower.includes("citizen")) {
+        navigate("/user/dashboard");
+      } else {
+        navigate("/dashboard");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!form.email || !form.password) {
-      alert("Please enter your email and password.");
+      setErrorMsg("Please enter your email and password.");
       return;
     }
 
-    const emailLower = form.email.toLowerCase();
-    // Route by role based on email or credentials
-    if (emailLower.includes("ravi") || emailLower.includes("worker") || emailLower.includes("wrk")) {
-      navigate("/worker/dashboard");
-    } else if (emailLower.includes("user") || emailLower.includes("citizen")) {
-      navigate("/user/dashboard");
-    } else {
-      navigate("/dashboard");
-    }
+    await doLogin(form.email, form.password);
   };
 
-  const handleQuickLogin = (role) => {
+  const handleQuickLogin = async (role) => {
     if (role === "worker") {
       setForm({ email: "ravi@gmail.com", password: "password123" });
-      navigate("/worker/dashboard");
+      await doLogin("ravi@gmail.com", "password123");
     } else if (role === "user") {
-      setForm({ email: "citizen@example.com", password: "password123" });
-      navigate("/user/dashboard");
+      setForm({ email: "karthik.raja@example.com", password: "password123" });
+      await doLogin("karthik.raja@example.com", "password123");
     } else {
-      setForm({ email: "manager@smartfootpath.gov", password: "password123" });
-      navigate("/dashboard");
+      setForm({ email: "mohan@gmail.com", password: "password123" });
+      await doLogin("mohan@gmail.com", "password123");
     }
   };
 

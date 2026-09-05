@@ -5,26 +5,55 @@ const path = require("path");
 
 const connectDB = require("./src/config/db");
 
-// Load environment variables
+// Route module imports
+const authRoutes = require("./src/routes/authRoutes");
+const dashboardRoutes = require("./src/routes/dashboardRoutes");
+const complaintRoutes = require("./src/routes/complaintRoutes");
+const workTrackingRoutes = require("./src/routes/workTrackingRoutes");
+const notificationRoutes = require("./src/routes/notificationRoutes");
+const workerRoutes = require("./src/routes/workerRoutes");
+const managerRoutes = require("./src/routes/managerRoutes");
+
+// ==========================================
+// 1. LOAD ENVIRONMENT CONFIGURATION
+// ==========================================
 dotenv.config({ path: [path.resolve(__dirname, ".env"), path.resolve(__dirname, "src/.env")] });
 
-// Connect to MongoDB
+// ==========================================
+// 2. CONNECT TO MONGODB
+// ==========================================
 connectDB();
 
 const app = express();
 
-// Middleware
+// ==========================================
+// 3. GLOBAL MIDDLEWARE
+// ==========================================
 app.use(cors());
 app.use(express.json());
 
-// Test route
+// ==========================================
+// 4. API ROUTE MOUNTING (MODULAR ROUTES)
+// ==========================================
+app.use("/api/auth", authRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/complaints", complaintRoutes);
+app.use("/api/work-tracking", workTrackingRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/workers", workerRoutes);
+app.use("/api/worker", workerRoutes);
+app.use("/api/manager", managerRoutes);
+
+// Root route
 app.get("/", (req, res) => {
   res.send("Smart Footpath Portal Backend Running");
 });
 
+// ==========================================
+// 5. SERVER INITIALIZATION
+// ==========================================
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-

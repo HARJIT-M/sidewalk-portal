@@ -53,6 +53,18 @@ const complaintSchema = new mongoose.Schema(
       required: [true, "Location is required"],
       trim: true,
     },
+    landmark: {
+      type: String,
+      trim: true,
+    },
+    area: {
+      type: String,
+      trim: true,
+    },
+    image_url: {
+      type: String,
+      trim: true,
+    },
     latitude: {
       type: Number,
     },

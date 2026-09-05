@@ -9,7 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { getStoredNotifications } from "../../pages/worker/workerData";
+import { getWorkerNotifications } from "../../services/workerApi";
 import "./WorkerSidebar.css";
 
 const WorkerSidebar = ({ collapsed, setCollapsed }) => {
@@ -17,13 +17,19 @@ const WorkerSidebar = ({ collapsed, setCollapsed }) => {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    const checkUnread = () => {
-      const notifs = getStoredNotifications();
-      const count = notifs.filter((n) => !n.read).length;
-      setUnreadCount(count);
+    const checkUnread = async () => {
+      try {
+        const res = await getWorkerNotifications();
+        if (res.success) {
+          setUnreadCount(res.unreadCount || 0);
+        }
+      } catch {
+        // Silently ignore if not logged in
+      }
     };
+
     checkUnread();
-    const interval = setInterval(checkUnread, 3000);
+    const interval = setInterval(checkUnread, 15000); // Check every 15s
     return () => clearInterval(interval);
   }, []);
 
@@ -41,6 +47,8 @@ const WorkerSidebar = ({ collapsed, setCollapsed }) => {
 
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to log out?")) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
       navigate("/login");
     }
   };

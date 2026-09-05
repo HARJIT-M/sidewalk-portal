@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  getStoredComplaints,
-  saveStoredComplaints,
-  getStoredProfile,
-  getStoredNotifications,
-  saveStoredNotifications,
-} from "./workerData";
+  getWorkerComplaintDetails,
+  startComplaintWork,
+  submitWorkUpdate,
+  getWorkerProfile,
+} from "../../services/workerApi";
 import "./WorkerComplaintDetails.css";
 
 const WorkerComplaintDetails = () => {
@@ -15,7 +14,10 @@ const WorkerComplaintDetails = () => {
 
   const [complaint, setComplaint] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [successAlert, setSuccessAlert] = useState("");
+  const [errorAlert, setErrorAlert] = useState("");
 
   // Work Update Form State
   const [workStatus, setWorkStatus] = useState("In Progress");
@@ -24,71 +26,66 @@ const WorkerComplaintDetails = () => {
   const [remarks, setRemarks] = useState("");
   const [completionImage, setCompletionImage] = useState(null);
 
-  useEffect(() => {
-    const allComplaints = getStoredComplaints();
-    const found = allComplaints.find((c) => c.id === id) || allComplaints[0];
-    if (found) {
-      setComplaint(found);
-      setWorkDescription(found.workDescription || "");
-      setMaterialsUsed(found.materialsUsed || "");
-      setRemarks(found.remarks || "");
-      setCompletionImage(found.completionImage || null);
-      if (found.status === "RESOLVED" || found.status === "COMPLETED") {
-        setWorkStatus("Completed");
-      } else if (found.status === "IN_PROGRESS") {
-        setWorkStatus("In Progress");
+  const loadDetails = async () => {
+    try {
+      setLoading(true);
+      setErrorAlert("");
+      const [res, profRes] = await Promise.allSettled([
+        getWorkerComplaintDetails(id),
+        getWorkerProfile(),
+      ]);
+
+      if (res.status === "fulfilled" && res.value.success) {
+        const found = res.value.complaint;
+        setComplaint(found);
+        setWorkDescription(found.workDescription || "");
+        setMaterialsUsed(found.materialsUsed || "");
+        setRemarks(found.remarks || "");
+        setCompletionImage(found.completionImage || null);
+        if (found.status === "RESOLVED" || found.status === "COMPLETED" || found.status === "CLOSED") {
+          setWorkStatus("Completed");
+        } else if (found.status === "IN_PROGRESS") {
+          setWorkStatus("In Progress");
+        } else {
+          setWorkStatus("Pending");
+        }
       } else {
-        setWorkStatus("Pending");
+        setErrorAlert("Complaint details not found.");
       }
+
+      if (profRes.status === "fulfilled" && profRes.value.success) {
+        setProfile(profRes.value.profile);
+      }
+    } catch (err) {
+      console.error("Error loading complaint details:", err);
+      setErrorAlert("Failed to load complaint details from server.");
+    } finally {
+      setLoading(false);
     }
-    setProfile(getStoredProfile());
+  };
+
+  useEffect(() => {
+    loadDetails();
   }, [id]);
 
-  if (!complaint) {
-    return (
-      <div className="complaint-details-page">
-        <div className="no-complaints">
-          <p>Loading complaint details...</p>
-        </div>
-      </div>
-    );
-  }
-
   // Quick Action: Start Work
-  const handleStartWork = () => {
-    const timestamp = new Date().toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    const updated = {
-      ...complaint,
-      status: "IN_PROGRESS",
-      statusHistory: [
-        ...(complaint.statusHistory || []),
-        {
-          status: "IN_PROGRESS",
-          date: timestamp,
-          note: `Work started on-site by ${profile?.name || "Worker"}.`,
-        },
-      ],
-      repairHistory: [
-        ...(complaint.repairHistory || []),
-        {
-          time: timestamp,
-          action: "Safety barricades placed and repair work initiated.",
-        },
-      ],
-    };
-
-    updateComplaintInStore(updated);
-    setComplaint(updated);
-    setWorkStatus("In Progress");
-    setSuccessAlert("Work status updated to In Progress!");
-    setTimeout(() => setSuccessAlert(""), 4000);
+  const handleStartWork = async () => {
+    try {
+      setSubmitting(true);
+      setErrorAlert("");
+      const res = await startComplaintWork(id);
+      if (res.success) {
+        setSuccessAlert("Work status updated to In Progress in MongoDB!");
+        setWorkStatus("In Progress");
+        await loadDetails();
+        setTimeout(() => setSuccessAlert(""), 4000);
+      }
+    } catch (err) {
+      console.error("Failed to start work:", err);
+      setErrorAlert(err.response?.data?.message || "Failed to update work status.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Image Upload
@@ -110,89 +107,72 @@ const WorkerComplaintDetails = () => {
   };
 
   // Submit Work Update
-  const handleSubmitUpdate = (e) => {
+  const handleSubmitUpdate = async (e) => {
     e.preventDefault();
+    try {
+      setSubmitting(true);
+      setErrorAlert("");
 
-    const timestamp = new Date().toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+      const payload = {
+        status: workStatus,
+        workDescription,
+        materialsUsed,
+        remarks,
+        completionImage,
+      };
 
-    const isCompleted = workStatus === "Completed";
-    const mappedStatus = isCompleted ? "RESOLVED" : "IN_PROGRESS";
-
-    const updated = {
-      ...complaint,
-      status: mappedStatus,
-      workDescription: workDescription,
-      materialsUsed: materialsUsed,
-      remarks: remarks,
-      completionImage: completionImage,
-      statusHistory: [
-        ...(complaint.statusHistory || []),
-        {
-          status: mappedStatus,
-          date: timestamp,
-          note: isCompleted
-            ? `Repair marked Completed by ${profile?.name || "Worker"}. Awaiting Manager verification.`
-            : `Work progress updated: ${workDescription.slice(0, 40) || "On-site progress logged."}`,
-        },
-      ],
-      repairHistory: [
-        ...(complaint.repairHistory || []),
-        {
-          time: timestamp,
-          action: isCompleted
-            ? "Repair completed, evidence uploaded, submitted for manager sign-off."
-            : `Work updated: ${workDescription.slice(0, 50) || "Progress recorded."}`,
-        },
-      ],
-    };
-
-    updateComplaintInStore(updated);
-    setComplaint(updated);
-
-    // Notify
-    if (isCompleted) {
-      const currentNotifs = getStoredNotifications();
-      saveStoredNotifications([
-        {
-          id: `NOTIF-${Date.now()}`,
-          type: "STATUS_UPDATE",
-          title: `Repair Completed: ${complaint.id}`,
-          message: `You completed ${complaint.id}. Field manager review is queued.`,
-          complaintId: complaint.id,
-          time: "Just now",
-          read: false,
-          urgent: false,
-        },
-        ...currentNotifs,
-      ]);
+      const res = await submitWorkUpdate(id, payload);
+      if (res.success) {
+        setSuccessAlert(
+          workStatus === "Completed"
+            ? "Work marked as Completed and submitted for Manager verification in MongoDB!"
+            : "Work progress logged successfully to MongoDB!"
+        );
+        await loadDetails();
+        setTimeout(() => setSuccessAlert(""), 4000);
+      }
+    } catch (err) {
+      console.error("Failed to submit work update:", err);
+      setErrorAlert(err.response?.data?.message || "Failed to submit work update.");
+    } finally {
+      setSubmitting(false);
     }
-
-    setSuccessAlert(
-      isCompleted
-        ? "Work successfully completed and submitted for Manager verification!"
-        : "Work progress updated successfully!"
-    );
-    setTimeout(() => setSuccessAlert(""), 4000);
-  };
-
-  const updateComplaintInStore = (updatedObj) => {
-    const all = getStoredComplaints();
-    const mapped = all.map((c) => (c.id === updatedObj.id ? updatedObj : c));
-    saveStoredComplaints(mapped);
   };
 
   const getStatusDisplay = (status) => {
     if (status === "ASSIGNED" || status === "PENDING") return "Pending";
     if (status === "IN_PROGRESS") return "In Progress";
-    if (status === "RESOLVED" || status === "COMPLETED") return "Completed";
-    return status;
+    if (status === "RESOLVED" || status === "COMPLETED" || status === "CLOSED") return "Completed";
+    return status || "Pending";
   };
+
+  if (loading && !complaint) {
+    return (
+      <div className="complaint-details-page">
+        <div style={{ textAlign: "center", padding: "60px", color: "#64748b" }}>
+          <h2>Loading complaint details from MongoDB...</h2>
+        </div>
+      </div>
+    );
+  }
+
+  if (!complaint) {
+    return (
+      <div className="complaint-details-page">
+        <div className="no-complaints">
+          <h3>Complaint Not Found</h3>
+          <p>Could not load the requested complaint details.</p>
+          <button
+            className="primary-action-btn"
+            onClick={() => navigate("/worker/my-complaints")}
+            style={{ marginTop: "16px" }}
+          >
+            ← Back to Complaints
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const currentDisplayStatus = getStatusDisplay(complaint.status);
 
@@ -216,8 +196,14 @@ const WorkerComplaintDetails = () => {
       </div>
 
       {successAlert && (
-        <div className="details-alert-box">
+        <div className="details-alert-box" style={{ background: "#dcfce7", color: "#166534", border: "1px solid #86efac" }}>
           <span>✅ {successAlert}</span>
+        </div>
+      )}
+
+      {errorAlert && (
+        <div className="details-alert-box" style={{ background: "#fee2e2", color: "#991b1b", border: "1px solid #fca5a5" }}>
+          <span>⚠️ {errorAlert}</span>
         </div>
       )}
 
@@ -230,7 +216,7 @@ const WorkerComplaintDetails = () => {
           <div className="card-top-title">
             <h2>{complaint.issue}</h2>
             <div className="card-badge-row">
-              <span className={`priority ${complaint.priority?.toLowerCase()}`}>
+              <span className={`priority ${(complaint.priority || "MEDIUM").toLowerCase()}`}>
                 {complaint.priority}
               </span>
               <span
@@ -254,12 +240,12 @@ const WorkerComplaintDetails = () => {
 
             <div className="meta-field">
               <label>Reported Date</label>
-              <p>{complaint.reportedDate}</p>
+              <p>{complaint.reportedDate || "N/A"}</p>
             </div>
 
             <div className="meta-field">
               <label>Assigned Date</label>
-              <p>{complaint.assignedDate || "21 Aug 2026"}</p>
+              <p>{complaint.assignedDate || "Assigned"}</p>
             </div>
           </div>
 
@@ -285,15 +271,19 @@ const WorkerComplaintDetails = () => {
           {currentDisplayStatus === "Pending" && (
             <div className="quick-start-box">
               <p>You have been assigned this task. Start repair on-site:</p>
-              <button className="primary-action-btn" onClick={handleStartWork}>
-                🚀 Start Work Now
+              <button
+                className="primary-action-btn"
+                onClick={handleStartWork}
+                disabled={submitting}
+              >
+                {submitting ? "Starting..." : "🚀 Start Work Now"}
               </button>
             </div>
           )}
         </div>
 
         {/* RIGHT CARD: Work Execution & Update Form */}
-        <div className="details-card">
+        <div className="details-card" id="work-update-section">
           <div className="card-top-title">
             <h2>Update Work Status & Repair Log</h2>
           </div>
@@ -379,8 +369,14 @@ const WorkerComplaintDetails = () => {
             </div>
 
             <div className="form-btn-row">
-              <button type="submit" className="primary-action-btn">
-                {workStatus === "Completed"
+              <button
+                type="submit"
+                className="primary-action-btn"
+                disabled={submitting}
+              >
+                {submitting
+                  ? "Saving to MongoDB..."
+                  : workStatus === "Completed"
                   ? "✓ Mark as Completed & Submit"
                   : "Submit Work Update"}
               </button>
@@ -389,9 +385,9 @@ const WorkerComplaintDetails = () => {
 
           {/* Repair Timeline History */}
           <div className="history-section">
-            <h3>Repair & Status History</h3>
+            <h3>Repair & Status History (MongoDB)</h3>
             <div className="history-timeline">
-              {complaint.statusHistory &&
+              {complaint.statusHistory && complaint.statusHistory.length > 0 ? (
                 complaint.statusHistory.map((item, index) => (
                   <div key={index} className="history-item">
                     <div className="history-dot"></div>
@@ -403,7 +399,12 @@ const WorkerComplaintDetails = () => {
                       <p>{item.note}</p>
                     </div>
                   </div>
-                ))}
+                ))
+              ) : (
+                <p style={{ color: "#64748b", fontStyle: "italic", fontSize: "13px" }}>
+                  No timeline history logged yet.
+                </p>
+              )}
             </div>
           </div>
         </div>

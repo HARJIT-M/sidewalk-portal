@@ -1,38 +1,64 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  getStoredNotifications,
-  saveStoredNotifications,
-} from "./workerData";
+  getWorkerNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  deleteWorkerNotification,
+} from "../../services/workerApi";
 import "./WorkerNotifications.css";
 
 const WorkerNotifications = () => {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
 
+  const loadNotifs = async () => {
+    try {
+      setLoading(true);
+      const res = await getWorkerNotifications();
+      if (res.success) {
+        setNotifications(res.notifications);
+      }
+    } catch (err) {
+      console.error("Failed to load notifications:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    setNotifications(getStoredNotifications());
+    loadNotifs();
   }, []);
 
-  const handleMarkAsRead = (id) => {
-    const updated = notifications.map((n) =>
-      n.id === id ? { ...n, read: true } : n
-    );
-    setNotifications(updated);
-    saveStoredNotifications(updated);
+  const handleMarkAsRead = async (id) => {
+    try {
+      await markNotificationRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      );
+    } catch (err) {
+      console.error("Failed to mark as read:", err);
+    }
   };
 
-  const handleMarkAllRead = () => {
-    const updated = notifications.map((n) => ({ ...n, read: true }));
-    setNotifications(updated);
-    saveStoredNotifications(updated);
+  const handleMarkAllRead = async () => {
+    try {
+      await markAllNotificationsRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    } catch (err) {
+      console.error("Failed to mark all as read:", err);
+    }
   };
 
-  const handleDeleteNotif = (id) => {
-    const updated = notifications.filter((n) => n.id !== id);
-    setNotifications(updated);
-    saveStoredNotifications(updated);
+  const handleDeleteNotif = async (id) => {
+    try {
+      await deleteWorkerNotification(id);
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    } catch (err) {
+      console.error("Failed to delete notification:", err);
+    }
   };
 
   const handleNavigateToTask = (notif) => {
@@ -45,7 +71,7 @@ const WorkerNotifications = () => {
   const filteredNotifications = notifications.filter((n) => {
     if (filter === "Unread") return !n.read;
     if (filter === "Assignments") return n.type === "ASSIGNMENT";
-    if (filter === "Updates") return n.type === "STATUS_UPDATE";
+    if (filter === "Updates") return n.type === "STATUS_CHANGE" || n.type === "REPAIR_COMPLETED";
     return true;
   });
 
@@ -59,7 +85,7 @@ const WorkerNotifications = () => {
       <div className="page-header">
         <div>
           <h1>Worker Notifications</h1>
-          <p>Task assignments, manager reviews, and status alerts</p>
+          <p>Task assignments, manager reviews, and status alerts (MongoDB)</p>
         </div>
 
         <div className="header-actions">
@@ -107,81 +133,87 @@ const WorkerNotifications = () => {
       {/* =========================
           NOTIFICATIONS LIST
       ========================= */}
-      <div className="notif-cards-container">
-        {filteredNotifications.map((notif) => (
-          <div
-            key={notif.id}
-            className={`notif-item-card ${!notif.read ? "unread" : ""}`}
-          >
-            <div className="notif-icon-col">
-              <div
-                className={`notif-avatar ${
-                  notif.type === "ASSIGNMENT"
-                    ? "assign"
-                    : notif.type === "STATUS_UPDATE"
-                    ? "update"
-                    : "system"
-                }`}
-              >
-                {notif.type === "ASSIGNMENT" ? "📋" : notif.type === "STATUS_UPDATE" ? "⚙️" : "🔔"}
-              </div>
-            </div>
-
-            <div className="notif-info-col">
-              <div className="notif-top-row">
-                <div className="title-box">
-                  {!notif.read && <span className="unread-dot"></span>}
-                  <h3>{notif.title}</h3>
-                  {notif.urgent && (
-                    <span className="priority high">Urgent</span>
-                  )}
+      {loading && notifications.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>
+          <p>Loading notifications from MongoDB...</p>
+        </div>
+      ) : (
+        <div className="notif-cards-container">
+          {filteredNotifications.map((notif) => (
+            <div
+              key={notif.id}
+              className={`notif-item-card ${!notif.read ? "unread" : ""}`}
+            >
+              <div className="notif-icon-col">
+                <div
+                  className={`notif-avatar ${
+                    notif.type === "ASSIGNMENT"
+                      ? "assign"
+                      : notif.type === "STATUS_CHANGE" || notif.type === "REPAIR_COMPLETED"
+                      ? "update"
+                      : "system"
+                  }`}
+                >
+                  {notif.type === "ASSIGNMENT" ? "📋" : notif.type === "STATUS_CHANGE" || notif.type === "REPAIR_COMPLETED" ? "⚙️" : "🔔"}
                 </div>
-                <span className="notif-time">{notif.time}</span>
               </div>
 
-              <p className="notif-body-text">{notif.message}</p>
+              <div className="notif-info-col">
+                <div className="notif-top-row">
+                  <div className="title-box">
+                    {!notif.read && <span className="unread-dot"></span>}
+                    <h3>{notif.title}</h3>
+                    {notif.urgent && (
+                      <span className="priority high">Urgent</span>
+                    )}
+                  </div>
+                  <span className="notif-time">{notif.time}</span>
+                </div>
 
-              <div className="notif-bottom-row">
-                {notif.complaintId ? (
-                  <button
-                    className="view-btn"
-                    onClick={() => handleNavigateToTask(notif)}
-                  >
-                    View Complaint ({notif.complaintId}) →
-                  </button>
-                ) : (
-                  <div></div>
-                )}
+                <p className="notif-body-text">{notif.message}</p>
 
-                <div className="item-actions">
-                  {!notif.read && (
+                <div className="notif-bottom-row">
+                  {notif.complaintId ? (
                     <button
-                      className="text-action-btn"
-                      onClick={() => handleMarkAsRead(notif.id)}
+                      className="view-btn"
+                      onClick={() => handleNavigateToTask(notif)}
                     >
-                      Mark read
+                      View Complaint ({notif.complaintId}) →
                     </button>
+                  ) : (
+                    <div></div>
                   )}
-                  <button
-                    className="text-action-btn delete"
-                    onClick={() => handleDeleteNotif(notif.id)}
-                  >
-                    Dismiss
-                  </button>
+
+                  <div className="item-actions">
+                    {!notif.read && (
+                      <button
+                        className="text-action-btn"
+                        onClick={() => handleMarkAsRead(notif.id)}
+                      >
+                        Mark read
+                      </button>
+                    )}
+                    <button
+                      className="text-action-btn delete"
+                      onClick={() => handleDeleteNotif(notif.id)}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
 
-        {filteredNotifications.length === 0 && (
-          <div className="no-notifications-card">
-            <div className="no-notif-icon">🔔</div>
-            <h3>No notifications in this filter</h3>
-            <p>You're all caught up with your task assignments.</p>
-          </div>
-        )}
-      </div>
+          {filteredNotifications.length === 0 && (
+            <div className="no-notifications-card">
+              <div className="no-notif-icon">🔔</div>
+              <h3>No notifications in this filter</h3>
+              <p>You're all caught up with your task assignments.</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
