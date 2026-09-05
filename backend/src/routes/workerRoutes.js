@@ -1,21 +1,17 @@
 const express = require("express");
 const { protect, authorize } = require("../middleware/authMiddleware");
 
-// Worker profile controllers
+// All Worker Profile & Worker Management controllers
 const {
   getWorkerProfile,
   updateWorkerProfile,
   changeWorkerPassword,
-} = require("../controllers/workerController");
-
-// Manager worker management controllers
-const {
   getAllWorkers,
   getAvailableWorkers,
   addWorker,
   updateWorkerStatus,
   deleteWorker,
-} = require("../controllers/managerController");
+} = require("../controllers/workerController");
 
 const router = express.Router();
 

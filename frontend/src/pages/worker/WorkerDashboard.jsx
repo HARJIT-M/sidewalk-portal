@@ -9,14 +9,14 @@ const WorkerDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeBarIndex, setActiveBarIndex] = useState(4); // Friday default
+  const [activeBarIndex, setActiveBarIndex] = useState(null);
 
   const loadDashboard = async () => {
     try {
       setLoading(true);
       setError(null);
       const res = await getWorkerDashboard();
-      if (res.success) {
+      if (res && res.success) {
         setDashboardData(res.dashboard);
       }
     } catch (err) {
@@ -32,56 +32,42 @@ const WorkerDashboard = () => {
   }, []);
 
   const worker = dashboardData?.worker || {
-    id: "WRK001",
-    name: "Ravi Kumar",
-    zone: "Zone 2 - Gandhipuram Central",
-    rating: 4.9,
-    onTimeRate: 96,
+    id: "",
+    name: "Worker",
+    zone: "",
+    rating: 0,
+    onTimeRate: 0,
   };
 
   const stats = dashboardData?.stats || {
-    totalAssigned: 5,
-    inProgress: 2,
-    completed: 1,
-    highPriority: 2,
+    totalAssigned: 0,
+    inProgress: 0,
+    completed: 0,
+    highPriority: 0,
     unreadNotifications: 0,
   };
 
-  const activeTask = dashboardData?.activeTask || {
-    id: "CMP001",
-    issue: "Broken Footpath & Sunk Paver Blocks",
-    location: "100 Feet Road, Gandhipuram, Coimbatore",
-    landmark: "Opposite City Bus Stand Gate #2",
-    description:
-      "Multiple interlock tiles have broken and sunk inward creating a deep 8-inch tripping hazard.",
-    priority: "HIGH",
-    status: "IN_PROGRESS",
-    progress: 80,
-  };
-
+  const activeTask = dashboardData?.activeTask || null;
   const highPriorityTasks = dashboardData?.highPriorityTasks || [];
-
-  const weeklyData = dashboardData?.weeklyData || [
-    { day: "Mon", count: 4, label: "4 Tasks" },
-    { day: "Tue", count: 6, label: "6 Tasks" },
-    { day: "Wed", count: 5, label: "5 Tasks" },
-    { day: "Thu", count: 7, label: "7 Tasks" },
-    { day: "Fri", count: 8, label: "8 Tasks" },
-    { day: "Sat", count: 3, label: "3 Tasks" },
-  ];
-
-  const statusData = dashboardData?.statusData || [
-    { label: "Resolved", count: stats.completed, color: "#16a34a", percent: 47 },
-    { label: "In Progress", count: stats.inProgress, color: "#4f46e5", percent: 24 },
-    { label: "Assigned", count: stats.totalAssigned - stats.completed - stats.inProgress, color: "#d97706", percent: 29 },
-  ];
-
+  const weeklyData = dashboardData?.weeklyData || [];
+  const statusData = dashboardData?.statusData || [];
   const recentActivity = dashboardData?.recentActivity || [];
   const upcomingSchedule = dashboardData?.upcomingSchedule || [];
 
-  const completionPercent = stats.totalAssigned > 0
-    ? Math.round((stats.completed / stats.totalAssigned) * 100)
-    : 0;
+  const completionPercent =
+    stats.totalAssigned > 0
+      ? Math.round((stats.completed / stats.totalAssigned) * 100)
+      : 0;
+
+  if (loading && !dashboardData) {
+    return (
+      <div className="worker-dashboard">
+        <div style={{ textAlign: "center", padding: "80px 20px", color: "#64748b" }}>
+          <h2>Loading live dashboard metrics from database...</h2>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="worker-dashboard">
@@ -103,7 +89,7 @@ const WorkerDashboard = () => {
           <div>
             <h3>{worker.name}</h3>
             <span>
-              {worker.zone} ({worker.id})
+              {worker.zone ? `${worker.zone} (${worker.id})` : worker.id}
             </span>
           </div>
         </div>
@@ -131,17 +117,19 @@ const WorkerDashboard = () => {
           <button
             className="action-pill-btn"
             onClick={() =>
-              navigate(`/worker/complaints/${activeTask.id || "CMP001"}`)
+              activeTask
+                ? navigate(`/worker/complaints/${activeTask.id}`)
+                : navigate("/worker/my-complaints")
             }
           >
-            🔧 Update Active Task
+            🔧 {activeTask ? "Update Active Task" : "View Assigned Tasks"}
           </button>
           <button
             className="action-pill-btn"
             onClick={() =>
-              navigate(
-                `/worker/complaints/${activeTask.id || "CMP001"}#work-update-section`
-              )
+              activeTask
+                ? navigate(`/worker/complaints/${activeTask.id}#work-update-section`)
+                : navigate("/worker/my-complaints")
             }
           >
             📷 Upload Repair Proof
@@ -215,7 +203,7 @@ const WorkerDashboard = () => {
       {/* =========================================
           4. TODAY'S WORK — FEATURED WORK ORDER
       ========================================= */}
-      {activeTask && (
+      {activeTask ? (
         <div className="complaints-section featured-work-box">
           <div className="section-header">
             <div>
@@ -247,12 +235,12 @@ const WorkerDashboard = () => {
             <div className="progress-box">
               <div className="progress-label-row">
                 <span className="progress-text-label">Repair Progress</span>
-                <strong>{activeTask.progress || 80}% Complete</strong>
+                <strong>{activeTask.progress || 0}% Complete</strong>
               </div>
               <div className="progress-bar-container">
                 <div
                   className="progress-bar-indicator"
-                  style={{ width: `${activeTask.progress || 80}%` }}
+                  style={{ width: `${activeTask.progress || 0}%` }}
                 ></div>
               </div>
               <div className="progress-footer-note">
@@ -285,6 +273,19 @@ const WorkerDashboard = () => {
               </button>
             </div>
           </div>
+        </div>
+      ) : (
+        <div className="complaints-section featured-work-box" style={{ textAlign: "center", padding: "30px 20px" }}>
+          <p style={{ color: "#64748b", margin: "0 0 12px 0", fontSize: "15px" }}>
+            No active repair tasks currently in progress.
+          </p>
+          <button
+            className="action-pill-btn"
+            onClick={() => navigate("/worker/my-complaints")}
+            style={{ margin: "0 auto", display: "inline-flex" }}
+          >
+            📋 Browse Assigned Complaints
+          </button>
         </div>
       )}
 
@@ -338,6 +339,9 @@ const WorkerDashboard = () => {
                   </div>
                 );
               })}
+              {weeklyData.length === 0 && (
+                <p style={{ color: "#64748b", padding: "20px", textAlign: "center" }}>No weekly activity recorded yet.</p>
+              )}
             </div>
           </div>
         </div>
@@ -560,15 +564,17 @@ const WorkerDashboard = () => {
               <div className="area-icon">📍</div>
               <div>
                 <strong>Active Operational Zone:</strong>
-                <p>{worker.zone}</p>
-                <a
-                  href={`https://maps.google.com/?q=${encodeURIComponent(worker.zone)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="map-anchor"
-                >
-                  View Location on Google Maps →
-                </a>
+                <p>{worker.zone || "Operational Zone Assigned by Field Manager"}</p>
+                {worker.zone && (
+                  <a
+                    href={`https://maps.google.com/?q=${encodeURIComponent(worker.zone)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="map-anchor"
+                  >
+                    View Location on Google Maps →
+                  </a>
+                )}
               </div>
             </div>
 
@@ -583,6 +589,9 @@ const WorkerDashboard = () => {
                   </div>
                 </div>
               ))}
+              {upcomingSchedule.length === 0 && (
+                <p style={{ color: "#64748b", fontStyle: "italic" }}>No upcoming scheduled work.</p>
+              )}
             </div>
           </div>
         </div>
