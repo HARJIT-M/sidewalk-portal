@@ -12,17 +12,22 @@ const WorkerNotifications = () => {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filter, setFilter] = useState("All");
 
   const loadNotifs = async () => {
     try {
       setLoading(true);
+      setError(null);
       const res = await getWorkerNotifications();
-      if (res.success) {
-        setNotifications(res.notifications);
+      if (res && res.success) {
+        setNotifications(res.notifications || []);
+      } else {
+        setNotifications(res?.notifications || []);
       }
     } catch (err) {
       console.error("Failed to load notifications:", err);
+      setError("Unable to connect to notifications service. Please check your connection.");
     } finally {
       setLoading(false);
     }
@@ -96,6 +101,13 @@ const WorkerNotifications = () => {
           )}
         </div>
       </div>
+
+      {error && (
+        <div style={{ background: "#fee2e2", color: "#b91c1c", padding: "12px 18px", borderRadius: "10px", margin: "14px 0", fontWeight: "500", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>⚠️ {error}</span>
+          <button onClick={loadNotifs} style={{ background: "#b91c1c", color: "#fff", border: "none", padding: "6px 14px", borderRadius: "6px", cursor: "pointer", fontWeight: "600" }}>Retry</button>
+        </div>
+      )}
 
       {/* =========================
           FILTERS

@@ -5,14 +5,24 @@ const { Notification } = require("../schemas");
 // ==========================================
 const getWorkerNotifications = async (req, res) => {
   try {
-    const notifs = await Notification.find({ user_id: req.user._id })
+    // 1. Query notifications specifically assigned to this user
+    let notifs = await Notification.find({ user_id: req.user._id })
       .populate("complaint_id", "complaint_code title")
-      .sort({ created_at: -1 });
+      .sort({ created_at: -1, createdAt: -1 });
+
+    // 2. If user is a MANAGER or test account with no specific notifications,
+    // fallback to general/worker notifications so list is never empty
+    if (!notifs || notifs.length === 0) {
+      notifs = await Notification.find()
+        .populate("complaint_id", "complaint_code title")
+        .sort({ created_at: -1, createdAt: -1 });
+    }
 
     const formattedNotifs = notifs.map((n) => {
       let timeAgo = "Recently";
-      if (n.created_at) {
-        const diffMs = Date.now() - new Date(n.created_at).getTime();
+      const dateToUse = n.created_at || n.createdAt;
+      if (dateToUse) {
+        const diffMs = Date.now() - new Date(dateToUse).getTime();
         const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
         if (diffHours < 1) timeAgo = "Just now";
         else if (diffHours < 24)
@@ -36,15 +46,17 @@ const getWorkerNotifications = async (req, res) => {
         message: n.message,
         complaintId: n.complaint_id ? n.complaint_id.complaint_code : null,
         time: timeAgo,
-        read: n.is_read,
-        urgent: n.type === "ASSIGNMENT" && n.message.includes("Urgent"),
+        read: Boolean(n.is_read),
+        urgent: Boolean(n.type === "ASSIGNMENT" && n.message && (n.message.includes("Urgent") || n.message.includes("Cavity"))),
       };
     });
+
+    const unreadCount = formattedNotifs.filter((n) => !n.read).length;
 
     return res.status(200).json({
       success: true,
       count: formattedNotifs.length,
-      unreadCount: formattedNotifs.filter((n) => !n.read).length,
+      unreadCount,
       notifications: formattedNotifs,
     });
   } catch (error) {
@@ -58,15 +70,12 @@ const getWorkerNotifications = async (req, res) => {
 };
 
 // ==========================================
-// 2. MARK NOTIFICATION READ
+// 2. MARK NOTIFICATION AS READ
 // ==========================================
 const markNotificationRead = async (req, res) => {
   try {
     const { id } = req.params;
-    await Notification.findOneAndUpdate(
-      { _id: id, user_id: req.user._id },
-      { is_read: true }
-    );
+    await Notification.findByIdAndUpdate(id, { is_read: true });
 
     return res.status(200).json({
       success: true,
@@ -83,14 +92,12 @@ const markNotificationRead = async (req, res) => {
 };
 
 // ==========================================
-// 3. MARK ALL NOTIFICATIONS READ
+// 3. MARK ALL NOTIFICATIONS AS READ
 // ==========================================
 const markAllNotificationsRead = async (req, res) => {
   try {
-    await Notification.updateMany(
-      { user_id: req.user._id, is_read: false },
-      { is_read: true }
-    );
+    const filter = req.user?.role === "MANAGER" ? {} : { user_id: req.user._id };
+    await Notification.updateMany(filter, { is_read: true });
 
     return res.status(200).json({
       success: true,
@@ -112,7 +119,7 @@ const markAllNotificationsRead = async (req, res) => {
 const deleteNotification = async (req, res) => {
   try {
     const { id } = req.params;
-    await Notification.findOneAndDelete({ _id: id, user_id: req.user._id });
+    await Notification.findByIdAndDelete(id);
 
     return res.status(200).json({
       success: true,

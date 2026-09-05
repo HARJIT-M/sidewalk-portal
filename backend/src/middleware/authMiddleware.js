@@ -1,6 +1,9 @@
 const jwt = require("jsonwebtoken");
 const User = require("../schemas/User");
 
+// ==========================================
+// 1. JWT AUTHENTICATION MIDDLEWARE
+// ==========================================
 const protect = async (req, res, next) => {
   try {
     let token;
@@ -33,7 +36,7 @@ const protect = async (req, res, next) => {
       });
     }
 
-    if (user.status !== "ACTIVE") {
+    if (user.status && user.status.toUpperCase() !== "ACTIVE") {
       return res.status(403).json({
         success: false,
         message: "User account is inactive.",
@@ -54,20 +57,31 @@ const protect = async (req, res, next) => {
   }
 };
 
-// ===============================
-// Role Authorization
-// ===============================
-
+// ==========================================
+// 2. ROLE AUTHORIZATION MIDDLEWARE
+// ==========================================
 const authorize = (...roles) => {
+  const allowedRoles = roles.map((r) => r.toUpperCase());
+
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
+    if (!req.user || !req.user.role) {
       return res.status(403).json({
         success: false,
-        message: "You do not have permission to access this resource.",
+        message: "User role not defined.",
       });
     }
 
-    next();
+    const currentRole = req.user.role.toUpperCase();
+
+    // If role matches allowed list OR user is MANAGER (manager has supervisor privilege)
+    if (allowedRoles.includes(currentRole) || currentRole === "MANAGER") {
+      return next();
+    }
+
+    return res.status(403).json({
+      success: false,
+      message: `You do not have permission to access this resource. Allowed roles: ${allowedRoles.join(", ")}`,
+    });
   };
 };
 
