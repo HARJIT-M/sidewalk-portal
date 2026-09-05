@@ -8,6 +8,7 @@ import WorkerLayout from "./components/worker/WorkerLayout";
 import UserLayout from "./components/user/userlayout";
 
 import Login from "./pages/auth/login";
+import ProtectedRoute from "./components/ProtectedRoute";
 import Signup from "./pages/auth/signin";
 
 // Manager Pages
@@ -42,118 +43,127 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/landing" element={<LandingPage />} />
 
+
         {/* =========================
-            USER PORTAL
-            UserLayout contains
-            UserSidebar
+            USER PORTAL - PROTECTED
         ========================= */}
 
-        <Route path="/user" element={<UserLayout />}>
+        <Route element={<ProtectedRoute />}>
+          <Route path="/user" element={<UserLayout />}>
 
-          {/* /user → /user/dashboard */}
-          <Route
-            index
-            element={<Navigate to="/user/dashboard" replace />}
-          />
+            {/* /user → /user/dashboard */}
+            <Route
+              index
+              element={
+                <Navigate
+                  to="/user/dashboard"
+                  replace
+                />
+              }
+            />
 
-          {/* /user/dashboard */}
-          <Route
-            path="dashboard"
-            element={<UserDashboard />}
-          />
+            {/* /user/dashboard */}
+            <Route
+              path="dashboard"
+              element={<UserDashboard />}
+            />
 
-          {/* /user/add-complaint */}
-          <Route
-            path="add-complaint"
-            element={<ReportComplaint />}
-          />
+            {/* /user/add-complaint */}
+            <Route
+              path="add-complaint"
+              element={<ReportComplaint />}
+            />
 
-          {/* /user/view-complaint */}
-          <Route
-            path="view-complaint"
-            element={<ViewComplaints />}
-          />
+            {/* /user/view-complaint */}
+            <Route
+              path="view-complaint"
+              element={<ViewComplaints />}
+            />
 
-          {/* /user/profile */}
-          <Route
-            path="profile"
-            element={<UserProfile />}
-          />
-          {/* Add your UserProfile component here later */}
+            {/* /user/profile */}
+            <Route
+              path="profile"
+              element={<UserProfile />}
+            />
 
+          </Route>
         </Route>
 
 
         {/* =========================
-            MANAGER PORTAL
+            MANAGER PORTAL - PROTECTED
         ========================= */}
 
-        <Route element={<Layout />}>
+        <Route element={<ProtectedRoute />}>
+          <Route element={<Layout />}>
 
-          <Route
-            path="/dashboard"
-            element={<Dashboard />}
-          />
+            <Route
+              path="/dashboard"
+              element={<Dashboard />}
+            />
 
-          <Route
-            path="/complaints"
-            element={<Complaint />}
-          />
+            <Route
+              path="/complaints"
+              element={<Complaint />}
+            />
 
-          <Route
-            path="/work-tracking"
-            element={<WorkTracking />}
-          />
+            <Route
+              path="/work-tracking"
+              element={<WorkTracking />}
+            />
 
-          <Route
-            path="/workers"
-            element={<Workers />}
-          />
+            <Route
+              path="/workers"
+              element={<Workers />}
+            />
 
+          </Route>
         </Route>
 
 
         {/* =========================
-            WORKER PORTAL
+            WORKER PORTAL - PROTECTED
         ========================= */}
 
-        <Route path="/worker" element={<WorkerLayout />}>
+        <Route element={<ProtectedRoute />}>
+          <Route path="/worker" element={<WorkerLayout />}>
 
-          <Route
-            index
-            element={
-              <Navigate
-                to="/worker/dashboard"
-                replace
-              />
-            }
-          />
+            <Route
+              index
+              element={
+                <Navigate
+                  to="/worker/dashboard"
+                  replace
+                />
+              }
+            />
 
-          <Route
-            path="dashboard"
-            element={<WorkerDashboard />}
-          />
+            <Route
+              path="dashboard"
+              element={<WorkerDashboard />}
+            />
 
-          <Route
-            path="my-complaints"
-            element={<MyComplaints />}
-          />
+            <Route
+              path="my-complaints"
+              element={<MyComplaints />}
+            />
 
-          <Route
-            path="complaints/:id"
-            element={<WorkerComplaintDetails />}
-          />
+            <Route
+              path="complaints/:id"
+              element={<WorkerComplaintDetails />}
+            />
 
-          <Route
-            path="profile"
-            element={<WorkerProfile />}
-          />
+            <Route
+              path="profile"
+              element={<WorkerProfile />}
+            />
 
-          <Route
-            path="notifications"
-            element={<WorkerNotifications />}
-          />
+            <Route
+              path="notifications"
+              element={<WorkerNotifications />}
+            />
 
+          </Route>
         </Route>
 
 
@@ -188,7 +198,12 @@ function App() {
 
         <Route
           path="/"
-          element={<Navigate to="/landing" replace />}
+          element={
+            <Navigate
+              to="/landing"
+              replace
+            />
+          }
         />
 
       </Routes>

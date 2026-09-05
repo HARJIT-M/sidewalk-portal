@@ -1,6 +1,7 @@
 
 import React from "react";
 import { NavLink, useNavigate } from "react-router-dom";
+import { logout } from "../../utils/auth";
 import {
   Home,
   FilePlus,
@@ -39,10 +40,11 @@ const UserSidebar = ({ collapsed, setCollapsed }) => {
   ];
 
   const handleLogout = () => {
-    if (window.confirm("Are you sure you want to log out?")) {
-      navigate("/login");
-    }
-  };
+  if (window.confirm("Are you sure you want to log out?")) {
+    logout();
+    navigate("/login", { replace: true });
+  }
+};
 
   return (
     <>
