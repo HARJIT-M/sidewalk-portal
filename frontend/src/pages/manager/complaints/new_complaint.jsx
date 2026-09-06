@@ -1,101 +1,22 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import {
+  getManagerComplaints,
+  getAvailableWorkers,
+  updateComplaintPriority,
+  assignComplaintWorkers,
+  getComplaintDetails,
+} from "../../../services/managerApi";
 import "./new_complaint.css";
 
 const PRIORITY_LEVELS = ["Not Set", "Low", "Medium", "High", "Critical"];
 const STATUS_FLOW = ["Not Assigned", "Assigned", "In Progress", "Completed"];
 
-const WorkerComplaints = () => {
-  const [complaints, setComplaints] = useState([
-    {
-      id: "CMP001",
-      title: "Broken Footpath",
-      location: "Gandhipuram, Coimbatore",
-      description:
-        "The footpath is badly damaged near the main bus stop. Several tiles are broken and the surface is uneven, making it difficult for pedestrians to walk safely.",
-      reportedBy: "Arun Kumar",
-      date: "21 Aug 2026",
-      priority: "Not Set",
-      status: "Not Assigned",
-      image:
-        "https://images.unsplash.com/photo-1590644365607-1c5a1c2c8a2a?auto=format&fit=crop&w=900&q=80",
-      assignedWorkers: [],
-      workStartDate: "",
-      workEndDate: "",
-    },
-    {
-      id: "CMP002",
-      title: "Large Pothole",
-      location: "RS Puram, Coimbatore",
-      description:
-        "A large pothole has developed on the pedestrian pathway. Water accumulates in the damaged area during rain.",
-      reportedBy: "Priya S",
-      date: "20 Aug 2026",
-      priority: "High",
-      status: "In Progress",
-      image:
-        "https://images.unsplash.com/photo-1517999349371-c43520457b23?auto=format&fit=crop&w=900&q=80",
-      assignedWorkers: ["Ravi", "Karthik"],
-      workStartDate: "2026-08-22",
-      workEndDate: "2026-08-26",
-    },
-    {
-      id: "CMP003",
-      title: "Cracked Sidewalk",
-      location: "Saibaba Colony, Coimbatore",
-      description:
-        "Multiple cracks have appeared along the sidewalk. One section has become loose and may cause pedestrians to trip.",
-      reportedBy: "Rahul M",
-      date: "19 Aug 2026",
-      priority: "Medium",
-      status: "Completed",
-      image:
-        "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&w=900&q=80",
-      assignedWorkers: ["Manoj", "Suresh"],
-      workStartDate: "2026-08-20",
-      workEndDate: "2026-08-23",
-    },
-    {
-      id: "CMP004",
-      title: "Damaged Pavement",
-      location: "Peelamedu, Coimbatore",
-      description:
-        "The pavement has been damaged due to construction work. Broken concrete pieces are blocking part of the pedestrian pathway.",
-      reportedBy: "Vignesh",
-      date: "18 Aug 2026",
-      priority: "Not Set",
-      status: "Not Assigned",
-      image:
-        "https://images.unsplash.com/photo-1590674899484-d5640e854abe?auto=format&fit=crop&w=900&q=80",
-      assignedWorkers: [],
-      workStartDate: "",
-      workEndDate: "",
-    },
-    {
-      id: "CMP005",
-      title: "Missing Footpath Tiles",
-      location: "Singanallur, Coimbatore",
-      description:
-        "Several tiles are missing from the footpath near the shopping area. The exposed surface is dangerous for pedestrians.",
-      reportedBy: "Sanjay",
-      date: "17 Aug 2026",
-      priority: "Medium",
-      status: "Not Assigned",
-      image:
-        "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=900&q=80",
-      assignedWorkers: [],
-      workStartDate: "",
-      workEndDate: "",
-    },
-  ]);
-
-  const availableWorkers = [
-    { id: 1, name: "Ravi", role: "Maintenance Worker" },
-    { id: 2, name: "Karthik", role: "Maintenance Worker" },
-    { id: 3, name: "Manoj", role: "Maintenance Worker" },
-    { id: 4, name: "Suresh", role: "Maintenance Worker" },
-    { id: 5, name: "Arun", role: "Maintenance Worker" },
-    { id: 6, name: "Dinesh", role: "Maintenance Worker" },
-  ];
+const Complaints = () => {
+  const [complaints, setComplaints] = useState([]);
+  const [availableWorkers, setAvailableWorkers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
@@ -103,55 +24,114 @@ const WorkerComplaints = () => {
   const [selectedWorkers, setSelectedWorkers] = useState([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [assigning, setAssigning] = useState(false);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
 
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setErrorMsg("");
+      const [compRes, workRes] = await Promise.all([
+        getManagerComplaints(),
+        getAvailableWorkers(),
+      ]);
+
+      if (compRes && compRes.success) {
+        setComplaints(compRes.complaints || []);
+      }
+      if (workRes && workRes.success) {
+        const formattedWorkers = (workRes.workers || []).map((w) => ({
+          id: w._id || w.id,
+          employeeCode: w.id || w.employee_code,
+          name: w.name,
+          role: w.role || "Maintenance Worker",
+          phone: w.phone,
+        }));
+        setAvailableWorkers(formattedWorkers);
+      }
+    } catch (err) {
+      console.error("Error loading complaints data:", err);
+      setErrorMsg(err.message || "Failed to load complaints.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
   const filteredComplaints = complaints.filter((complaint) => {
+    const q = search.toLowerCase();
     const matchesSearch =
-      complaint.id.toLowerCase().includes(search.toLowerCase()) ||
-      complaint.title.toLowerCase().includes(search.toLowerCase()) ||
-      complaint.location.toLowerCase().includes(search.toLowerCase());
+      (complaint.id && complaint.id.toLowerCase().includes(q)) ||
+      (complaint.title && complaint.title.toLowerCase().includes(q)) ||
+      (complaint.location && complaint.location.toLowerCase().includes(q)) ||
+      (complaint.reportedBy && complaint.reportedBy.toLowerCase().includes(q));
 
     const matchesStatus =
-      statusFilter === "All" || complaint.status === statusFilter;
+      statusFilter === "All" ||
+      (complaint.status && complaint.status.toLowerCase() === statusFilter.toLowerCase());
 
     const matchesPriority =
-      priorityFilter === "All" || complaint.priority === priorityFilter;
+      priorityFilter === "All" ||
+      (complaint.priority && complaint.priority.toLowerCase() === priorityFilter.toLowerCase());
 
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
-  // ---- Priority ----
-  const handlePriorityChange = (complaintId, newPriority) => {
-    setComplaints((prev) =>
-      prev.map((c) =>
-        c.id === complaintId ? { ...c, priority: newPriority } : c
-      )
-    );
+  // ---- Priority Change ----
+  const handlePriorityChange = async (complaintId, newPriority) => {
+    try {
+      setErrorMsg("");
+      await updateComplaintPriority(complaintId, newPriority);
+      setComplaints((prev) =>
+        prev.map((c) =>
+          c.id === complaintId ? { ...c, priority: newPriority } : c
+        )
+      );
 
-    if (selectedComplaint?.id === complaintId) {
-      setSelectedComplaint((prev) => ({ ...prev, priority: newPriority }));
+      if (selectedComplaint?.id === complaintId) {
+        setSelectedComplaint((prev) => ({ ...prev, priority: newPriority }));
+      }
+      setSuccessMsg(`Priority updated to ${newPriority}.`);
+      setTimeout(() => setSuccessMsg(""), 3000);
+    } catch (err) {
+      console.error("Error updating priority:", err);
+      setErrorMsg(err.message || "Failed to update priority.");
     }
   };
 
-  // ---- Details ----
-  const handleViewDetails = (complaint) => {
+  // ---- View Details ----
+  const handleViewDetails = async (complaint) => {
     setSelectedComplaint(complaint);
     setShowDetails(true);
+    try {
+      const res = await getComplaintDetails(complaint.id || complaint.mongoId);
+      if (res && res.success && res.complaint) {
+        setSelectedComplaint((prev) => ({
+          ...prev,
+          ...res.complaint,
+        }));
+      }
+    } catch (err) {
+      console.warn("Could not load extended details:", err);
+    }
   };
 
-  // ---- Assign ----
+  // ---- Assign Workers ----
   const handleOpenAssign = (complaint) => {
-    if (complaint.priority === "Not Set") {
+    if (complaint.priority === "Not Set" || !complaint.priority) {
       alert("Please set a priority before assigning workers.");
       return;
     }
     setSelectedComplaint(complaint);
     setSelectedWorkers(complaint.assignedWorkers || []);
-    setStartDate(complaint.workStartDate || "");
-    setEndDate(complaint.workEndDate || "");
+    setStartDate(complaint.workStartDate ? complaint.workStartDate.split("T")[0] : "");
+    setEndDate(complaint.workEndDate ? complaint.workEndDate.split("T")[0] : "");
     setShowAssignPopup(true);
   };
 
@@ -167,9 +147,9 @@ const WorkerComplaints = () => {
     }
   };
 
-  const handleAssignWorkers = () => {
-    if (selectedWorkers.length < 2) {
-      alert("Please select at least 2 workers.");
+  const handleAssignWorkers = async () => {
+    if (selectedWorkers.length < 1) {
+      alert("Please select at least 1 worker.");
       return;
     }
 
@@ -183,52 +163,58 @@ const WorkerComplaints = () => {
       return;
     }
 
-    setComplaints((prev) =>
-      prev.map((c) =>
-        c.id === selectedComplaint.id
-          ? {
-              ...c,
-              assignedWorkers: selectedWorkers,
-              status: "Assigned",
-              workStartDate: startDate,
-              workEndDate: endDate,
-            }
-          : c
-      )
-    );
+    setAssigning(true);
+    setErrorMsg("");
+    try {
+      const res = await assignComplaintWorkers(selectedComplaint.id || selectedComplaint.mongoId, {
+        selectedWorkers,
+        startDate,
+        endDate,
+      });
 
-    setSelectedComplaint((prev) => ({
-      ...prev,
-      assignedWorkers: selectedWorkers,
-      status: "Assigned",
-      workStartDate: startDate,
-      workEndDate: endDate,
-    }));
+      if (res && res.success) {
+        setComplaints((prev) =>
+          prev.map((c) =>
+            c.id === selectedComplaint.id
+              ? {
+                  ...c,
+                  assignedWorkers: selectedWorkers,
+                  status: "Assigned",
+                  workStartDate: startDate,
+                  workEndDate: endDate,
+                }
+              : c
+          )
+        );
 
-    setShowAssignPopup(false);
-    alert("Workers assigned successfully!");
-  };
+        setSelectedComplaint((prev) => ({
+          ...prev,
+          assignedWorkers: selectedWorkers,
+          status: "Assigned",
+          workStartDate: startDate,
+          workEndDate: endDate,
+        }));
 
-  // ---- Status progression ----
-  const advanceStatus = (complaintId, nextStatus) => {
-    setComplaints((prev) =>
-      prev.map((c) =>
-        c.id === complaintId ? { ...c, status: nextStatus } : c
-      )
-    );
-
-    if (selectedComplaint?.id === complaintId) {
-      setSelectedComplaint((prev) => ({ ...prev, status: nextStatus }));
+        setShowAssignPopup(false);
+        setSuccessMsg("Workers assigned successfully!");
+        setTimeout(() => setSuccessMsg(""), 3000);
+      }
+    } catch (err) {
+      console.error("Error assigning workers:", err);
+      setErrorMsg(err.message || "Failed to assign workers.");
+    } finally {
+      setAssigning(false);
     }
   };
 
-  const statusClass = (status) => status.toLowerCase().replace(" ", "-");
+  const statusClass = (status) => (status ? status.toLowerCase().replace(" ", "-") : "pending");
 
-  const priorityClass = (priority) => priority.toLowerCase().replace(" ", "-");
+  const priorityClass = (priority) => (priority ? priority.toLowerCase().replace(" ", "-") : "medium");
 
   const formatDate = (isoDate) => {
     if (!isoDate) return "";
     const d = new Date(isoDate);
+    if (isNaN(d.getTime())) return isoDate;
     return d.toLocaleDateString("en-GB", {
       day: "2-digit",
       month: "short",
@@ -264,7 +250,7 @@ const WorkerComplaints = () => {
       <div className="page-header">
         <div>
           <h1>Complaints</h1>
-          <p>View, manage and assign reported footpath issues</p>
+          <p>Supervise, prioritize and assign reported footpath issues</p>
         </div>
 
         <div className="complaint-count">
@@ -273,13 +259,39 @@ const WorkerComplaints = () => {
         </div>
       </div>
 
+      {successMsg && (
+        <div style={{
+          backgroundColor: "#f0fdf4",
+          color: "#166534",
+          padding: "12px 16px",
+          borderRadius: "8px",
+          marginBottom: "16px",
+          border: "1px solid #bbf7d0"
+        }}>
+          ✓ {successMsg}
+        </div>
+      )}
+
+      {errorMsg && (
+        <div style={{
+          backgroundColor: "#fef2f2",
+          color: "#b91c1c",
+          padding: "12px 16px",
+          borderRadius: "8px",
+          marginBottom: "16px",
+          border: "1px solid #fecaca"
+        }}>
+          ⚠️ {errorMsg}
+        </div>
+      )}
+
       {/* ================= FILTERS ================= */}
       <div className="filters-container">
         <div className="search-box">
           <span>🔍</span>
           <input
             type="text"
-            placeholder="Search complaint, location..."
+            placeholder="Search complaint, location, reporter..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -308,6 +320,22 @@ const WorkerComplaints = () => {
             </option>
           ))}
         </select>
+
+        <button
+          onClick={loadData}
+          style={{
+            padding: "10px 18px",
+            background: "#4f46e5",
+            color: "white",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontWeight: "600",
+            fontSize: "13px"
+          }}
+        >
+          {loading ? "Refreshing..." : "↻ Refresh"}
+        </button>
       </div>
 
       {/* ================= COMPLAINT TABLE ================= */}
@@ -330,147 +358,132 @@ const WorkerComplaints = () => {
             </thead>
 
             <tbody>
-              {filteredComplaints.map((complaint) => {
-                const overdue = getOverdueInfo(complaint);
+              {loading ? (
+                <tr>
+                  <td colSpan="10" style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
+                    Loading complaints from database...
+                  </td>
+                </tr>
+              ) : filteredComplaints.length === 0 ? (
+                <tr>
+                  <td colSpan="10" style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
+                    No complaints match the filter criteria.
+                  </td>
+                </tr>
+              ) : (
+                filteredComplaints.map((complaint) => {
+                  const overdue = getOverdueInfo(complaint);
 
-                return (
-                  <tr key={complaint.id}>
-                    <td>
-                      <span className="complaint-id">{complaint.id}</span>
-                    </td>
+                  return (
+                    <tr key={complaint.id || complaint.mongoId}>
+                      <td>
+                        <span className="complaint-id">{complaint.id}</span>
+                      </td>
 
-                    <td>
-                      <strong>{complaint.title}</strong>
-                    </td>
+                      <td>
+                        <strong>{complaint.title}</strong>
+                      </td>
 
-                    <td>
-                      <span className="location-text">
-                        📍 {complaint.location}
-                      </span>
-                    </td>
+                      <td>
+                        <span className="location-text">
+                          📍 {complaint.location}
+                        </span>
+                      </td>
 
-                    <td>{complaint.reportedBy}</td>
-                    <td>{complaint.date}</td>
+                      <td>{complaint.reportedBy || "Citizen"}</td>
+                      <td>{complaint.date}</td>
 
-                    {/* PRIORITY DROPDOWN */}
-                    <td>
-                      <select
-                        className={`priority-select ${priorityClass(
-                          complaint.priority
-                        )}`}
-                        value={complaint.priority}
-                        onChange={(e) =>
-                          handlePriorityChange(complaint.id, e.target.value)
-                        }
-                      >
-                        {PRIORITY_LEVELS.map((p) => (
-                          <option key={p} value={p}>
-                            {p}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
+                      {/* PRIORITY DROPDOWN */}
+                      <td>
+                        <select
+                          className={`priority-select ${priorityClass(
+                            complaint.priority
+                          )}`}
+                          value={complaint.priority || "Not Set"}
+                          onChange={(e) =>
+                            handlePriorityChange(complaint.id, e.target.value)
+                          }
+                        >
+                          {PRIORITY_LEVELS.map((p) => (
+                            <option key={p} value={p}>
+                              {p}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
 
-                    <td>
-                      <span
-                        className={`status-badge ${statusClass(
-                          complaint.status
-                        )}`}
-                      >
-                        {complaint.status}
-                      </span>
-                    </td>
+                      <td>
+                        <span
+                          className={`status-badge ${statusClass(
+                            complaint.status
+                          )}`}
+                        >
+                          {complaint.status}
+                        </span>
+                      </td>
 
-                    {/* TIMELINE */}
-                    <td>
-                      {complaint.workStartDate ? (
-                        <div className="timeline-cell">
-                          <span className="timeline-text">
-                            {formatDate(complaint.workStartDate)} →{" "}
-                            {formatDate(complaint.workEndDate)}
-                          </span>
-                          {overdue && (
-                            <span className={`overdue-badge ${overdue.type}`}>
-                              {overdue.label}
+                      {/* TIMELINE */}
+                      <td>
+                        {complaint.workStartDate ? (
+                          <div className="timeline-cell">
+                            <span className="timeline-text">
+                              {formatDate(complaint.workStartDate)} →{" "}
+                              {formatDate(complaint.workEndDate)}
                             </span>
+                            {overdue && (
+                              <span className={`overdue-badge ${overdue.type}`}>
+                                {overdue.label}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="not-assigned">—</span>
+                        )}
+                      </td>
+
+                      <td>
+                        {!complaint.assignedWorkers || complaint.assignedWorkers.length === 0 ? (
+                          <span className="not-assigned">Not Assigned</span>
+                        ) : (
+                          <div className="team-names">
+                            {complaint.assignedWorkers.map((worker) => (
+                              <span key={worker}>{worker}</span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+
+                      <td>
+                        <div className="action-buttons">
+                          <button
+                            className="details-btn"
+                            onClick={() => handleViewDetails(complaint)}
+                          >
+                            View
+                          </button>
+
+                          {(complaint.status === "Not Assigned" || complaint.status === "Pending") && (
+                            <button
+                              className="assign-btn"
+                              disabled={complaint.priority === "Not Set"}
+                              title={
+                                complaint.priority === "Not Set"
+                                  ? "Set priority first"
+                                  : ""
+                              }
+                              onClick={() => handleOpenAssign(complaint)}
+                            >
+                              Assign
+                            </button>
                           )}
                         </div>
-                      ) : (
-                        <span className="not-assigned">—</span>
-                      )}
-                    </td>
-
-                    <td>
-                      {complaint.assignedWorkers.length === 0 ? (
-                        <span className="not-assigned">Not Assigned</span>
-                      ) : (
-                        <div className="team-names">
-                          {complaint.assignedWorkers.map((worker) => (
-                            <span key={worker}>{worker}</span>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-
-                    <td>
-                      <div className="action-buttons">
-                        <button
-                          className="details-btn"
-                          onClick={() => handleViewDetails(complaint)}
-                        >
-                          View
-                        </button>
-
-                        {complaint.status === "Not Assigned" && (
-                          <button
-                            className="assign-btn"
-                            disabled={complaint.priority === "Not Set"}
-                            title={
-                              complaint.priority === "Not Set"
-                                ? "Set priority first"
-                                : ""
-                            }
-                            onClick={() => handleOpenAssign(complaint)}
-                          >
-                            Assign
-                          </button>
-                        )}
-
-                        {complaint.status === "Assigned" && (
-                          <button
-                            className="progress-btn"
-                            onClick={() =>
-                              advanceStatus(complaint.id, "In Progress")
-                            }
-                          >
-                            Start Work
-                          </button>
-                        )}
-
-                        {complaint.status === "In Progress" && (
-                          <button
-                            className="complete-btn"
-                            onClick={() =>
-                              advanceStatus(complaint.id, "Completed")
-                            }
-                          >
-                            Mark Done
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
-
-          {filteredComplaints.length === 0 && (
-            <div className="no-results">
-              <h3>No complaints found</h3>
-              <p>Try changing your search or filters.</p>
-            </div>
-          )}
         </div>
       </div>
 
@@ -495,33 +508,35 @@ const WorkerComplaints = () => {
             </div>
 
             <div className="details-content">
-              <div className="complaint-image-container">
-                <img
-                  src={selectedComplaint.image}
-                  alt={selectedComplaint.title}
-                  className="complaint-image"
-                />
+              {selectedComplaint.image && (
+                <div className="complaint-image-container">
+                  <img
+                    src={selectedComplaint.image}
+                    alt={selectedComplaint.title}
+                    className="complaint-image"
+                  />
 
-                <div className="image-badges">
-                  <span
-                    className={`priority-badge ${priorityClass(
-                      selectedComplaint.priority
-                    )}`}
-                  >
-                    {selectedComplaint.priority === "Not Set"
-                      ? "Priority Not Set"
-                      : `${selectedComplaint.priority} Priority`}
-                  </span>
+                  <div className="image-badges">
+                    <span
+                      className={`priority-badge ${priorityClass(
+                        selectedComplaint.priority
+                      )}`}
+                    >
+                      {selectedComplaint.priority === "Not Set"
+                        ? "Priority Not Set"
+                        : `${selectedComplaint.priority} Priority`}
+                    </span>
 
-                  <span
-                    className={`status-badge ${statusClass(
-                      selectedComplaint.status
-                    )}`}
-                  >
-                    {selectedComplaint.status}
-                  </span>
+                    <span
+                      className={`status-badge ${statusClass(
+                        selectedComplaint.status
+                      )}`}
+                    >
+                      {selectedComplaint.status}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* PRIORITY EDITOR IN MODAL */}
               <div className="priority-editor">
@@ -556,7 +571,7 @@ const WorkerComplaints = () => {
                   <div className="info-icon">🧑</div>
                   <div>
                     <span>Reported By</span>
-                    <strong>{selectedComplaint.reportedBy}</strong>
+                    <strong>{selectedComplaint.reportedBy || "Citizen"}</strong>
                   </div>
                 </div>
 
@@ -564,7 +579,7 @@ const WorkerComplaints = () => {
                   <div className="info-icon">📅</div>
                   <div>
                     <span>Reported Date</span>
-                    <strong>{selectedComplaint.date}</strong>
+                    <strong>{selectedComplaint.date || selectedComplaint.reportedDate}</strong>
                   </div>
                 </div>
 
@@ -594,13 +609,13 @@ const WorkerComplaints = () => {
 
               <div className="description-section">
                 <h3>Description</h3>
-                <p>{selectedComplaint.description}</p>
+                <p>{selectedComplaint.description || "No additional description provided."}</p>
               </div>
 
               <div className="assigned-section">
-                <h3>Assigned Team</h3>
+                <h3>Assigned Maintenance Crew</h3>
 
-                {selectedComplaint.assignedWorkers.length === 0 ? (
+                {!selectedComplaint.assignedWorkers || selectedComplaint.assignedWorkers.length === 0 ? (
                   <p className="no-workers">No workers assigned yet.</p>
                 ) : (
                   <div className="assigned-workers">
@@ -625,7 +640,7 @@ const WorkerComplaints = () => {
                 Close
               </button>
 
-              {selectedComplaint.status === "Not Assigned" && (
+              {(selectedComplaint.status === "Not Assigned" || selectedComplaint.status === "Pending") && (
                 <button
                   className="assign-main-btn"
                   disabled={selectedComplaint.priority === "Not Set"}
@@ -635,28 +650,6 @@ const WorkerComplaints = () => {
                   }}
                 >
                   Assign Workers
-                </button>
-              )}
-
-              {selectedComplaint.status === "Assigned" && (
-                <button
-                  className="assign-main-btn"
-                  onClick={() =>
-                    advanceStatus(selectedComplaint.id, "In Progress")
-                  }
-                >
-                  Start Work
-                </button>
-              )}
-
-              {selectedComplaint.status === "In Progress" && (
-                <button
-                  className="assign-main-btn"
-                  onClick={() =>
-                    advanceStatus(selectedComplaint.id, "Completed")
-                  }
-                >
-                  Mark Completed
                 </button>
               )}
             </div>
@@ -739,32 +732,39 @@ const WorkerComplaints = () => {
               </div>
 
               <div className="workers-list">
-                {availableWorkers.map((worker) => {
-                  const isSelected = selectedWorkers.includes(worker.name);
+                {availableWorkers.length === 0 ? (
+                  <p style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>
+                    No available workers found in this zone. Add workers from the Workers tab.
+                  </p>
+                ) : (
+                  availableWorkers.map((worker) => {
+                    const identifier = worker.employeeCode || worker.name;
+                    const isSelected = selectedWorkers.includes(identifier) || selectedWorkers.includes(worker.name);
 
-                  return (
-                    <div
-                      key={worker.id}
-                      className={`worker-option ${
-                        isSelected ? "selected" : ""
-                      }`}
-                      onClick={() => toggleWorker(worker.name)}
-                    >
-                      <div className="worker-avatar-small">
-                        {worker.name.charAt(0)}
-                      </div>
+                    return (
+                      <div
+                        key={worker.id || worker.employeeCode}
+                        className={`worker-option ${
+                          isSelected ? "selected" : ""
+                        }`}
+                        onClick={() => toggleWorker(identifier)}
+                      >
+                        <div className="worker-avatar-small">
+                          {worker.name.charAt(0)}
+                        </div>
 
-                      <div className="worker-details">
-                        <strong>{worker.name}</strong>
-                        <span>{worker.role}</span>
-                      </div>
+                        <div className="worker-details">
+                          <strong>{worker.name} ({worker.employeeCode || "WRK"})</strong>
+                          <span>{worker.role} • {worker.phone}</span>
+                        </div>
 
-                      <div className="worker-checkbox">
-                        {isSelected ? "✓" : ""}
+                        <div className="worker-checkbox">
+                          {isSelected ? "✓" : ""}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </div>
 
@@ -779,9 +779,9 @@ const WorkerComplaints = () => {
               <button
                 className="assign-main-btn"
                 onClick={handleAssignWorkers}
-                disabled={selectedWorkers.length < 2}
+                disabled={selectedWorkers.length < 1 || assigning}
               >
-                Assign {selectedWorkers.length} Workers
+                {assigning ? "Assigning..." : `Assign ${selectedWorkers.length} Worker(s)`}
               </button>
             </div>
           </div>
@@ -791,4 +791,4 @@ const WorkerComplaints = () => {
   );
 };
 
-export default WorkerComplaints;
+export default Complaints;

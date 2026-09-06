@@ -1,76 +1,24 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import {
+  getAllWorkers,
+  addWorker,
+  updateWorkerStatus,
+  deleteWorker,
+} from "../../../services/managerApi";
 import "./new_worker.css";
 
 const Workers = () => {
-  // Temporary worker data
-  const [workers, setWorkers] = useState([
-    {
-      id: "WRK001",
-      name: "Ravi Kumar",
-      phone: "9876543210",
-      email: "ravi@gmail.com",
-      role: "Maintenance Worker",
-      status: "Active",
-      joinedDate: "12 Jan 2025",
-      assignedWorks: 3,
-    },
-    {
-      id: "WRK002",
-      name: "Karthik S",
-      phone: "9876543211",
-      email: "karthik@gmail.com",
-      role: "Maintenance Worker",
-      status: "Active",
-      joinedDate: "25 Feb 2025",
-      assignedWorks: 2,
-    },
-    {
-      id: "WRK003",
-      name: "Manoj Kumar",
-      phone: "9876543212",
-      email: "manoj@gmail.com",
-      role: "Maintenance Worker",
-      status: "Active",
-      joinedDate: "18 Mar 2025",
-      assignedWorks: 4,
-    },
-    {
-      id: "WRK004",
-      name: "Suresh R",
-      phone: "9876543213",
-      email: "suresh@gmail.com",
-      role: "Maintenance Worker",
-      status: "Inactive",
-      joinedDate: "05 Apr 2025",
-      assignedWorks: 0,
-    },
-    {
-      id: "WRK005",
-      name: "Arun Prakash",
-      phone: "9876543214",
-      email: "arun@gmail.com",
-      role: "Maintenance Worker",
-      status: "Active",
-      joinedDate: "22 May 2025",
-      assignedWorks: 1,
-    },
-    {
-      id: "WRK006",
-      name: "Dinesh M",
-      phone: "9876543215",
-      email: "dinesh@gmail.com",
-      role: "Maintenance Worker",
-      status: "Inactive",
-      joinedDate: "10 Jun 2025",
-      assignedWorks: 0,
-    },
-  ]);
+  const [workers, setWorkers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
   const [showAddPopup, setShowAddPopup] = useState(false);
   const [showRemovePopup, setShowRemovePopup] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [selectedWorker, setSelectedWorker] = useState(null);
 
@@ -80,46 +28,63 @@ const Workers = () => {
     phone: "",
     email: "",
     role: "Maintenance Worker",
+    zone: "Central Municipal Zone",
   });
+
+  const loadWorkers = async () => {
+    try {
+      setLoading(true);
+      setErrorMsg("");
+      const res = await getAllWorkers();
+      if (res && res.success) {
+        setWorkers(res.workers || []);
+      }
+    } catch (err) {
+      console.error("Error loading workers:", err);
+      setErrorMsg(err.message || "Failed to load workers.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadWorkers();
+  }, []);
 
   // ==============================
   // COUNTS
   // ==============================
-
   const totalWorkers = workers.length;
 
   const activeWorkers = workers.filter(
-    (worker) => worker.status === "Active"
+    (worker) => worker.status === "Active" || worker.availabilityStatus === "ACTIVE"
   ).length;
 
   const inactiveWorkers = workers.filter(
-    (worker) => worker.status === "Inactive"
+    (worker) => worker.status === "Inactive" || worker.availabilityStatus === "INACTIVE"
   ).length;
-
 
   // ==============================
   // FILTER WORKERS
   // ==============================
-
   const filteredWorkers = workers.filter((worker) => {
-
+    const q = search.toLowerCase();
     const matchesSearch =
-      worker.name.toLowerCase().includes(search.toLowerCase()) ||
-      worker.id.toLowerCase().includes(search.toLowerCase()) ||
-      worker.email.toLowerCase().includes(search.toLowerCase());
+      (worker.name && worker.name.toLowerCase().includes(q)) ||
+      (worker.id && worker.id.toLowerCase().includes(q)) ||
+      (worker.email && worker.email.toLowerCase().includes(q)) ||
+      (worker.phone && worker.phone.includes(q));
 
     const matchesStatus =
       statusFilter === "All" ||
-      worker.status === statusFilter;
+      worker.status?.toLowerCase() === statusFilter.toLowerCase();
 
     return matchesSearch && matchesStatus;
   });
 
-
   // ==============================
   // INPUT CHANGE
   // ==============================
-
   const handleInputChange = (e) => {
     setNewWorker({
       ...newWorker,
@@ -127,97 +92,94 @@ const Workers = () => {
     });
   };
 
-
   // ==============================
   // ADD WORKER
   // ==============================
-
-  const handleAddWorker = (e) => {
+  const handleAddWorker = async (e) => {
     e.preventDefault();
 
-    if (
-      !newWorker.name ||
-      !newWorker.phone ||
-      !newWorker.email
-    ) {
+    if (!newWorker.name || !newWorker.phone || !newWorker.email) {
       alert("Please fill all required fields.");
       return;
     }
 
-    const worker = {
-      id: `WRK${String(workers.length + 1).padStart(3, "0")}`,
-      name: newWorker.name,
-      phone: newWorker.phone,
-      email: newWorker.email,
-      role: newWorker.role,
-      status: "Active",
-      joinedDate: new Date().toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }),
-      assignedWorks: 0,
-    };
-
-    setWorkers([...workers, worker]);
-
-    setNewWorker({
-      name: "",
-      phone: "",
-      email: "",
-      role: "Maintenance Worker",
-    });
-
-    setShowAddPopup(false);
-
-    alert("Worker added successfully!");
+    setSubmitting(true);
+    setErrorMsg("");
+    try {
+      const res = await addWorker(newWorker);
+      if (res && res.success) {
+        setSuccessMsg("Worker added successfully! Default credentials created.");
+        setTimeout(() => setSuccessMsg(""), 3000);
+        setShowAddPopup(false);
+        setNewWorker({
+          name: "",
+          phone: "",
+          email: "",
+          role: "Maintenance Worker",
+          zone: "Central Municipal Zone",
+        });
+        await loadWorkers();
+      }
+    } catch (err) {
+      console.error("Error adding worker:", err);
+      alert(err.message || "Failed to add worker.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
+  // ==============================
+  // TOGGLE STATUS
+  // ==============================
+  const handleToggleStatus = async (worker) => {
+    const newStatus = worker.status === "Active" ? "INACTIVE" : "ACTIVE";
+    try {
+      await updateWorkerStatus(worker.id || worker.mongoId, newStatus);
+      setWorkers((prev) =>
+        prev.map((w) =>
+          w.id === worker.id
+            ? { ...w, status: newStatus === "ACTIVE" ? "Active" : "Inactive" }
+            : w
+        )
+      );
+    } catch (err) {
+      console.error("Error updating worker status:", err);
+      alert(err.message || "Failed to update status.");
+    }
+  };
 
   // ==============================
   // REMOVE WORKER
   // ==============================
-
-  const handleRemoveWorker = () => {
-
-    setWorkers(
-      workers.filter(
-        (worker) => worker.id !== selectedWorker.id
-      )
-    );
-
-    setShowRemovePopup(false);
-    setSelectedWorker(null);
-
-    alert("Worker removed successfully!");
+  const handleRemoveWorker = async () => {
+    if (!selectedWorker) return;
+    try {
+      await deleteWorker(selectedWorker.id || selectedWorker.mongoId);
+      setWorkers(workers.filter((worker) => worker.id !== selectedWorker.id));
+      setShowRemovePopup(false);
+      setSelectedWorker(null);
+      setSuccessMsg("Worker deactivated successfully.");
+      setTimeout(() => setSuccessMsg(""), 3000);
+    } catch (err) {
+      console.error("Error removing worker:", err);
+      alert(err.message || "Failed to remove worker.");
+    }
   };
-
-
-  // ==============================
-  // OPEN REMOVE POPUP
-  // ==============================
 
   const openRemovePopup = (worker) => {
     setSelectedWorker(worker);
     setShowRemovePopup(true);
   };
 
-
   return (
     <div className="workers-page">
-
       {/* =================================
           HEADER
       ================================= */}
-
       <div className="workers-header">
-
         <div>
-          <h1>Workers</h1>
-
-          <p>
-            Manage maintenance workers and their availability
-          </p>
+          <h1>Worker Management</h1>
+          <p>Supervise maintenance crew, workloads, and real-time availability</p>
         </div>
 
         <button
@@ -226,538 +188,302 @@ const Workers = () => {
         >
           + Add Worker
         </button>
-
       </div>
 
+      {successMsg && (
+        <div style={{
+          backgroundColor: "#f0fdf4",
+          color: "#166534",
+          padding: "12px 16px",
+          borderRadius: "8px",
+          marginBottom: "16px",
+          border: "1px solid #bbf7d0"
+        }}>
+          ✓ {successMsg}
+        </div>
+      )}
+
+      {errorMsg && (
+        <div style={{
+          backgroundColor: "#fef2f2",
+          color: "#b91c1c",
+          padding: "12px 16px",
+          borderRadius: "8px",
+          marginBottom: "16px",
+          border: "1px solid #fecaca"
+        }}>
+          ⚠️ {errorMsg}
+        </div>
+      )}
 
       {/* =================================
           STATISTICS
       ================================= */}
-
       <div className="worker-stats">
-
         <div className="worker-stat-card">
-
-          <div className="worker-stat-icon total">
-            👥
-          </div>
-
+          <div className="worker-stat-icon total">👥</div>
           <div>
             <span>Total Workers</span>
-            <strong>{totalWorkers}</strong>
+            <strong>{loading ? "..." : totalWorkers}</strong>
           </div>
-
         </div>
-
 
         <div className="worker-stat-card">
-
-          <div className="worker-stat-icon active">
-            ✓
-          </div>
-
+          <div className="worker-stat-icon active">🟢</div>
           <div>
-            <span>Active Workers</span>
-            <strong>{activeWorkers}</strong>
+            <span>Active & Ready</span>
+            <strong>{loading ? "..." : activeWorkers}</strong>
           </div>
-
         </div>
-
 
         <div className="worker-stat-card">
-
-          <div className="worker-stat-icon inactive">
-            ○
-          </div>
-
+          <div className="worker-stat-icon inactive">🔴</div>
           <div>
-            <span>Inactive Workers</span>
-            <strong>{inactiveWorkers}</strong>
+            <span>Inactive / On Leave</span>
+            <strong>{loading ? "..." : inactiveWorkers}</strong>
           </div>
-
         </div>
-
-
-        <div className="worker-stat-card">
-
-          <div className="worker-stat-icon available">
-            🔧
-          </div>
-
-          <div>
-            <span>Available Now</span>
-
-            <strong>
-              {
-                workers.filter(
-                  (worker) =>
-                    worker.status === "Active" &&
-                    worker.assignedWorks === 0
-                ).length
-              }
-            </strong>
-
-          </div>
-
-        </div>
-
       </div>
 
-
       {/* =================================
-          FILTER SECTION
+          CONTROLS / FILTERS
       ================================= */}
-
-      <div className="worker-filters">
-
+      <div className="worker-controls">
         <div className="worker-search">
-
-          <span>🔍</span>
-
           <input
             type="text"
-            placeholder="Search worker by name, ID or email..."
+            placeholder="Search by worker ID, name, email or phone..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-
         </div>
-
 
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
-          <option value="All">All Workers</option>
+          <option value="All">All Status</option>
           <option value="Active">Active</option>
           <option value="Inactive">Inactive</option>
         </select>
 
+        <button
+          onClick={loadWorkers}
+          style={{
+            padding: "10px 18px",
+            background: "#4f46e5",
+            color: "white",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontWeight: "600",
+            fontSize: "13px"
+          }}
+        >
+          {loading ? "Refreshing..." : "↻ Refresh"}
+        </button>
       </div>
-
 
       {/* =================================
           WORKER TABLE
       ================================= */}
+      <div className="worker-table-container">
+        <table className="worker-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Email</th>
+              <th>Zone / Role</th>
+              <th>Status</th>
+              <th>Assigned Tasks</th>
+              <th>Joined Date</th>
+              <th>Action</th>
+            </tr>
+          </thead>
 
-      <div className="workers-container">
-
-        <div className="workers-table-wrapper">
-
-          <table className="workers-table">
-
-            <thead>
-
+          <tbody>
+            {loading ? (
               <tr>
-
-                <th>Worker</th>
-                <th>Contact</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Assigned Works</th>
-                <th>Joined Date</th>
-                <th>Action</th>
-
+                <td colSpan="9" style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
+                  Loading workers from database...
+                </td>
               </tr>
-
-            </thead>
-
-
-            <tbody>
-
-              {filteredWorkers.map((worker) => (
-
-                <tr key={worker.id}>
-
-                  {/* Worker */}
-
+            ) : filteredWorkers.length === 0 ? (
+              <tr>
+                <td colSpan="9" style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
+                  No workers match your filter.
+                </td>
+              </tr>
+            ) : (
+              filteredWorkers.map((worker) => (
+                <tr key={worker.id || worker.mongoId}>
                   <td>
-
-                    <div className="worker-profile">
-
-                      <div className="worker-avatar">
-                        {worker.name.charAt(0)}
-                      </div>
-
-                      <div>
-
-                        <strong>
-                          {worker.name}
-                        </strong>
-
-                        <span>
-                          {worker.id}
-                        </span>
-
-                      </div>
-
-                    </div>
-
+                    <span className="worker-id-badge">{worker.id}</span>
                   </td>
 
-
-                  {/* Contact */}
-
                   <td>
-
-                    <div className="contact-details">
-
-                      <span>
-                        📞 {worker.phone}
-                      </span>
-
-                      <span>
-                        ✉ {worker.email}
-                      </span>
-
-                    </div>
-
+                    <strong>{worker.name}</strong>
                   </td>
 
+                  <td>{worker.phone || "—"}</td>
 
-                  {/* Role */}
+                  <td>{worker.email || "—"}</td>
 
-                  <td>
-                    <span className="role-text">
-                      {worker.role}
-                    </span>
-                  </td>
-
-
-                  {/* Status */}
+                  <td>{worker.zone || worker.role}</td>
 
                   <td>
-
                     <span
-                      className={`worker-status ${worker.status.toLowerCase()}`}
-                    >
-
-                      <span className="status-dot"></span>
-
-                      {worker.status}
-
-                    </span>
-
-                  </td>
-
-
-                  {/* Assigned Works */}
-
-                  <td>
-
-                    <span
-                      className={`assigned-count ${
-                        worker.assignedWorks > 0
-                          ? "has-work"
-                          : "no-work"
+                      onClick={() => handleToggleStatus(worker)}
+                      style={{ cursor: "pointer" }}
+                      title="Click to toggle status"
+                      className={`status-pill ${
+                        worker.status === "Active" ? "active" : "inactive"
                       }`}
                     >
-                      {worker.assignedWorks}
+                      {worker.status} ⇄
                     </span>
-
                   </td>
 
-
-                  {/* Joined Date */}
-
                   <td>
-                    {worker.joinedDate}
+                    <strong>{worker.assignedWorks || 0} active</strong>
                   </td>
 
-
-                  {/* Action */}
+                  <td>{worker.joinedDate}</td>
 
                   <td>
-
                     <button
                       className="remove-btn"
-                      onClick={() =>
-                        openRemovePopup(worker)
-                      }
+                      onClick={() => openRemovePopup(worker)}
                     >
                       Remove
                     </button>
-
                   </td>
-
                 </tr>
-
-              ))}
-
-            </tbody>
-
-          </table>
-
-
-          {filteredWorkers.length === 0 && (
-
-            <div className="no-workers">
-
-              <div className="no-worker-icon">
-                👥
-              </div>
-
-              <h3>
-                No workers found
-              </h3>
-
-              <p>
-                Try changing your search or filter.
-              </p>
-
-            </div>
-
-          )}
-
-        </div>
-
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
-
 
       {/* =================================
           ADD WORKER POPUP
       ================================= */}
-
       {showAddPopup && (
-
-        <div
-          className="worker-modal-overlay"
-          onClick={() => setShowAddPopup(false)}
-        >
-
-          <div
-            className="worker-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-
+        <div className="worker-modal-overlay" onClick={() => setShowAddPopup(false)}>
+          <div className="worker-modal" onClick={(e) => e.stopPropagation()}>
             <div className="worker-modal-header">
-
-              <div>
-
-                <span className="modal-label">
-                  WORKER MANAGEMENT
-                </span>
-
-                <h2>
-                  Add New Worker
-                </h2>
-
-              </div>
-
+              <h2>Add New Field Worker</h2>
               <button
-                className="modal-close"
-                onClick={() =>
-                  setShowAddPopup(false)
-                }
+                className="worker-modal-close"
+                onClick={() => setShowAddPopup(false)}
               >
                 ×
               </button>
-
             </div>
 
-
-            <form
-              onSubmit={handleAddWorker}
-              className="worker-form"
-            >
-
-              {/* Name */}
-
-              <div className="form-group">
-
-                <label>
-                  Full Name *
-                </label>
-
+            <form onSubmit={handleAddWorker} className="worker-form">
+              <div className="worker-form-group">
+                <label>Full Name *</label>
                 <input
                   type="text"
                   name="name"
-                  placeholder="Enter worker name"
+                  placeholder="e.g. Suresh Kumar"
                   value={newWorker.name}
                   onChange={handleInputChange}
+                  required
                 />
-
               </div>
 
-
-              {/* Phone */}
-
-              <div className="form-group">
-
-                <label>
-                  Phone Number *
-                </label>
-
+              <div className="worker-form-group">
+                <label>Phone Number *</label>
                 <input
                   type="text"
                   name="phone"
-                  placeholder="Enter phone number"
+                  placeholder="e.g. 9876543210"
                   value={newWorker.phone}
                   onChange={handleInputChange}
+                  required
                 />
-
               </div>
 
-
-              {/* Email */}
-
-              <div className="form-group">
-
-                <label>
-                  Email *
-                </label>
-
+              <div className="worker-form-group">
+                <label>Email Address *</label>
                 <input
                   type="email"
                   name="email"
-                  placeholder="Enter email address"
+                  placeholder="e.g. suresh@example.com"
                   value={newWorker.email}
                   onChange={handleInputChange}
+                  required
                 />
-
               </div>
 
-
-              {/* Role */}
-
-              <div className="form-group">
-
-                <label>
-                  Role
-                </label>
-
-                <select
-                  name="role"
-                  value={newWorker.role}
+              <div className="worker-form-group">
+                <label>Assigned Zone</label>
+                <input
+                  type="text"
+                  name="zone"
+                  placeholder="e.g. Zone 2 - Gandhipuram Central"
+                  value={newWorker.zone}
                   onChange={handleInputChange}
-                >
-
-                  <option>
-                    Maintenance Worker
-                  </option>
-
-                  <option>
-                    Senior Maintenance Worker
-                  </option>
-
-                  <option>
-                    Field Supervisor
-                  </option>
-
-                </select>
-
+                />
               </div>
 
-
-              {/* Footer */}
-
-              <div className="worker-modal-footer">
-
+              <div className="worker-modal-actions">
                 <button
                   type="button"
-                  className="modal-cancel-btn"
-                  onClick={() =>
-                    setShowAddPopup(false)
-                  }
+                  className="cancel-btn"
+                  onClick={() => setShowAddPopup(false)}
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  className="modal-add-btn"
+                  className="confirm-btn"
+                  disabled={submitting}
                 >
-                  Add Worker
+                  {submitting ? "Adding..." : "Add Worker"}
                 </button>
-
               </div>
-
             </form>
-
           </div>
-
         </div>
-
       )}
-
 
       {/* =================================
           REMOVE WORKER POPUP
       ================================= */}
-
       {showRemovePopup && selectedWorker && (
-
-        <div
-          className="worker-modal-overlay"
-          onClick={() => setShowRemovePopup(false)}
-        >
-
-          <div
-            className="remove-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-
-            <div className="remove-icon">
-              !
-            </div>
-
-            <h2>
-              Remove Worker?
-            </h2>
+        <div className="worker-modal-overlay" onClick={() => setShowRemovePopup(false)}>
+          <div className="worker-modal remove-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Remove Field Worker</h2>
 
             <p>
-
-              Are you sure you want to remove
-
-              <strong>
-                {" "}{selectedWorker.name}
-              </strong>
-
-              {" "}from the worker list?
-
+              Are you sure you want to deactivate worker{" "}
+              <strong>{selectedWorker.name}</strong> ({selectedWorker.id})?
             </p>
 
-            {selectedWorker.assignedWorks > 0 && (
-
-              <div className="remove-warning">
-
-                ⚠ This worker currently has{" "}
-                <strong>
-                  {selectedWorker.assignedWorks}
-                </strong>{" "}
-                assigned work(s).
-
-              </div>
-
-            )}
-
-
-            <div className="remove-actions">
-
+            <div className="worker-modal-actions">
               <button
-                className="cancel-remove-btn"
-                onClick={() =>
-                  setShowRemovePopup(false)
-                }
+                className="cancel-btn"
+                onClick={() => setShowRemovePopup(false)}
               >
                 Cancel
               </button>
 
               <button
-                className="confirm-remove-btn"
+                className="delete-confirm-btn"
                 onClick={handleRemoveWorker}
               >
-                Remove Worker
+                Deactivate Worker
               </button>
-
             </div>
-
           </div>
-
         </div>
-
       )}
-
     </div>
   );
 };
