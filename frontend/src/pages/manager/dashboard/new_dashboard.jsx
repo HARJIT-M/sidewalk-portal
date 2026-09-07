@@ -10,9 +10,9 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [manager, setManager] = useState({
-    name: "Field Manager",
-    city: "Coimbatore",
-    zone: "Central Municipal Zone",
+    name: "",
+    city: "",
+    zone: "",
   });
   const [stats, setStats] = useState({
     totalComplaints: 0,

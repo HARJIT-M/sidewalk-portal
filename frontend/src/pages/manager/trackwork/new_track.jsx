@@ -171,7 +171,7 @@ const WorkTracking = () => {
         </div>
 
         <div className="tracking-stat">
-          <div className="stat-icon complete-icon">
+          <div className="stat-icon completed-icon">
             <CheckCircle2 size={22} strokeWidth={2} />
           </div>
           <div>
@@ -181,199 +181,209 @@ const WorkTracking = () => {
         </div>
       </div>
 
-      {/* ================= CONTROLS ================= */}
-      <div className="tracking-controls">
-        <div className="tracking-search">
-          <Search size={18} />
-          <input
-            type="text"
-            placeholder="Search work ID, issue title, location, worker..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="All">All Status</option>
-          <option value="Assigned">Assigned</option>
-          <option value="In Progress">In Progress</option>
-          <option value="Completed">Completed</option>
-        </select>
-      </div>
-
       {/* ================= MAIN SPLIT LAYOUT ================= */}
-      <div className="tracking-layout">
+      <div className="tracking-split">
         {/* LEFT COLUMN: LIST OF WORK */}
-        <div className="tracking-list">
-          {loading ? (
-            <div className="no-works">
-              <p>Loading live repair operations...</p>
-            </div>
-          ) : filteredWorks.length === 0 ? (
-            <div className="no-works">
-              <p>No repair works found matching the criteria.</p>
-            </div>
-          ) : (
-            filteredWorks.map((work) => {
-              const isSelected = selectedWork && selectedWork.id === work.id;
+        <div className="tracking-list-panel">
+          <div className="tracking-search">
+            <Search size={18} />
+            <input
+              type="text"
+              placeholder="Search work ID, issue title, location, worker..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
 
-              return (
-                <div
-                  key={work.id || work.mongoId}
-                  className={`work-item ${isSelected ? "selected" : ""}`}
-                  onClick={() => setSelectedId(work.id)}
-                >
-                  <div className="work-item-top">
-                    <span className="work-id">{work.id}</span>
-                    <span
-                      className={`status-badge ${statusClass(work.status)}`}
-                    >
-                      {work.status}
-                    </span>
-                  </div>
+          <div className="status-pill-filters">
+            {["All", "Assigned", "In Progress", "Completed"].map((status) => (
+              <div
+                key={status}
+                className={`status-pill-filter ${statusFilter === status ? "active" : ""}`}
+                onClick={() => setStatusFilter(status)}
+              >
+                {status}
+              </div>
+            ))}
+          </div>
 
-                  <h3 className="work-title">{work.title}</h3>
+          <div className="work-list-scroll">
+            {loading ? (
+              <div className="work-list-empty">
+                <p>Loading live repair operations...</p>
+              </div>
+            ) : filteredWorks.length === 0 ? (
+              <div className="work-list-empty">
+                <p>No repair works found matching the criteria.</p>
+              </div>
+            ) : (
+              filteredWorks.map((work) => {
+                const isSelected = selectedWork && selectedWork.id === work.id;
 
-                  <div className="work-location">
-                    <MapPin size={14} />
-                    <span>{work.location}</span>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div className="progress-container">
-                    <div className="progress-bar-bg">
-                      <div
-                        className="progress-bar-fill"
-                        style={{ width: `${work.progress || 0}%` }}
-                      ></div>
+                return (
+                  <div
+                    key={work.id || work.mongoId}
+                    className={`work-list-item ${isSelected ? "active" : ""}`}
+                    onClick={() => setSelectedId(work.id)}
+                  >
+                    <div className="work-list-item-top">
+                      <span className="work-id-tag">{work.id}</span>
+                      <span
+                        className={`work-status ${statusClass(work.status)}`}
+                      >
+                        {work.status}
+                      </span>
                     </div>
-                    <span className="progress-text">{work.progress || 0}%</span>
-                  </div>
 
-                  <div className="work-meta">
-                    <span>
+                    <h3>{work.title}</h3>
+
+                    <div className="work-list-location">
+                      <MapPin size={14} />
+                      <span>{work.location}</span>
+                    </div>
+
+                    <div className="work-list-location" style={{ marginTop: "2px" }}>
                       <Users size={14} />
-                      {work.assignedWorkers && work.assignedWorkers.length > 0
-                        ? work.assignedWorkers.join(", ")
-                        : "Unassigned"}
-                    </span>
+                      <span>
+                        {work.assignedWorkers && work.assignedWorkers.length > 0
+                          ? work.assignedWorkers.join(", ")
+                          : "Unassigned"}
+                      </span>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="work-list-progress">
+                      <div className="work-list-progress-track">
+                        <div
+                          className="work-list-progress-fill"
+                          style={{
+                            width: `${work.progress || 0}%`,
+                            background: "linear-gradient(90deg, #4f46e5, #7c3aed)"
+                          }}
+                        ></div>
+                      </div>
+                      <span>{work.progress || 0}%</span>
+                    </div>
                   </div>
-                </div>
-              );
-            })
-          )}
+                );
+              })
+            )}
+          </div>
         </div>
 
         {/* RIGHT COLUMN: WORK DETAILS & TIMELINE */}
-        <div className="tracking-details">
+        <div className="tracking-detail-panel">
           {selectedWork ? (
             <>
-              <div className="details-card-header">
+              <div className="detail-header">
                 <div>
-                  <div className="header-meta">
-                    <span className="selected-id">{selectedWork.id}</span>
+                  <div className="detail-header-badges">
+                    <span className="work-id-tag">{selectedWork.id}</span>
                     <span
-                      className={`status-badge ${statusClass(
+                      className={`work-status ${statusClass(
                         selectedWork.status
                       )}`}
                     >
                       {selectedWork.status}
                     </span>
+                    <span className={`priority-small ${selectedWork.priority ? selectedWork.priority.toLowerCase() : "medium"}`}>
+                      <Flag size={12} /> {selectedWork.priority || "Medium"} Priority
+                    </span>
                   </div>
 
                   <h2>{selectedWork.title}</h2>
-                  <p className="detail-location">
+                  <div className="work-list-location">
                     <MapPin size={16} />
-                    {selectedWork.location}
-                  </p>
-                </div>
-
-                <div className="priority-tag">
-                  <Flag size={14} />
-                  <span>{selectedWork.priority || "Medium"} Priority</span>
+                    <span>{selectedWork.location}</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Progress Large */}
-              <div className="details-progress-card">
-                <div className="progress-header">
+              {/* Progress */}
+              <div className="detail-progress-box">
+                <div className="detail-progress-top">
                   <span>Current Repair Completion</span>
                   <strong>{selectedWork.progress || 0}%</strong>
                 </div>
 
-                <div className="progress-bar-large-bg">
+                <div className="progress-bar">
                   <div
-                    className="progress-bar-large-fill"
+                    className={`progress-fill ${statusClass(selectedWork.status)}`}
                     style={{ width: `${selectedWork.progress || 0}%` }}
                   ></div>
                 </div>
               </div>
 
               {/* Meta Grid */}
-              <div className="details-grid">
-                <div className="grid-item">
-                  <Calendar size={18} />
-                  <div>
-                    <label>Assigned Date</label>
-                    <span>{selectedWork.assignedDate || "—"}</span>
-                  </div>
+              <div className="detail-info-grid">
+                <div className="detail-info-item">
+                  <span>
+                    <Calendar size={14} /> Assigned Date
+                  </span>
+                  <strong>{selectedWork.assignedDate || "—"}</strong>
                 </div>
 
-                <div className="grid-item">
-                  <Clock size={18} />
-                  <div>
-                    <label>Work Started</label>
-                    <span>{selectedWork.startedDate || "—"}</span>
-                  </div>
+                <div className="detail-info-item">
+                  <span>
+                    <Clock size={14} /> Work Started
+                  </span>
+                  <strong>{selectedWork.startedDate || "—"}</strong>
                 </div>
+              </div>
 
-                <div className="grid-item">
-                  <Users size={18} />
-                  <div>
-                    <label>Maintenance Team</label>
-                    <span>
-                      {selectedWork.assignedWorkers &&
-                      selectedWork.assignedWorkers.length > 0
-                        ? selectedWork.assignedWorkers.join(", ")
-                        : "None assigned"}
-                    </span>
-                  </div>
+              {/* Team Block */}
+              <div className="detail-team-block">
+                <h3>
+                  <Users size={16} /> Maintenance Team
+                </h3>
+                <div className="worker-list">
+                  {selectedWork.assignedWorkers &&
+                  selectedWork.assignedWorkers.length > 0 ? (
+                    selectedWork.assignedWorkers.map((worker, idx) => (
+                      <span key={idx}>{worker}</span>
+                    ))
+                  ) : (
+                    <span style={{ background: "#f0f0f6", color: "#a9a5bd" }}>None assigned</span>
+                  )}
                 </div>
               </div>
 
               {/* Latest Update Box */}
-              <div className="latest-update-box">
-                <h4>Latest Field Observation</h4>
-                <p>{selectedWork.lastUpdate || "No field notes logged yet."}</p>
-                <div className="update-meta">
-                  <span>Updated by: {selectedWork.updatedBy || "System"}</span>
-                  <span>{selectedWork.updatedAt || ""}</span>
+              <div className="last-update">
+                <div className="update-icon">
+                  <Wrench size={20} />
+                </div>
+                <div>
+                  <span>Latest Field Observation</span>
+                  <p>{selectedWork.lastUpdate || "No field notes logged yet."}</p>
+                  <small>
+                    Updated by {selectedWork.updatedBy || "System"}{" "}
+                    {selectedWork.updatedAt && `• ${selectedWork.updatedAt}`}
+                  </small>
                 </div>
               </div>
 
               {/* History Timeline */}
-              <div className="timeline-section">
-                <h4>Execution Timeline & Status Updates</h4>
-
-                <div className="timeline-list">
+              <div className="work-history">
+                <h3>Execution Timeline & Status Updates</h3>
+                <div style={{ marginTop: "15px" }}>
                   {!selectedWork.history || selectedWork.history.length === 0 ? (
-                    <p style={{ color: "#6b7280", padding: "10px 0" }}>
+                    <p style={{ color: "#9c99b4", fontSize: "13px" }}>
                       No history events recorded yet.
                     </p>
                   ) : (
                     selectedWork.history.map((item, index) => (
-                      <div key={index} className="timeline-item">
-                        <div className="timeline-marker"></div>
-                        <div className="timeline-content">
-                          <div className="timeline-top">
+                      <div key={index} className="history-item">
+                        <div className="history-line">
+                          <div className="history-dot"></div>
+                        </div>
+                        <div className="history-content">
+                          <div className="history-top">
                             <strong>{item.worker || "Crew Member"}</strong>
-                            <span className="timeline-time">{item.date}</span>
+                            <span>{item.date}</span>
                           </div>
                           <p>{item.message}</p>
-                          <span className="timeline-progress-tag">
+                          <span className="history-progress">
                             Progress reached: {item.progress}%
                           </span>
                         </div>
@@ -384,10 +394,12 @@ const WorkTracking = () => {
               </div>
             </>
           ) : (
-            <div className="no-selection">
-              <ClipboardList size={40} />
-              <h3>Select a Task</h3>
-              <p>Choose an assigned work from the left panel to inspect real-time progress.</p>
+            <div className="detail-empty">
+              <div style={{ textAlign: "center" }}>
+                <ClipboardList size={40} style={{ margin: "0 auto 15px", color: "#d8d3f5" }} />
+                <h3>Select a Task</h3>
+                <p style={{ marginTop: "8px" }}>Choose an assigned work from the left panel to inspect real-time progress.</p>
+              </div>
             </div>
           )}
         </div>

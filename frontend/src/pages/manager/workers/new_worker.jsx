@@ -27,8 +27,8 @@ const Workers = () => {
     name: "",
     phone: "",
     email: "",
-    role: "Maintenance Worker",
-    zone: "Central Municipal Zone",
+    role: "",
+    zone: "",
   });
 
   const loadWorkers = async () => {
@@ -115,8 +115,8 @@ const Workers = () => {
           name: "",
           phone: "",
           email: "",
-          role: "Maintenance Worker",
-          zone: "Central Municipal Zone",
+          role: "",
+          zone: "",
         });
         await loadWorkers();
       }
@@ -182,12 +182,7 @@ const Workers = () => {
           <p>Supervise maintenance crew, workloads, and real-time availability</p>
         </div>
 
-        <button
-          className="add-worker-btn"
-          onClick={() => setShowAddPopup(true)}
-        >
-          + Add Worker
-        </button>
+
       </div>
 
       {successMsg && (
@@ -243,13 +238,23 @@ const Workers = () => {
             <strong>{loading ? "..." : inactiveWorkers}</strong>
           </div>
         </div>
+
+        <div>
+          <button
+            className="add-worker-btn"
+            onClick={() => setShowAddPopup(true)}
+          >
+            + Add Worker
+          </button>
+        </div>
       </div>
 
       {/* =================================
           CONTROLS / FILTERS
       ================================= */}
-      <div className="worker-controls">
+      <div className="worker-filters">
         <div className="worker-search">
+          <span style={{ color: "#a9a5bd" }}>🔍</span>
           <input
             type="text"
             placeholder="Search by worker ID, name, email or phone..."
@@ -287,84 +292,101 @@ const Workers = () => {
       {/* =================================
           WORKER TABLE
       ================================= */}
-      <div className="worker-table-container">
-        <table className="worker-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Phone</th>
-              <th>Email</th>
-              <th>Zone / Role</th>
-              <th>Status</th>
-              <th>Assigned Tasks</th>
-              <th>Joined Date</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {loading ? (
+      <div className="workers-container">
+        <div className="workers-table-wrapper">
+          <table className="workers-table">
+            <thead>
               <tr>
-                <td colSpan="9" style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
-                  Loading workers from database...
-                </td>
+                <th>Worker</th>
+                <th>Contact</th>
+                <th>Zone / Role</th>
+                <th>Status</th>
+                <th>Tasks</th>
+                <th>Joined Date</th>
+                <th>Action</th>
               </tr>
-            ) : filteredWorkers.length === 0 ? (
-              <tr>
-                <td colSpan="9" style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
-                  No workers match your filter.
-                </td>
-              </tr>
-            ) : (
-              filteredWorkers.map((worker) => (
-                <tr key={worker.id || worker.mongoId}>
-                  <td>
-                    <span className="worker-id-badge">{worker.id}</span>
-                  </td>
+            </thead>
 
-                  <td>
-                    <strong>{worker.name}</strong>
-                  </td>
-
-                  <td>{worker.phone || "—"}</td>
-
-                  <td>{worker.email || "—"}</td>
-
-                  <td>{worker.zone || worker.role}</td>
-
-                  <td>
-                    <span
-                      onClick={() => handleToggleStatus(worker)}
-                      style={{ cursor: "pointer" }}
-                      title="Click to toggle status"
-                      className={`status-pill ${
-                        worker.status === "Active" ? "active" : "inactive"
-                      }`}
-                    >
-                      {worker.status} ⇄
-                    </span>
-                  </td>
-
-                  <td>
-                    <strong>{worker.assignedWorks || 0} active</strong>
-                  </td>
-
-                  <td>{worker.joinedDate}</td>
-
-                  <td>
-                    <button
-                      className="remove-btn"
-                      onClick={() => openRemovePopup(worker)}
-                    >
-                      Remove
-                    </button>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan="7" style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
+                    Loading workers from database...
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : filteredWorkers.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="no-workers">
+                    <div className="no-worker-icon">👥</div>
+                    <h3>No Workers Found</h3>
+                    <p>No workers match your filter criteria.</p>
+                  </td>
+                </tr>
+              ) : (
+                filteredWorkers.map((worker) => {
+                  const isActive = worker.status === "Active" || worker.availabilityStatus === "ACTIVE";
+                  return (
+                    <tr key={worker.id || worker.mongoId}>
+                      <td>
+                        <div className="worker-profile">
+                          <div className="worker-avatar">
+                            {worker.name ? worker.name.charAt(0).toUpperCase() : "W"}
+                          </div>
+                          <div>
+                            <strong>{worker.name}</strong>
+                            <span>{worker.id}</span>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td>
+                        <div className="contact-details">
+                          <span>📞 {worker.phone || "—"}</span>
+                          <span>✉️ {worker.email || "—"}</span>
+                        </div>
+                      </td>
+
+                      <td>
+                        <div className="role-text">
+                          {worker.zone || worker.role}
+                        </div>
+                      </td>
+
+                      <td>
+                        <span
+                          onClick={() => handleToggleStatus(worker)}
+                          style={{ cursor: "pointer" }}
+                          title="Click to toggle status"
+                          className={`worker-status ${isActive ? "active" : "inactive"}`}
+                        >
+                          <div className="status-dot"></div>
+                          {isActive ? "Active" : "Inactive"} ⇄
+                        </span>
+                      </td>
+
+                      <td>
+                        <span className={`assigned-count ${(worker.assignedWorks || 0) > 0 ? "has-work" : "no-work"}`}>
+                          {worker.assignedWorks || 0}
+                        </span>
+                      </td>
+
+                      <td>{worker.joinedDate || "—"}</td>
+
+                      <td>
+                        <button
+                          className="remove-btn"
+                          onClick={() => openRemovePopup(worker)}
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* =================================
@@ -374,9 +396,12 @@ const Workers = () => {
         <div className="worker-modal-overlay" onClick={() => setShowAddPopup(false)}>
           <div className="worker-modal" onClick={(e) => e.stopPropagation()}>
             <div className="worker-modal-header">
-              <h2>Add New Field Worker</h2>
+              <div>
+                <span className="modal-label">NEW WORKER</span>
+                <h2>Add New Field Worker</h2>
+              </div>
               <button
-                className="worker-modal-close"
+                className="modal-close"
                 onClick={() => setShowAddPopup(false)}
               >
                 ×
@@ -384,31 +409,33 @@ const Workers = () => {
             </div>
 
             <form onSubmit={handleAddWorker} className="worker-form">
-              <div className="worker-form-group">
-                <label>Full Name *</label>
-                <input
-                  type="text"
-                  name="name"
-                  placeholder="e.g. Suresh Kumar"
-                  value={newWorker.name}
-                  onChange={handleInputChange}
-                  required
-                />
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Full Name *</label>
+                  <input
+                    type="text"
+                    name="name"
+                    placeholder="e.g. Suresh Kumar"
+                    value={newWorker.name}
+                    onChange={handleInputChange}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Phone Number *</label>
+                  <input
+                    type="text"
+                    name="phone"
+                    placeholder="e.g. 9876543210"
+                    value={newWorker.phone}
+                    onChange={handleInputChange}
+                    required
+                  />
+                </div>
               </div>
 
-              <div className="worker-form-group">
-                <label>Phone Number *</label>
-                <input
-                  type="text"
-                  name="phone"
-                  placeholder="e.g. 9876543210"
-                  value={newWorker.phone}
-                  onChange={handleInputChange}
-                  required
-                />
-              </div>
-
-              <div className="worker-form-group">
+              <div className="form-group">
                 <label>Email Address *</label>
                 <input
                   type="email"
@@ -420,21 +447,10 @@ const Workers = () => {
                 />
               </div>
 
-              <div className="worker-form-group">
-                <label>Assigned Zone</label>
-                <input
-                  type="text"
-                  name="zone"
-                  placeholder="e.g. Zone 2 - Gandhipuram Central"
-                  value={newWorker.zone}
-                  onChange={handleInputChange}
-                />
-              </div>
-
-              <div className="worker-modal-actions">
+              <div className="worker-modal-footer">
                 <button
                   type="button"
-                  className="cancel-btn"
+                  className="modal-cancel-btn"
                   onClick={() => setShowAddPopup(false)}
                 >
                   Cancel
@@ -442,7 +458,7 @@ const Workers = () => {
 
                 <button
                   type="submit"
-                  className="confirm-btn"
+                  className="modal-add-btn"
                   disabled={submitting}
                 >
                   {submitting ? "Adding..." : "Add Worker"}
@@ -458,7 +474,8 @@ const Workers = () => {
       ================================= */}
       {showRemovePopup && selectedWorker && (
         <div className="worker-modal-overlay" onClick={() => setShowRemovePopup(false)}>
-          <div className="worker-modal remove-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="remove-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="remove-icon">!</div>
             <h2>Remove Field Worker</h2>
 
             <p>
@@ -466,16 +483,20 @@ const Workers = () => {
               <strong>{selectedWorker.name}</strong> ({selectedWorker.id})?
             </p>
 
-            <div className="worker-modal-actions">
+            <div className="remove-warning">
+              This action will prevent the worker from logging in and unassign them from any active tasks.
+            </div>
+
+            <div className="remove-actions">
               <button
-                className="cancel-btn"
+                className="cancel-remove-btn"
                 onClick={() => setShowRemovePopup(false)}
               >
                 Cancel
               </button>
 
               <button
-                className="delete-confirm-btn"
+                className="confirm-remove-btn"
                 onClick={handleRemoveWorker}
               >
                 Deactivate Worker

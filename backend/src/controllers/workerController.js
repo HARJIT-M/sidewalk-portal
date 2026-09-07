@@ -283,8 +283,18 @@ const addWorker = async (req, res) => {
       });
     }
 
-    const totalWorkers = await Worker.countDocuments();
-    const nextCodeNumber = totalWorkers + 1;
+    let nextCodeNumber = 1;
+    const lastWorker = await Worker.findOne().sort({ createdAt: -1 });
+    if (lastWorker && lastWorker.employee_code && lastWorker.employee_code.startsWith("WRK")) {
+      const lastCode = parseInt(lastWorker.employee_code.replace("WRK", ""), 10);
+      if (!isNaN(lastCode)) {
+        nextCodeNumber = lastCode + 1;
+      } else {
+        const totalWorkers = await Worker.countDocuments();
+        nextCodeNumber = totalWorkers + 1;
+      }
+    }
+
     const employeeCode = `WRK${String(nextCodeNumber).padStart(3, "0")}`;
 
     const defaultPasswordHash = await bcrypt.hash("password123", 10);
@@ -298,13 +308,15 @@ const addWorker = async (req, res) => {
       status: "ACTIVE",
     });
 
+    const managerZone = req.user.zone || "Central Municipal Area";
+
     const newWorkerProfile = await Worker.create({
       user_id: newUser._id,
       employee_code: employeeCode,
-      worker_role: role || "Maintenance Worker",
+      worker_role: "Maintenance Worker",
       availability_status: "ACTIVE",
       shift: shift || "Day Shift (08:00 AM - 05:00 PM)",
-      zone: zone || "Zone 2 - Gandhipuram Central",
+      zone: managerZone,
       emergency_contact: phone.trim(),
       address: address || "Gandhipuram, Coimbatore",
       skills: Array.isArray(skills) && skills.length > 0 ? skills : ["Footpath Tile Paving", "Concrete Crack Sealing"],

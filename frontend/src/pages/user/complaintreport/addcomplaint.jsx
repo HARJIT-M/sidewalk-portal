@@ -1,5 +1,6 @@
 // addcomplaint.jsx
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   FileText,
   MapPin,
@@ -12,6 +13,7 @@ import {
   AlertCircle,
   Sparkles,
 } from "lucide-react";
+import userApi from "../../../services/userApi";
 import "./addcomplaint.css";
 
 const ISSUE_TYPES = [
@@ -24,6 +26,8 @@ const ISSUE_TYPES = [
 ];
 
 const ReportComplaint = () => {
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -37,7 +41,7 @@ const ReportComplaint = () => {
 
   const [coords, setCoords] = useState(null); // { lat, lng }
   const [locationStatus, setLocationStatus] = useState("idle");
-  // idle | loading | success | error
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
     setFormData({
@@ -82,8 +86,6 @@ const ReportComplaint = () => {
         setCoords({ lat, lng });
         setLocationStatus("success");
 
-        // Try reverse geocoding to fill the location text field.
-        // Uses OpenStreetMap's free Nominatim API — no key required.
         try {
           const res = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`
@@ -97,8 +99,6 @@ const ReportComplaint = () => {
             }));
           }
 
-          // Pull the most relevant "area" / neighbourhood level from
-          // the structured address, falling back gracefully.
           const addr = data?.address || {};
           const area =
             addr.suburb ||
@@ -117,8 +117,6 @@ const ReportComplaint = () => {
             }));
           }
         } catch (err) {
-          // Reverse geocoding failed — coordinates are still captured,
-          // so the complaint remains valid, just without an auto-filled address.
           console.error("Reverse geocoding failed:", err);
         }
       },
@@ -137,13 +135,35 @@ const ReportComplaint = () => {
     );
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.title || !formData.issueType || !formData.location) {
+      alert("Please fill out all required fields.");
+      return;
+    }
 
-    console.log("Complaint:", { ...formData, coordinates: coords });
-    console.log("Images:", images);
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        ...formData,
+        latitude: coords?.lat,
+        longitude: coords?.lng,
+        // Using placeholder logic since actual image upload to S3/Cloudinary isn't specified
+        // Just take the first image if there is one and store as a local blob for preview or null
+        imageUrl: images.length > 0 ? images[0].preview : null
+      };
 
-    alert("Complaint submitted successfully!");
+      const res = await userApi.submitComplaint(payload);
+      if (res.success) {
+        alert(res.message);
+        navigate("/user/my-complaints");
+      }
+    } catch (err) {
+      console.error("Submit error", err);
+      alert(err.response?.data?.message || "Failed to submit complaint.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // ------- progress calculation (purely visual) -------
@@ -455,12 +475,12 @@ const ReportComplaint = () => {
 
           {/* Submit (mobile inline actions, hidden on desktop where sidebar handles it) */}
           <div className="form-actions mobile-only">
-            <button type="button" className="cancel-button">
+            <button type="button" className="cancel-button" onClick={() => navigate(-1)}>
               Cancel
             </button>
 
-            <button type="submit" className="submit-button">
-              Submit Complaint
+            <button type="submit" className="submit-button" disabled={isSubmitting}>
+              {isSubmitting ? "Submitting..." : "Submit Complaint"}
             </button>
           </div>
 
@@ -501,7 +521,7 @@ const ReportComplaint = () => {
             <div className="summary-divider"></div>
 
             <div className="form-actions">
-              <button type="button" className="cancel-button">
+              <button type="button" className="cancel-button" onClick={() => navigate(-1)}>
                 Cancel
               </button>
 
@@ -510,8 +530,9 @@ const ReportComplaint = () => {
                 form="report-complaint-form"
                 className="submit-button"
                 onClick={handleSubmit}
+                disabled={isSubmitting}
               >
-                Submit Complaint
+                {isSubmitting ? "Submitting..." : "Submit Complaint"}
               </button>
             </div>
           </div>

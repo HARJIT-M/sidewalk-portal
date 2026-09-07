@@ -551,10 +551,116 @@ const assignComplaintWorkers = async (req, res) => {
   }
 };
 
+// ==========================================
+// 6. SUBMIT NEW COMPLAINT (USER)
+// ==========================================
+const submitComplaint = async (req, res) => {
+  try {
+    const { title, description, issueType, location, landmark, area, latitude, longitude, imageUrl } = req.body;
+
+    if (!title || !location || !issueType) {
+      return res.status(400).json({
+        success: false,
+        message: "Title, location, and issue type are required.",
+      });
+    }
+
+    const totalComplaints = await Complaint.countDocuments();
+    const nextCodeNumber = totalComplaints + 1;
+    const complaintCode = `CMP${String(nextCodeNumber).padStart(3, "0")}`;
+
+    const newComplaint = await Complaint.create({
+      complaint_code: complaintCode,
+      title,
+      description,
+      issue_type: issueType,
+      priority: "MEDIUM", // Default priority
+      status: "PENDING", // Initial status
+      location,
+      landmark,
+      area,
+      latitude,
+      longitude,
+      reported_by: req.user._id,
+      image_url: imageUrl || null,
+      reported_at: new Date(),
+    });
+
+    await StatusHistory.create({
+      complaint_id: newComplaint._id,
+      old_status: "NEW",
+      new_status: "PENDING",
+      changed_by: req.user._id,
+      remarks: "Complaint submitted by citizen.",
+      changed_at: new Date(),
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `Complaint submitted successfully. Your ID is ${complaintCode}.`,
+      complaintId: complaintCode,
+      complaint: newComplaint,
+    });
+  } catch (error) {
+    console.error("Error submitting complaint:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while submitting complaint.",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// 7. GET USER COMPLAINTS (USER)
+// ==========================================
+const getUserComplaints = async (req, res) => {
+  try {
+    const { status } = req.query;
+    
+    let filter = { reported_by: req.user._id };
+
+    if (status && status !== "All") {
+      filter.status = status.toUpperCase();
+    }
+
+    const complaints = await Complaint.find(filter).sort({ reported_at: -1 });
+
+    const formattedComplaints = complaints.map(c => ({
+      id: c.complaint_code,
+      mongoId: c._id,
+      title: c.title,
+      location: c.location,
+      area: c.area || "",
+      date: c.reported_at ? new Date(c.reported_at).toLocaleDateString("en-GB", {
+        day: "2-digit", month: "short", year: "numeric"
+      }) : "Recent",
+      priority: c.priority,
+      status: c.status,
+      image: c.image_url || null,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      count: formattedComplaints.length,
+      complaints: formattedComplaints,
+    });
+  } catch (error) {
+    console.error("Error fetching user complaints:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while fetching your complaints.",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAssignedComplaints,
   getComplaintDetails,
   getManagerComplaints,
   updateComplaintPriority,
   assignComplaintWorkers,
+  submitComplaint,
+  getUserComplaints,
 };

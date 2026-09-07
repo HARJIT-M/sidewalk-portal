@@ -1,4 +1,5 @@
 const express = require("express");
+const cors  = require("cors");
 const { protect } = require("../middleware/authMiddleware");
 const {
   uploadRepairProof,
@@ -13,7 +14,7 @@ router.use(protect);
 
 // ==========================================
 // 1. UPLOAD REPAIR PROOF (BEFORE / AFTER)
-// ==========================================
+// ======================================
 router.post("/proof", uploadRepairProof);
 
 // ==========================================

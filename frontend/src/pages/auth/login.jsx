@@ -237,9 +237,8 @@ const Login = () => {
 
           <div className="trust-item">
             <MapPinned size={16} strokeWidth={2} />
-            <span>Live issue tracking</span>
+            <span>Live issue tracking</span>  
           </div>
-
           <div className="trust-item">
             <Timer size={16} strokeWidth={2} />
             <span>Fast repair updates</span>

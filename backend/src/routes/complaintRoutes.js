@@ -6,6 +6,8 @@ const {
   getManagerComplaints,
   updateComplaintPriority,
   assignComplaintWorkers,
+  submitComplaint,
+  getUserComplaints,
 } = require("../controllers/complaintController");
 
 const router = express.Router();
@@ -31,5 +33,11 @@ router.post("/:id/assign", authorize("MANAGER"), assignComplaintWorkers);
 // 3. COMMON COMPLAINT DETAILS (WORKER & MANAGER)
 // ==========================================
 router.get("/:id", getComplaintDetails);
+
+// ==========================================
+// 4. USER COMPLAINTS (USER)
+// ==========================================
+router.post("/", authorize("USER"), submitComplaint);
+router.get("/user", authorize("USER"), getUserComplaints);
 
 module.exports = router;

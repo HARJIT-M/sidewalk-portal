@@ -306,7 +306,74 @@ const getManagerDashboard = async (req, res) => {
   }
 };
 
+// ==========================================
+// 3. GET USER DASHBOARD
+// ==========================================
+const getUserDashboard = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Fetch complaints for the user
+    const userComplaints = await Complaint.find({ reported_by: userId })
+      .sort({ reported_at: -1 });
+
+    const totalReported = userComplaints.length;
+    const inProgressCount = userComplaints.filter(c => c.status === "IN_PROGRESS").length;
+    const resolvedCount = userComplaints.filter(c => c.status === "RESOLVED" || c.status === "CLOSED").length;
+    const pendingCount = userComplaints.filter(c => c.status === "PENDING" || c.status === "ASSIGNED").length;
+
+    // Recent activity map (e.g. up to 3)
+    const recentActivity = userComplaints.slice(0, 3).map(c => {
+      let iconType = "reported";
+      let actionText = "Reported new issue";
+      if (c.status === "RESOLVED" || c.status === "CLOSED") {
+        iconType = "resolved";
+        actionText = "Issue resolved by team";
+      } else if (c.status === "IN_PROGRESS") {
+        iconType = "progress";
+        actionText = "Repair work started";
+      }
+
+      return {
+        id: c.complaint_code,
+        mongoId: c._id,
+        action: actionText,
+        issue: c.title,
+        location: c.location,
+        priority: c.priority,
+        status: c.status,
+        date: c.reported_at ? new Date(c.reported_at).toLocaleDateString("en-GB", {
+          day: "2-digit", month: "short", year: "numeric"
+        }) : "Recently",
+        time: c.reported_at ? new Date(c.reported_at).toLocaleDateString("en-GB", {
+          day: "2-digit", month: "short"
+        }) : "Recently",
+        iconType
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      stats: {
+        totalReported,
+        inProgress: inProgressCount,
+        resolved: resolvedCount,
+        pending: pendingCount
+      },
+      recentActivity
+    });
+  } catch (error) {
+    console.error("Error generating user dashboard:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while generating user dashboard.",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getWorkerDashboard,
   getManagerDashboard,
+  getUserDashboard,
 };

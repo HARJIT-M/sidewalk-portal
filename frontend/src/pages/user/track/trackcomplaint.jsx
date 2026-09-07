@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ClipboardList,
   Pin,
@@ -12,169 +12,73 @@ import {
   RefreshCw,
   Clock,
 } from "lucide-react";
+import userApi from "../../../services/userApi";
 import "./new_track.css";
 
 const WorkTracking = () => {
-  // Temporary work tracking data
-  const [works] = useState([
-    {
-      id: "CMP001",
-      title: "Broken Footpath",
-      location: "Gandhipuram, Coimbatore",
-      priority: "High",
-      status: "In Progress",
-      progress: 65,
-      assignedWorkers: ["Ravi", "Karthik", "Manoj"],
-      assignedDate: "21 Aug 2026",
-      startedDate: "21 Aug 2026",
-      expectedDate: "24 Aug 2026",
-      lastUpdate: "Broken tiles have been removed. New tiles are being installed.",
-      updatedBy: "Ravi",
-      updatedAt: "21 Aug 2026, 11:30 AM",
-      history: [
-        {
-          date: "21 Aug 2026, 11:30 AM",
-          worker: "Ravi",
-          message:
-            "Broken tiles have been removed. New tiles are being installed.",
-          progress: 65,
-        },
-        {
-          date: "21 Aug 2026, 09:00 AM",
-          worker: "Karthik",
-          message: "Work started. Damaged section was inspected.",
-          progress: 30,
-        },
-      ],
-    },
+  const [works, setWorks] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-    {
-      id: "CMP002",
-      title: "Large Pothole",
-      location: "RS Puram, Coimbatore",
-      priority: "High",
-      status: "In Progress",
-      progress: 40,
-      assignedWorkers: ["Suresh", "Arun"],
-      assignedDate: "20 Aug 2026",
-      startedDate: "20 Aug 2026",
-      expectedDate: "23 Aug 2026",
-      lastUpdate: "Pothole area has been cleaned and prepared for repair.",
-      updatedBy: "Suresh",
-      updatedAt: "21 Aug 2026, 10:15 AM",
-      history: [
-        {
-          date: "21 Aug 2026, 10:15 AM",
-          worker: "Suresh",
-          message:
-            "Pothole area has been cleaned and prepared for repair.",
-          progress: 40,
-        },
-        {
-          date: "20 Aug 2026, 03:00 PM",
-          worker: "Arun",
-          message: "Repair work started.",
-          progress: 20,
-        },
-      ],
-    },
-
-    {
-      id: "CMP003",
-      title: "Cracked Sidewalk",
-      location: "Saibaba Colony, Coimbatore",
-      priority: "Medium",
-      status: "Completed",
-      progress: 100,
-      assignedWorkers: ["Manoj", "Dinesh"],
-      assignedDate: "18 Aug 2026",
-      startedDate: "18 Aug 2026",
-      expectedDate: "20 Aug 2026",
-      lastUpdate: "Cracked sidewalk has been completely repaired.",
-      updatedBy: "Manoj",
-      updatedAt: "20 Aug 2026, 04:30 PM",
-      history: [
-        {
-          date: "20 Aug 2026, 04:30 PM",
-          worker: "Manoj",
-          message:
-            "Cracked sidewalk has been completely repaired.",
-          progress: 100,
-        },
-        {
-          date: "19 Aug 2026, 02:00 PM",
-          worker: "Dinesh",
-          message: "Damaged section was repaired.",
-          progress: 75,
-        },
-        {
-          date: "18 Aug 2026, 10:00 AM",
-          worker: "Manoj",
-          message: "Repair work started.",
-          progress: 20,
-        },
-      ],
-    },
-
-    {
-      id: "CMP004",
-      title: "Damaged Pavement",
-      location: "Peelamedu, Coimbatore",
-      priority: "Low",
-      status: "Assigned",
-      progress: 0,
-      assignedWorkers: ["Arun", "Suresh"],
-      assignedDate: "21 Aug 2026",
-      startedDate: "-",
-      expectedDate: "25 Aug 2026",
-      lastUpdate: "Work has been assigned. Waiting for the team to start.",
-      updatedBy: "System",
-      updatedAt: "21 Aug 2026, 08:00 AM",
-      history: [
-        {
-          date: "21 Aug 2026, 08:00 AM",
-          worker: "System",
-          message: "Work assigned to maintenance team.",
-          progress: 0,
-        },
-      ],
-    },
-
-    {
-      id: "CMP005",
-      title: "Missing Footpath Tiles",
-      location: "Singanallur, Coimbatore",
-      priority: "Medium",
-      status: "Completed",
-      progress: 100,
-      assignedWorkers: ["Ravi", "Karthik"],
-      assignedDate: "16 Aug 2026",
-      startedDate: "16 Aug 2026",
-      expectedDate: "19 Aug 2026",
-      lastUpdate: "All missing tiles have been replaced successfully.",
-      updatedBy: "Karthik",
-      updatedAt: "19 Aug 2026, 05:15 PM",
-      history: [
-        {
-          date: "19 Aug 2026, 05:15 PM",
-          worker: "Karthik",
-          message:
-            "All missing tiles have been replaced successfully.",
-          progress: 100,
-        },
-        {
-          date: "18 Aug 2026, 01:30 PM",
-          worker: "Ravi",
-          message: "New tiles are being installed.",
-          progress: 70,
-        },
-      ],
-    },
-  ]);
-
-  const [selectedId, setSelectedId] = useState(works[0]?.id || null);
+  const [selectedId, setSelectedId] = useState(null);
+  const [selectedWorkDetails, setSelectedWorkDetails] = useState(null);
+  
   const [statusFilter, setStatusFilter] = useState("All");
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    fetchWorks();
+  }, [statusFilter]);
+
+  const fetchWorks = async () => {
+    setLoading(true);
+    try {
+      const data = await userApi.getUserComplaints(statusFilter);
+      if (data.success) {
+        setWorks(data.complaints);
+        if (data.complaints.length > 0 && !selectedId) {
+          setSelectedId(data.complaints[0].id);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch works:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedId) {
+      fetchWorkDetails(selectedId);
+    }
+  }, [selectedId]);
+
+  const fetchWorkDetails = async (id) => {
+    try {
+      const data = await userApi.getComplaintDetails(id);
+      if (data.success) {
+        setSelectedWorkDetails(data.complaint);
+      }
+    } catch (error) {
+      console.error("Failed to fetch complaint details:", error);
+    }
+  };
+
+  const formatStatus = (status) => {
+    if (!status) return "Pending";
+    if (status === "IN_PROGRESS") return "In Progress";
+    if (status === "RESOLVED" || status === "CLOSED") return "Completed";
+    if (status === "ASSIGNED") return "Assigned";
+    return "Pending";
+  };
+
+  const formatPriority = (priority) => {
+    if (!priority) return "Medium";
+    if (priority === "CRITICAL") return "Critical";
+    if (priority === "HIGH") return "High";
+    if (priority === "MEDIUM") return "Medium";
+    if (priority === "LOW") return "Low";
+    return "Not Set";
+  };
 
   // Filter work
   const filteredWorks = works.filter((work) => {
@@ -183,31 +87,28 @@ const WorkTracking = () => {
       work.title.toLowerCase().includes(search.toLowerCase()) ||
       work.location.toLowerCase().includes(search.toLowerCase());
 
-    const matchesStatus =
-      statusFilter === "All" || work.status === statusFilter;
-
-    return matchesSearch && matchesStatus;
+    return matchesSearch;
   });
 
-  const selectedWork =
-    works.find((w) => w.id === selectedId) || filteredWorks[0] || null;
+  const selectedWorkListItem = works.find((w) => w.id === selectedId) || null;
 
   // Counts
   const totalWorks = works.length;
 
   const assignedWorks = works.filter(
-    (work) => work.status === "Assigned"
+    (work) => formatStatus(work.status) === "Assigned" || formatStatus(work.status) === "Pending"
   ).length;
 
   const inProgressWorks = works.filter(
-    (work) => work.status === "In Progress"
+    (work) => formatStatus(work.status) === "In Progress"
   ).length;
 
   const completedWorks = works.filter(
-    (work) => work.status === "Completed"
+    (work) => formatStatus(work.status) === "Completed"
   ).length;
 
-  const statusClass = (status) => status.toLowerCase().replace(" ", "-");
+  const statusClass = (status) => status ? status.toLowerCase().replace(" ", "-") : "";
+
 
   return (
     <div className="work-tracking-page">
@@ -306,14 +207,18 @@ const WorkTracking = () => {
 
             {filteredWorks.length > 0 ? (
 
-              filteredWorks.map((work) => (
+              filteredWorks.map((work) => {
+                const displayStatus = formatStatus(work.status);
+                let progress = 10;
+                if (displayStatus === "Assigned") progress = 30;
+                if (displayStatus === "In Progress") progress = 75;
+                if (displayStatus === "Completed") progress = 100;
 
+                return (
                 <button
                   key={work.id}
                   className={`work-list-item ${
-                    selectedWork && selectedWork.id === work.id
-                      ? "active"
-                      : ""
+                    selectedId === work.id ? "active" : ""
                   }`}
                   onClick={() => setSelectedId(work.id)}
                 >
@@ -321,9 +226,9 @@ const WorkTracking = () => {
                   <div className="work-list-item-top">
                     <span className="work-id-tag">{work.id}</span>
                     <span
-                      className={`work-status ${statusClass(work.status)}`}
+                      className={`work-status ${statusClass(displayStatus)}`}
                     >
-                      {work.status}
+                      {displayStatus}
                     </span>
                   </div>
 
@@ -338,17 +243,16 @@ const WorkTracking = () => {
                     <div className="work-list-progress-track">
                       <div
                         className={`work-list-progress-fill ${statusClass(
-                          work.status
+                          displayStatus
                         )}`}
-                        style={{ width: `${work.progress}%` }}
+                        style={{ width: `${progress}%` }}
                       ></div>
                     </div>
-                    <span>{work.progress}%</span>
+                    <span>{progress}%</span>
                   </div>
 
                 </button>
-
-              ))
+              )})
 
             ) : (
 
@@ -365,7 +269,7 @@ const WorkTracking = () => {
 
         <div className="tracking-detail-panel">
 
-          {selectedWork ? (
+          {selectedWorkDetails ? (
 
             <>
               {/* Detail Header */}
@@ -373,27 +277,25 @@ const WorkTracking = () => {
               <div className="detail-header">
 
                 <div>
-                  <span className="work-id-tag">{selectedWork.id}</span>
-                  <h2>{selectedWork.title}</h2>
+                  <span className="work-id-tag">{selectedWorkDetails.id}</span>
+                  <h2>{selectedWorkDetails.title}</h2>
                   <p className="work-list-location">
                     <MapPin size={13} strokeWidth={2} />
-                    {selectedWork.location}
+                    {selectedWorkDetails.location}
                   </p>
                 </div>
 
                 <div className="detail-header-badges">
                   <span
-                    className={`work-status ${statusClass(
-                      selectedWork.status
-                    )}`}
+                    className={`work-status ${statusClass(formatStatus(selectedWorkDetails.status))}`}
                   >
-                    {selectedWork.status}
+                    {formatStatus(selectedWorkDetails.status)}
                   </span>
                   <span
-                    className={`priority-small ${selectedWork.priority.toLowerCase()}`}
+                    className={`priority-small ${formatPriority(selectedWorkDetails.priority).toLowerCase()}`}
                   >
                     <Flag size={11} strokeWidth={2.5} />
-                    {selectedWork.priority}
+                    {formatPriority(selectedWorkDetails.priority)}
                   </span>
                 </div>
 
@@ -403,21 +305,29 @@ const WorkTracking = () => {
               {/* Progress */}
 
               <div className="detail-progress-box">
+                {(() => {
+                  let p = 10;
+                  const s = formatStatus(selectedWorkDetails.status);
+                  if (s === "Assigned") p = 30;
+                  if (s === "In Progress") p = 75;
+                  if (s === "Completed") p = 100;
 
-                <div className="detail-progress-top">
-                  <span>Repair Progress</span>
-                  <strong>{selectedWork.progress}%</strong>
-                </div>
+                  return (
+                    <>
+                      <div className="detail-progress-top">
+                        <span>Repair Progress</span>
+                        <strong>{p}%</strong>
+                      </div>
 
-                <div className="progress-bar">
-                  <div
-                    className={`progress-fill ${statusClass(
-                      selectedWork.status
-                    )}`}
-                    style={{ width: `${selectedWork.progress}%` }}
-                  ></div>
-                </div>
-
+                      <div className="progress-bar">
+                        <div
+                          className={`progress-fill ${statusClass(s)}`}
+                          style={{ width: `${p}%` }}
+                        ></div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
 
@@ -427,94 +337,71 @@ const WorkTracking = () => {
 
                 <div className="detail-info-item">
                   <span>
-                    <Calendar size={13} strokeWidth={2} /> Assigned Date
+                    <Calendar size={13} strokeWidth={2} /> Reported Date
                   </span>
-                  <strong>{selectedWork.assignedDate}</strong>
+                  <strong>{selectedWorkDetails.reportedDate || "-"}</strong>
                 </div>
 
                 <div className="detail-info-item">
                   <span>
-                    <Clock size={13} strokeWidth={2} /> Started Date
+                    <Clock size={13} strokeWidth={2} /> Assigned Date
                   </span>
-                  <strong>{selectedWork.startedDate}</strong>
+                  <strong>{selectedWorkDetails.assignedDate || "-"}</strong>
                 </div>
 
                 <div className="detail-info-item">
                   <span>
-                    <Calendar size={13} strokeWidth={2} /> Expected Completion
+                    <Calendar size={13} strokeWidth={2} /> Work Started
                   </span>
-                  <strong>{selectedWork.expectedDate}</strong>
-                </div>
-
-                <div className="detail-info-item">
-                  <span>
-                    <RefreshCw size={13} strokeWidth={2} /> Last Updated By
-                  </span>
-                  <strong>{selectedWork.updatedBy}</strong>
+                  <strong>{selectedWorkDetails.workStartDate ? new Date(selectedWorkDetails.workStartDate).toLocaleDateString() : "-"}</strong>
                 </div>
 
               </div>
 
 
               {/* Assigned Team */}
+              {selectedWorkDetails.assignedWorkers && selectedWorkDetails.assignedWorkers.length > 0 && (
+                <div className="detail-team-block">
+                  <h3>
+                    <Users size={15} strokeWidth={2} /> Assigned Team
+                  </h3>
 
-              <div className="detail-team-block">
-                <h3>
-                  <Users size={15} strokeWidth={2} /> Assigned Team
-                </h3>
-
-                <div className="worker-list">
-                  {selectedWork.assignedWorkers.map((worker) => (
-                    <span key={worker}>👤 {worker}</span>
-                  ))}
+                  <div className="worker-list">
+                    {selectedWorkDetails.assignedWorkers.map((worker, i) => (
+                      <span key={i}>👤 {worker}</span>
+                    ))}
+                  </div>
                 </div>
-              </div>
-
-
-              {/* Latest Update */}
-
-              <div className="last-update">
-                <div className="update-icon">
-                  <RefreshCw size={18} strokeWidth={2} />
-                </div>
-
-                <div>
-                  <span>Latest Update</span>
-                  <p>{selectedWork.lastUpdate}</p>
-                  <small>{selectedWork.updatedAt}</small>
-                </div>
-              </div>
+              )}
 
 
               {/* Update History */}
-
               <div className="work-history">
-                <h3>Work Updates</h3>
+                <h3>Work Updates & History</h3>
 
-                {selectedWork.history.map((update, index) => (
-                  <div className="history-item" key={index}>
-
-                    <div className="history-line">
-                      <div className="history-dot"></div>
-                    </div>
-
-                    <div className="history-content">
-
-                      <div className="history-top">
-                        <strong>{update.worker}</strong>
-                        <span>{update.date}</span>
+                {selectedWorkDetails.statusHistory && selectedWorkDetails.statusHistory.length > 0 ? (
+                  selectedWorkDetails.statusHistory.map((update, index) => (
+                    <div className="history-item" key={index}>
+                      <div className="history-line">
+                        <div className="history-dot"></div>
                       </div>
-
-                      <p>{update.message}</p>
-
-                      <span className="history-progress">
-                        Progress: {update.progress}%
-                      </span>
-
+                      <div className="history-content">
+                        <div className="history-top">
+                          <strong>{update.changedBy}</strong>
+                          <span>{update.date}</span>
+                        </div>
+                        <p>{update.note}</p>
+                        <span className="history-progress">
+                          Status: {formatStatus(update.status)}
+                        </span>
+                      </div>
                     </div>
-
+                  ))
+                ) : (
+                  <div style={{ color: "#888", fontSize: "0.85rem", marginTop: "0.5rem" }}>
+                    No updates available.
                   </div>
-                ))}
+                )}
               </div>
 
             </>

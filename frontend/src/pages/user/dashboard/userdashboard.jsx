@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ClipboardList,
@@ -9,55 +9,57 @@ import {
   MapPin,
   Calendar,
 } from "lucide-react";
+import userApi from "../../../services/userApi";
 import "./userdashboard.css";
 
 const UserDashboard = () => {
   const navigate = useNavigate();
 
-  // Temporary sample data
-  const complaints = [
-    {
-      id: "CMP001",
-      issue: "Broken Footpath",
-      location: "Gandhi Road",
-      date: "22 Aug 2026",
-      status: "In Progress",
-      priority: "High",
-    },
-    {
-      id: "CMP002",
-      issue: "Footpath Crack",
-      location: "Main Street",
-      date: "20 Aug 2026",
-      status: "Not Assigned",
-      priority: "Not Set",
-    },
-    {
-      id: "CMP003",
-      issue: "Damaged Sidewalk",
-      location: "Bus Stand Road",
-      date: "15 Aug 2026",
-      status: "Completed",
-      priority: "Medium",
-    },
-  ];
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const data = await userApi.getDashboard();
+        if (data.success) {
+          setDashboardData(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch user dashboard", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, []);
+
+  if (loading) {
+    return <div className="user-dashboard">Loading dashboard...</div>;
+  }
 
   // Statistics
-  const totalComplaints = complaints.length;
-
-  const notAssigned = complaints.filter(
-    (complaint) => complaint.status === "Not Assigned"
-  ).length;
-
-  const inProgress = complaints.filter(
-    (complaint) => complaint.status === "In Progress"
-  ).length;
-
-  const completed = complaints.filter(
-    (complaint) => complaint.status === "Completed"
-  ).length;
+  const stats = dashboardData?.stats || { totalReported: 0, pending: 0, inProgress: 0, resolved: 0 };
+  const complaints = dashboardData?.recentActivity || [];
 
   const badgeClass = (value) => value.toLowerCase().replace(" ", "-");
+
+  const formatStatus = (status) => {
+    if (!status) return "Pending";
+    if (status === "IN_PROGRESS") return "In Progress";
+    if (status === "RESOLVED" || status === "CLOSED") return "Completed";
+    if (status === "ASSIGNED") return "Assigned";
+    return "Pending";
+  };
+
+  const formatPriority = (priority) => {
+    if (!priority) return "Medium";
+    if (priority === "CRITICAL") return "Critical";
+    if (priority === "HIGH") return "High";
+    if (priority === "MEDIUM") return "Medium";
+    if (priority === "LOW") return "Low";
+    return "Not Set";
+  };
 
   return (
     <div className="user-dashboard">
@@ -90,7 +92,7 @@ const UserDashboard = () => {
           </div>
           <div>
             <span>Total Complaints</span>
-            <strong>{totalComplaints}</strong>
+            <strong>{stats.totalReported}</strong>
           </div>
         </div>
 
@@ -100,7 +102,7 @@ const UserDashboard = () => {
           </div>
           <div>
             <span>Not Assigned</span>
-            <strong>{notAssigned}</strong>
+            <strong>{stats.pending}</strong>
           </div>
         </div>
 
@@ -110,7 +112,7 @@ const UserDashboard = () => {
           </div>
           <div>
             <span>In Progress</span>
-            <strong>{inProgress}</strong>
+            <strong>{stats.inProgress}</strong>
           </div>
         </div>
 
@@ -120,7 +122,7 @@ const UserDashboard = () => {
           </div>
           <div>
             <span>Completed</span>
-            <strong>{completed}</strong>
+            <strong>{stats.resolved}</strong>
           </div>
         </div>
       </div>
@@ -183,7 +185,10 @@ const UserDashboard = () => {
             </thead>
 
             <tbody>
-              {complaints.map((complaint) => (
+              {complaints.map((complaint) => {
+                const displayStatus = formatStatus(complaint.status);
+                const displayPriority = formatPriority(complaint.priority);
+                return (
                 <tr key={complaint.id}>
                   <td>
                     <strong>{complaint.id}</strong>
@@ -200,41 +205,40 @@ const UserDashboard = () => {
 
                   <td>
                     <span
-                      className={`priority-badge ${badgeClass(
-                        complaint.priority
-                      )}`}
+                      className={`priority-badge ${badgeClass(displayPriority)}`}
                     >
-                      {complaint.priority}
+                      {displayPriority}
                     </span>
                   </td>
 
                   <td>
                     <span
-                      className={`status-badge ${badgeClass(
-                        complaint.status
-                      )}`}
+                      className={`status-badge ${badgeClass(displayStatus)}`}
                     >
                       <span className="status-dot"></span>
-                      {complaint.status}
+                      {displayStatus}
                     </span>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>
 
         {/* ---- MOBILE CARD LIST ---- */}
         <div className="complaints-card-list">
-          {complaints.map((complaint) => (
+          {complaints.map((complaint) => {
+            const displayStatus = formatStatus(complaint.status);
+            const displayPriority = formatPriority(complaint.priority);
+            return (
             <div className="complaint-mobile-card" key={complaint.id}>
               <div className="complaint-mobile-top">
                 <span className="complaint-mobile-id">{complaint.id}</span>
                 <span
-                  className={`status-badge ${badgeClass(complaint.status)}`}
+                  className={`status-badge ${badgeClass(displayStatus)}`}
                 >
                   <span className="status-dot"></span>
-                  {complaint.status}
+                  {displayStatus}
                 </span>
               </div>
 
@@ -253,15 +257,13 @@ const UserDashboard = () => {
 
               <div className="complaint-mobile-bottom">
                 <span
-                  className={`priority-badge ${badgeClass(
-                    complaint.priority
-                  )}`}
+                  className={`priority-badge ${badgeClass(displayPriority)}`}
                 >
-                  {complaint.priority}
+                  {displayPriority}
                 </span>
               </div>
             </div>
-          ))}
+          )})}
         </div>
       </div>
     </div>

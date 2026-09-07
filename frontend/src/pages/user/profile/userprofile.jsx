@@ -1,43 +1,60 @@
-// UserProfile.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import userApi from "../../../services/userApi";
 import "./userprofile.css";
 
 const UserProfile = () => {
 
-  // ============================
-  // SAMPLE USER DATA
-  // ============================
-
   const [user, setUser] = useState({
-    name: "Karthik Raja",
-    email: "karthik.raja@example.com",
-    phone: "+91 98765 43210",
-    address: "12, Gandhi Street, Coimbatore",
-    city: "Coimbatore",
-    pincode: "641001",
-    joined: "12 Jan 2025",
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+    city: "",
+    pincode: "",
+    joined: "",
   });
 
+  const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-
   const [formData, setFormData] = useState(user);
+  const [statsData, setStatsData] = useState(null);
 
+  useEffect(() => {
+    fetchProfile();
+    fetchStats();
+  }, []);
 
-  // ============================
-  // STATS (sample)
-  // ============================
+  const fetchProfile = async () => {
+    try {
+      const data = await userApi.getProfile();
+      if (data.success && data.profile) {
+        setUser(data.profile);
+        setFormData(data.profile);
+      }
+    } catch (error) {
+      console.error("Failed to fetch profile:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const data = await userApi.getDashboard();
+      if (data.success && data.stats) {
+        setStatsData(data.stats);
+      }
+    } catch (error) {
+      console.error("Failed to fetch stats:", error);
+    }
+  };
 
   const stats = [
-    { label: "Total Complaints", value: 12, icon: "📋", type: "total" },
-    { label: "Resolved", value: 8, icon: "✓", type: "resolved" },
-    { label: "In Progress", value: 3, icon: "🔧", type: "progress" },
-    { label: "Pending", value: 1, icon: "⏳", type: "pending" },
+    { label: "Total Complaints", value: statsData?.totalReported || 0, icon: "📋", type: "total" },
+    { label: "Resolved", value: statsData?.resolved || 0, icon: "✓", type: "resolved" },
+    { label: "In Progress", value: statsData?.inProgress || 0, icon: "🔧", type: "progress" },
+    { label: "Pending", value: statsData?.pending || 0, icon: "⏳", type: "pending" },
   ];
-
-
-  // ============================
-  // HANDLERS
-  // ============================
 
   const handleChange = (e) => {
     setFormData({
@@ -46,9 +63,18 @@ const UserProfile = () => {
     });
   };
 
-  const handleSave = () => {
-    setUser(formData);
-    setIsEditing(false);
+  const handleSave = async () => {
+    try {
+      const data = await userApi.updateProfile(formData);
+      if (data.success) {
+        setUser(data.profile);
+        setIsEditing(false);
+        alert("Profile updated successfully");
+      }
+    } catch (error) {
+      console.error("Failed to update profile:", error);
+      alert(error.response?.data?.message || "Failed to update profile");
+    }
   };
 
   const handleCancel = () => {
@@ -56,6 +82,9 @@ const UserProfile = () => {
     setIsEditing(false);
   };
 
+  if (loading) {
+    return <div className="profile-page">Loading profile...</div>;
+  }
 
   return (
     <div className="profile-page">

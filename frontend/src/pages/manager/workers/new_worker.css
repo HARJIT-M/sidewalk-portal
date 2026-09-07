@@ -515,6 +515,15 @@
   padding: 26px;
 }
 
+.form-row {
+  display: flex;
+  gap: 15px;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
 .form-group {
   margin-bottom: 17px;
 }
