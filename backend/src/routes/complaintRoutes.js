@@ -30,14 +30,14 @@ router.put("/:id/priority", authorize("MANAGER"), updateComplaintPriority);
 router.post("/:id/assign", authorize("MANAGER"), assignComplaintWorkers);
 
 // ==========================================
-// 3. COMMON COMPLAINT DETAILS (WORKER & MANAGER)
-// ==========================================
-router.get("/:id", getComplaintDetails);
-
-// ==========================================
-// 4. USER COMPLAINTS (USER)
+// 3. USER COMPLAINTS (USER)
 // ==========================================
 router.post("/", authorize("USER"), submitComplaint);
 router.get("/user", authorize("USER"), getUserComplaints);
+
+// ==========================================
+// 4. COMMON COMPLAINT DETAILS (WORKER & MANAGER & USER)
+// ==========================================
+router.get("/:id", getComplaintDetails);
 
 module.exports = router;

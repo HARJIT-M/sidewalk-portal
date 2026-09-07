@@ -565,8 +565,17 @@ const submitComplaint = async (req, res) => {
       });
     }
 
-    const totalComplaints = await Complaint.countDocuments();
-    const nextCodeNumber = totalComplaints + 1;
+    let nextCodeNumber = 1;
+    const lastComplaint = await Complaint.findOne().sort({ createdAt: -1 });
+    if (lastComplaint && lastComplaint.complaint_code && lastComplaint.complaint_code.startsWith("CMP")) {
+      const lastCode = parseInt(lastComplaint.complaint_code.replace("CMP", ""), 10);
+      if (!isNaN(lastCode)) {
+        nextCodeNumber = lastCode + 1;
+      } else {
+        const totalComplaints = await Complaint.countDocuments();
+        nextCodeNumber = totalComplaints + 1;
+      }
+    }
     const complaintCode = `CMP${String(nextCodeNumber).padStart(3, "0")}`;
 
     const newComplaint = await Complaint.create({

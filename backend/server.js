@@ -16,6 +16,7 @@ const workTrackingRoutes = require("./src/routes/workTrackingRoutes");
 const notificationRoutes = require("./src/routes/notificationRoutes");
 const workerRoutes = require("./src/routes/workerRoutes");
 const managerRoutes = require("./src/routes/managerRoutes");
+const userRoutes = require("./src/routes/userRoutes");
 
 // ==========================================
 // 1. LOAD ENVIRONMENT CONFIGURATION
@@ -49,6 +50,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/workers", workerRoutes);
 app.use("/api/worker", workerRoutes);
 app.use("/api/manager", managerRoutes);
+app.use("/api/users", userRoutes);
 
 // Root route
 app.get("/", (req, res) => {
