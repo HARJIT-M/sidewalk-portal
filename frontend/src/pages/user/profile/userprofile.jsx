@@ -9,9 +9,7 @@ const UserProfile = () => {
     email: "",
     phone: "",
     address: "",
-    city: "",
-    pincode: "",
-    joined: "",
+    joinedDate: "",
   });
 
   const [loading, setLoading] = useState(true);
@@ -105,7 +103,7 @@ const UserProfile = () => {
             <h1>{user.name}</h1>
             <p>{user.email}</p>
             <span className="joined-tag">
-              Member since {user.joined}
+              Member since {user.joinedDate}
             </span>
           </div>
 
@@ -220,20 +218,6 @@ const UserProfile = () => {
             )}
           </div>
 
-          <div className="detail-item">
-            <label>City</label>
-            {isEditing ? (
-              <input
-                type="text"
-                name="city"
-                value={formData.city}
-                onChange={handleChange}
-              />
-            ) : (
-              <span>{user.city}</span>
-            )}
-          </div>
-
           <div className="detail-item full-width">
             <label>Address</label>
             {isEditing ? (
@@ -245,20 +229,6 @@ const UserProfile = () => {
               />
             ) : (
               <span>{user.address}</span>
-            )}
-          </div>
-
-          <div className="detail-item">
-            <label>Pincode</label>
-            {isEditing ? (
-              <input
-                type="text"
-                name="pincode"
-                value={formData.pincode}
-                onChange={handleChange}
-              />
-            ) : (
-              <span>{user.pincode}</span>
             )}
           </div>
 

@@ -7,7 +7,7 @@ const bcrypt = require("bcryptjs");
 const getUserProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select("-password");
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -16,17 +16,17 @@ const getUserProfile = async (req, res) => {
     }
 
     const totalReported = await Complaint.countDocuments({ reported_by: user._id });
-    const resolvedComplaints = await Complaint.countDocuments({ 
+    const resolvedComplaints = await Complaint.countDocuments({
       reported_by: user._id,
       status: { $in: ["RESOLVED", "CLOSED"] }
     });
 
     const joinedDateFormatted = user.createdAt
       ? new Date(user.createdAt).toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
       : "10 Feb 2025";
 
     return res.status(200).json({
@@ -63,7 +63,7 @@ const updateUserProfile = async (req, res) => {
     const { name, phone, email, address, currentPassword, newPassword } = req.body;
 
     const user = await User.findById(req.user._id);
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,

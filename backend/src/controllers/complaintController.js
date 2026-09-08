@@ -597,7 +597,7 @@ const submitComplaint = async (req, res) => {
 
     await StatusHistory.create({
       complaint_id: newComplaint._id,
-      old_status: "NEW",
+      old_status: null,
       new_status: "PENDING",
       changed_by: req.user._id,
       remarks: "Complaint submitted by citizen.",

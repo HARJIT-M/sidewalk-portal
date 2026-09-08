@@ -17,12 +17,12 @@ import userApi from "../../../services/userApi";
 import "./addcomplaint.css";
 
 const ISSUE_TYPES = [
-  { value: "Broken Footpath", label: "Broken Footpath" },
-  { value: "Pothole", label: "Pothole" },
-  { value: "Crack", label: "Footpath Crack" },
-  { value: "Damaged Sidewalk", label: "Damaged Sidewalk" },
-  { value: "Uneven Surface", label: "Uneven Surface" },
-  { value: "Other", label: "Other" },
+  { value: "BROKEN_FOOTPATH", label: "Broken Footpath" },
+  { value: "POTHOLE", label: "Pothole" },
+  { value: "CRACK", label: "Footpath Crack" },
+  { value: "BROKEN_SIDEWALK", label: "Damaged Sidewalk" },
+  { value: "DAMAGED_PAVEMENT", label: "Uneven Surface" },
+  { value: "OTHER", label: "Other" },
 ];
 
 const ReportComplaint = () => {

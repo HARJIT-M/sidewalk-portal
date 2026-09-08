@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ClipboardList,
   CircleDot,
@@ -9,54 +9,88 @@ import {
   MapPin,
   X,
 } from "lucide-react";
+import userApi from "../../../services/userApi";
 import "./viewcomplaint.css";
 
 const ViewComplaints = () => {
 
   const [complaints, setComplaints] = useState([]);
-      const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
 
-      const [selectedComplaint, setSelectedComplaint] = useState(null);
-      const [search, setSearch] = useState("");
-      const [statusFilter, setStatusFilter] = useState("All");
+  const [selectedComplaint, setSelectedComplaint] = useState(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
 
-      useEffect(() => {
-  fetchComplaints();
-}, [statusFilter]);
+  useEffect(() => {
+    fetchComplaints();
+  }, [statusFilter]);
 
-const fetchComplaints = async () => {
-  setLoading(true);
-  try {
-    const data = await userApi.getUserComplaints(statusFilter);
-    if (data.success) {
-      setComplaints(data.complaints);
+  const fetchComplaints = async () => {
+    setLoading(true);
+    try {
+      const data = await userApi.getUserComplaints(statusFilter);
+      if (data.success) {
+        setComplaints(data.complaints);
+      }
+    } catch (error) {
+      console.error("Failed to fetch complaints:", error);
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error("Failed to fetch complaints:", error);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
-// ============================
-// FILTER COMPLAINTS
-// ============================
+  const formatStatus = (status) => {
+    if (!status) return "Pending";
+    if (status === "IN_PROGRESS") return "In Progress";
+    if (status === "RESOLVED" || status === "CLOSED") return "Completed";
+    if (status === "ASSIGNED") return "Assigned";
+    return "Pending";
+  };
 
-const notAssignedComplaints = complaints.filter(
-  (complaint) => complaint.status === "Not Assigned"
-).length;
+  const formatPriority = (priority) => {
+    if (!priority) return "Medium";
+    if (priority === "CRITICAL") return "Critical";
+    if (priority === "HIGH") return "High";
+    if (priority === "MEDIUM") return "Medium";
+    if (priority === "LOW") return "Low";
+    return "Not Set";
+  };
 
-const inProgressComplaints = complaints.filter(
-  (complaint) => complaint.status === "In Progress"
-).length;
+  // ============================
+  // FILTER COMPLAINTS
+  // ============================
+  const filteredComplaints = complaints.filter((complaint) => {
+    const matchesSearch =
+      complaint.id.toLowerCase().includes(search.toLowerCase()) ||
+      complaint.title.toLowerCase().includes(search.toLowerCase()) ||
+      complaint.location.toLowerCase().includes(search.toLowerCase());
 
-const completedComplaints = complaints.filter(
-  (complaint) => complaint.status === "Completed"
-).length;
+    const displayStatus = formatStatus(complaint.status);
+    const matchesStatus = statusFilter === "All" || displayStatus === statusFilter;
 
+    return matchesSearch && matchesStatus;
+  });
 
-return (
-  <div className="my-complaints-page">
+  const notAssignedComplaints = complaints.filter(
+    (complaint) => formatStatus(complaint.status) === "Pending" || formatStatus(complaint.status) === "Assigned"
+  ).length;
+
+  const inProgressComplaints = complaints.filter(
+    (complaint) => formatStatus(complaint.status) === "In Progress"
+  ).length;
+
+  const completedComplaints = complaints.filter(
+    (complaint) => formatStatus(complaint.status) === "Completed"
+  ).length;
+
+  const stats = {
+    total: complaints.length,
+    pending: notAssignedComplaints,
+    progress: inProgressComplaints,
+  };
+
+  return (
+    <div className="my-complaints-page">
 
     {/* ============================
           HEADER
@@ -231,19 +265,19 @@ return (
 
                   <td>
                     <span
-                      className={`priority ${complaint.priority.toLowerCase()}`}
+                      className={`priority ${formatPriority(complaint.priority).toLowerCase()}`}
                     >
-                      {complaint.priority}
+                      {formatPriority(complaint.priority)}
                     </span>
                   </td>
 
                   <td>
                     <span
-                      className={`status ${complaint.status
+                      className={`status ${formatStatus(complaint.status)
                         .toLowerCase()
                         .replace(" ", "-")}`}
                     >
-                      {complaint.status}
+                      {formatStatus(complaint.status)}
                     </span>
                   </td>
 
