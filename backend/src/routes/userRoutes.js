@@ -13,7 +13,7 @@ router.use(protect);
 // ==========================================
 // USER ROUTES (For Public Citizen)
 // ==========================================
-router.get("/profile", authorize("USER"), getUserProfile);
-router.put("/profile", authorize("USER"), updateUserProfile);
+router.get("/profile", authorize("CITIZEN"), getUserProfile);
+router.put("/profile", authorize("CITIZEN"), updateUserProfile);
 
 module.exports = router;

@@ -32,8 +32,8 @@ router.post("/:id/assign", authorize("MANAGER"), assignComplaintWorkers);
 // ==========================================
 // 3. USER COMPLAINTS (USER)
 // ==========================================
-router.post("/", authorize("USER"), submitComplaint);
-router.get("/user", authorize("USER"), getUserComplaints);
+router.post("/", authorize("CITIZEN"), submitComplaint);
+router.get("/user", authorize("CITIZEN"), getUserComplaints);
 
 // ==========================================
 // 4. COMMON COMPLAINT DETAILS (WORKER & MANAGER & USER)

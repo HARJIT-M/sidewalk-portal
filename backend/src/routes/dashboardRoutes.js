@@ -24,6 +24,6 @@ router.get("/manager", authorize("MANAGER"), getManagerDashboard);
 // ==========================================
 // 3. USER DASHBOARD
 // ==========================================
-router.get("/user", authorize("USER"), getUserDashboard);
+router.get("/user", authorize("CITIZEN"), getUserDashboard);
 
 module.exports = router;
