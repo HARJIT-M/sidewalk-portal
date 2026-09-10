@@ -8,7 +8,9 @@ const {
   assignComplaintWorkers,
   submitComplaint,
   getUserComplaints,
+  deleteComplaint,
 } = require("../controllers/complaintController");
+const upload = require("../middleware/uploadMiddleware");
 
 const router = express.Router();
 
@@ -28,11 +30,16 @@ router.get("/manager", authorize("MANAGER"), getManagerComplaints);
 router.get("/all", authorize("MANAGER"), getManagerComplaints);
 router.put("/:id/priority", authorize("MANAGER"), updateComplaintPriority);
 router.post("/:id/assign", authorize("MANAGER"), assignComplaintWorkers);
+router.delete("/:id", authorize("MANAGER"), deleteComplaint);
 
 // ==========================================
 // 3. USER COMPLAINTS (USER)
 // ==========================================
-router.post("/", authorize("CITIZEN"), submitComplaint);
+router.post(
+  "/",
+  authorize("CITIZEN"),
+  submitComplaint
+);
 router.get("/user", authorize("CITIZEN"), getUserComplaints);
 
 // ==========================================

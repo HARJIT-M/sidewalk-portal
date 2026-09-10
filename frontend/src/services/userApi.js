@@ -46,8 +46,21 @@ const userApi = {
 
   // Submit a new complaint
   submitComplaint: async (complaintData) => {
-    const response = await API.post("/api/complaints", complaintData);
-    return response.data;
+    try {
+      const response = await API.post(
+        "/api/complaints",
+        complaintData
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error(
+        "Submit Complaint Error:",
+        error.response?.data || error.message
+      );
+
+      throw error;
+    }
   },
 
   // Get all complaints submitted by the user

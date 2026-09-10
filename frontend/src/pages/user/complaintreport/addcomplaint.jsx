@@ -135,32 +135,77 @@ const ReportComplaint = () => {
     );
   };
 
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.title || !formData.issueType || !formData.location) {
+
+    // Validate required fields
+    if (
+      !formData.title ||
+      !formData.issueType ||
+      !formData.location
+    ) {
       alert("Please fill out all required fields.");
       return;
     }
 
     setIsSubmitting(true);
+
     try {
+      let base64Image = null;
+      if (images?.length > 0 && images[0]?.file) {
+        base64Image = await fileToBase64(images[0].file);
+      }
+
       const payload = {
-        ...formData,
-        latitude: coords?.lat,
-        longitude: coords?.lng,
-        // Using placeholder logic since actual image upload to S3/Cloudinary isn't specified
-        // Just take the first image if there is one and store as a local blob for preview or null
-        imageUrl: images.length > 0 ? images[0].preview : null
+        title: formData.title,
+        description: formData.description || "",
+        issueType: formData.issueType,
+        location: formData.location,
+        area: formData.area || "",
+        latitude: coords?.lat !== undefined ? String(coords.lat) : undefined,
+        longitude: coords?.lng !== undefined ? String(coords.lng) : undefined,
+        image: base64Image,
       };
 
+      // Debug
+      console.log("Submitting complaint:");
+      console.log(payload);
+
+      // API call
       const res = await userApi.submitComplaint(payload);
+
+      console.log("Server response:", res);
+
       if (res.success) {
-        alert(res.message);
+        alert(res.message || "Complaint submitted successfully!");
+
         navigate("/user/my-complaints");
+      } else {
+        alert(res.message || "Failed to submit complaint.");
       }
+
     } catch (err) {
-      console.error("Submit error", err);
-      alert(err.response?.data?.message || "Failed to submit complaint.");
+      console.error("Submit error:", err);
+
+      console.error(
+        "Backend response:",
+        err.response?.data
+      );
+
+      alert(
+        err.response?.data?.message ||
+        "Failed to submit complaint."
+      );
+
     } finally {
       setIsSubmitting(false);
     }
@@ -254,9 +299,8 @@ const ReportComplaint = () => {
                   <button
                     type="button"
                     key={item.value}
-                    className={`chip ${
-                      formData.issueType === item.value ? "active" : ""
-                    }`}
+                    className={`chip ${formData.issueType === item.value ? "active" : ""
+                      }`}
                     onClick={() => selectIssueType(item.value)}
                   >
                     {item.label}
@@ -398,9 +442,8 @@ const ReportComplaint = () => {
             <div className="upload-toggle">
               <button
                 type="button"
-                className={`upload-toggle-option ${
-                  uploadMode === "upload" ? "active" : ""
-                }`}
+                className={`upload-toggle-option ${uploadMode === "upload" ? "active" : ""
+                  }`}
                 onClick={() => setUploadMode("upload")}
               >
                 <Upload size={14} strokeWidth={2.5} />
@@ -409,9 +452,8 @@ const ReportComplaint = () => {
 
               <button
                 type="button"
-                className={`upload-toggle-option ${
-                  uploadMode === "capture" ? "active" : ""
-                }`}
+                className={`upload-toggle-option ${uploadMode === "capture" ? "active" : ""
+                  }`}
                 onClick={() => setUploadMode("capture")}
               >
                 <Camera size={14} strokeWidth={2.5} />

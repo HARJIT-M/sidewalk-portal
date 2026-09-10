@@ -51,17 +51,17 @@ const getAssignedComplaints = async (req, res) => {
           area: c.area || "",
           reportedDate: c.reported_at
             ? new Date(c.reported_at).toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })
             : "",
           assignedDate: a.assigned_at
             ? new Date(a.assigned_at).toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })
             : "",
           reportedImage: c.image_url || null,
           reporterName: c.reported_by ? c.reported_by.name : "Citizen",
@@ -182,12 +182,12 @@ const getComplaintDetails = async (req, res) => {
       status: sh.new_status,
       date: sh.changed_at
         ? new Date(sh.changed_at).toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
         : "",
       note: sh.remarks || `Status updated to ${sh.new_status}`,
       changedBy: sh.changed_by ? sh.changed_by.name : "System",
@@ -196,12 +196,12 @@ const getComplaintDetails = async (req, res) => {
     const formattedRepairHistory = repairHistories.map((rh) => ({
       time: rh.started_at
         ? new Date(rh.started_at).toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
         : "",
       action: rh.repair_description,
       materials: rh.materials_used ? rh.materials_used.join(", ") : "",
@@ -230,18 +230,18 @@ const getComplaintDetails = async (req, res) => {
         longitude: complaint.longitude,
         reportedDate: complaint.reported_at
           ? new Date(complaint.reported_at).toLocaleDateString("en-GB", {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            })
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })
           : "",
         assignedDate:
           assignments.length > 0 && assignments[0].assigned_at
             ? new Date(assignments[0].assigned_at).toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })
             : "",
         assignedWorkers: assignedWorkerNames,
         workStartDate: assignments.length > 0 && assignments[0].started_at ? assignments[0].started_at : "",
@@ -306,10 +306,10 @@ const getManagerComplaints = async (req, res) => {
 
       const formattedDate = c.reported_at
         ? new Date(c.reported_at).toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          })
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
         : "Recent";
 
       return {
@@ -556,12 +556,19 @@ const assignComplaintWorkers = async (req, res) => {
 // ==========================================
 const submitComplaint = async (req, res) => {
   try {
-    const { title, description, issueType, location, landmark, area, latitude, longitude, imageUrl } = req.body;
+    const { title, description, issueType, location, landmark, area, latitude, longitude } = req.body;
 
     if (!title || !location || !issueType) {
       return res.status(400).json({
         success: false,
         message: "Title, location, and issue type are required.",
+      });
+    }
+
+    if (!req.body.image) {
+      return res.status(400).json({
+        success: false,
+        message: "Image is required.",
       });
     }
 
@@ -591,7 +598,8 @@ const submitComplaint = async (req, res) => {
       latitude,
       longitude,
       reported_by: req.user._id,
-      image_url: imageUrl || null,
+      image_url: req.body.image, // Base64 string directly from frontend
+      image_public_id: null,
       reported_at: new Date(),
     });
 
@@ -611,10 +619,57 @@ const submitComplaint = async (req, res) => {
       complaint: newComplaint,
     });
   } catch (error) {
-    console.error("Error submitting complaint:", error);
+    console.error("========== CREATE COMPLAINT ERROR ==========");
+    console.error("Name:", error?.name);
+    console.error("Message:", error?.message);
+    console.error("Code:", error?.code);
+    console.error("Stack:", error?.stack);
+    console.error("Full Error:", error);
+    console.error("==============================================");
+
     return res.status(500).json({
       success: false,
-      message: "Server error while submitting complaint.",
+      message: error?.message || "Failed to create complaint",
+      error: {
+        name: error?.name || null,
+        code: error?.code || null,
+        message: error?.message || null,
+      },
+    });
+  }
+};
+
+// ==========================================
+// 7. DELETE COMPLAINT (MANAGER)
+// ==========================================
+const deleteComplaint = async (req, res) => {
+  try {
+    const complaint = await Complaint.findById(req.params.id);
+
+    if (!complaint) {
+      return res.status(404).json({
+        success: false,
+        message: "Complaint not found",
+      });
+    }
+
+    // Delete image from Cloudinary if it exists
+    if (complaint.image_public_id) {
+      const cloudinary = require("../config/cloudinary");
+      await cloudinary.uploader.destroy(complaint.image_public_id);
+    }
+
+    await Complaint.findByIdAndDelete(req.params.id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Complaint deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting complaint:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while deleting complaint",
       error: error.message,
     });
   }
@@ -626,7 +681,7 @@ const submitComplaint = async (req, res) => {
 const getUserComplaints = async (req, res) => {
   try {
     const { status } = req.query;
-    
+
     let filter = { reported_by: req.user._id };
 
     if (status && status !== "All") {
@@ -672,4 +727,5 @@ module.exports = {
   assignComplaintWorkers,
   submitComplaint,
   getUserComplaints,
+  deleteComplaint,
 };

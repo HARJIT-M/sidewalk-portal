@@ -32,10 +32,10 @@ const getWorkerProfile = async (req, res) => {
 
     const formattedJoinedDate = worker.joined_date
       ? new Date(worker.joined_date).toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
       : "12 Jan 2025";
 
     return res.status(200).json({
@@ -186,10 +186,10 @@ const getAllWorkers = async (req, res) => {
 
         const joinedDateFormatted = worker.joined_date
           ? new Date(worker.joined_date).toLocaleDateString("en-GB", {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            })
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })
           : "12 Jan 2025";
 
         return {

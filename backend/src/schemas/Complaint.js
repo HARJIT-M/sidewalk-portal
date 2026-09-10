@@ -65,6 +65,10 @@ const complaintSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    image_public_id: {
+      type: String,
+      trim: true,
+    },
     latitude: {
       type: Number,
     },
