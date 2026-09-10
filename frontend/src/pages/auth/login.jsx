@@ -91,6 +91,8 @@ const Login = () => {
         navigate("/user/dashboard");
       } else if (user.role === "MANAGER") {
         navigate("/dashboard");
+      } else if (user.role === "ADMIN") {
+        navigate("/admin/dashboard");
       } else {
         alert("Unknown user role.");
       }

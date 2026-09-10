@@ -1,4 +1,3 @@
-
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import LandingPage from "./pages/landing/landingpage";
@@ -6,6 +5,7 @@ import LandingPage from "./pages/landing/landingpage";
 import Layout from "./components/manager/layout";
 import WorkerLayout from "./components/worker/WorkerLayout";
 import UserLayout from "./components/user/userlayout";
+import AdminLayout from "./components/admin/adminlayout";
 
 import Login from "./pages/auth/login";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -30,6 +30,10 @@ import WorkerComplaintDetails from "./pages/worker/WorkerComplaintDetails";
 import WorkerProfile from "./pages/worker/WorkerProfile";
 import WorkerNotifications from "./pages/worker/WorkerNotifications";
 
+// Admin Pages
+import AdminDashboard from "./pages/admin/admindashboard";
+import AdminManagement from "./pages/admin/adminmanagement";
+
 function App() {
   return (
     <BrowserRouter>
@@ -48,7 +52,7 @@ function App() {
             USER PORTAL - PROTECTED
         ========================= */}
 
-        <Route element={<ProtectedRoute />}>
+        <Route element={<ProtectedRoute allowedRoles={["CITIZEN"]} />}>
           <Route path="/user" element={<UserLayout />}>
 
             {/* /user → /user/dashboard */}
@@ -94,7 +98,7 @@ function App() {
             MANAGER PORTAL - PROTECTED
         ========================= */}
 
-        <Route element={<ProtectedRoute />}>
+        <Route element={<ProtectedRoute allowedRoles={["MANAGER"]} />}>
           <Route element={<Layout />}>
 
             <Route
@@ -125,7 +129,7 @@ function App() {
             WORKER PORTAL - PROTECTED
         ========================= */}
 
-        <Route element={<ProtectedRoute />}>
+        <Route element={<ProtectedRoute allowedRoles={["WORKER"]} />}>
           <Route path="/worker" element={<WorkerLayout />}>
 
             <Route
@@ -161,6 +165,40 @@ function App() {
             <Route
               path="notifications"
               element={<WorkerNotifications />}
+            />
+
+          </Route>
+        </Route>
+
+
+        {/* =========================
+            ADMIN PORTAL - PROTECTED
+        ========================= */}
+
+        <Route element={<ProtectedRoute allowedRoles={["ADMIN"]} />}>
+          <Route path="/admin" element={<AdminLayout />}>
+
+            {/* /admin → /admin/dashboard */}
+            <Route
+              index
+              element={
+                <Navigate
+                  to="/admin/dashboard"
+                  replace
+                />
+              }
+            />
+
+            {/* /admin/dashboard */}
+            <Route
+              path="dashboard"
+              element={<AdminDashboard />}
+            />
+
+            {/* /admin/management */}
+            <Route
+              path="management"
+              element={<AdminManagement />}
             />
 
           </Route>

@@ -1,5 +1,7 @@
 import React from "react";
+import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { getToken, getUser } from "../../../utils/auth";
 import {
   ClipboardList,
   CircleDot,
@@ -11,9 +13,11 @@ import {
 } from "lucide-react";
 import "./userdashboard.css";
 
+
+
 const UserDashboard = () => {
   const navigate = useNavigate();
-
+  const user = getUser();
   // Temporary sample data
   const complaints = [
     {
@@ -67,7 +71,7 @@ const UserDashboard = () => {
 
       <div className="user-dashboard-header">
         <div>
-          <h1>Welcome Back!</h1>
+          <h1>Welcome Back, {user?.name || "Citizen"}!</h1>
           <p>Track your reported footpath and sidewalk issues.</p>
         </div>
 

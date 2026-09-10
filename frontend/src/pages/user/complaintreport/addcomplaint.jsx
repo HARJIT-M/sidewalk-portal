@@ -1,5 +1,7 @@
 // addcomplaint.jsx
 import React, { useState } from "react";
+import axios from "axios";
+import { getToken } from "../../../utils/auth";
 import {
   FileText,
   MapPin,
@@ -15,12 +17,15 @@ import {
 import "./addcomplaint.css";
 
 const ISSUE_TYPES = [
-  { value: "Broken Footpath", label: "Broken Footpath" },
-  { value: "Pothole", label: "Pothole" },
-  { value: "Crack", label: "Footpath Crack" },
-  { value: "Damaged Sidewalk", label: "Damaged Sidewalk" },
-  { value: "Uneven Surface", label: "Uneven Surface" },
-  { value: "Other", label: "Other" },
+  { value: "BROKEN_FOOTPATH", label: "Broken Footpath" },
+  { value: "POTHOLE", label: "Pothole" },
+  { value: "CRACK", label: "Footpath Crack" },
+  { value: "BROKEN_SIDEWALK", label: "Damaged Sidewalk" },
+  { value: "MISSING_TILES", label: "Missing Tiles" },
+  { value: "DAMAGED_PAVEMENT", label: "Damaged Pavement" },
+  { value: "OBSTRUCTION", label: "Obstruction" },
+  { value: "DRAINAGE_DAMAGE", label: "Drainage Damage" },
+  { value: "OTHER", label: "Other" },
 ];
 
 const ReportComplaint = () => {
@@ -137,14 +142,59 @@ const ReportComplaint = () => {
     );
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    console.log("Complaint:", { ...formData, coordinates: coords });
-    console.log("Images:", images);
+  try {
+    const token = getToken();
+
+    if (!token) {
+      alert("Please login to submit a complaint.");
+      return;
+    }
+
+    const response = await axios.post(
+      "http://localhost:8000/api/complaints",
+      {
+        title: formData.title,
+        description: formData.description,
+        issue_type: formData.issueType,
+        location: formData.location,
+        latitude: coords?.lat || null,
+        longitude: coords?.lng || null,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    console.log("Complaint created:", response.data);
 
     alert("Complaint submitted successfully!");
-  };
+
+    // Clear form after successful submission
+    setFormData({
+      title: "",
+      description: "",
+      issueType: "",
+      location: "",
+      area: "",
+    });
+
+    setImages([]);
+    setCoords(null);
+    setLocationStatus("idle");
+  } catch (error) {
+    console.error("Complaint submission error:", error);
+
+    alert(
+      error.response?.data?.message ||
+        "Failed to submit complaint. Please try again."
+    );
+  }
+};
 
   // ------- progress calculation (purely visual) -------
   const requiredFields = ["title", "issueType", "description", "location", "area"];

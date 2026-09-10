@@ -1,4 +1,19 @@
 import React, { useState } from "react";
+import {
+  Users,
+  CheckCircle2,
+  CircleOff,
+  Wrench,
+  Search,
+  Phone,
+  Mail,
+  UserPlus,
+  X,
+  AlertTriangle,
+  Eye,
+  EyeOff,
+  Lock,
+} from "lucide-react";
 import "./new_worker.css";
 
 const Workers = () => {
@@ -80,7 +95,13 @@ const Workers = () => {
     phone: "",
     email: "",
     role: "Maintenance Worker",
+    password: "",
+    confirmPassword: "",
   });
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [formError, setFormError] = useState("");
 
   // ==============================
   // COUNTS
@@ -125,6 +146,7 @@ const Workers = () => {
       ...newWorker,
       [e.target.name]: e.target.value,
     });
+    setFormError("");
   };
 
 
@@ -132,15 +154,42 @@ const Workers = () => {
   // ADD WORKER
   // ==============================
 
+  const closeAddPopup = () => {
+    setShowAddPopup(false);
+    setFormError("");
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+    setNewWorker({
+      name: "",
+      phone: "",
+      email: "",
+      role: "Maintenance Worker",
+      password: "",
+      confirmPassword: "",
+    });
+  };
+
   const handleAddWorker = (e) => {
     e.preventDefault();
 
     if (
       !newWorker.name ||
       !newWorker.phone ||
-      !newWorker.email
+      !newWorker.email ||
+      !newWorker.password ||
+      !newWorker.confirmPassword
     ) {
-      alert("Please fill all required fields.");
+      setFormError("Please fill all required fields.");
+      return;
+    }
+
+    if (newWorker.password.length < 6) {
+      setFormError("Password must be at least 6 characters long.");
+      return;
+    }
+
+    if (newWorker.password !== newWorker.confirmPassword) {
+      setFormError("Passwords do not match.");
       return;
     }
 
@@ -161,14 +210,7 @@ const Workers = () => {
 
     setWorkers([...workers, worker]);
 
-    setNewWorker({
-      name: "",
-      phone: "",
-      email: "",
-      role: "Maintenance Worker",
-    });
-
-    setShowAddPopup(false);
+    closeAddPopup();
 
     alert("Worker added successfully!");
   };
@@ -224,7 +266,7 @@ const Workers = () => {
           className="add-worker-btn"
           onClick={() => setShowAddPopup(true)}
         >
-          + Add Worker
+          <UserPlus size={15} strokeWidth={2.5} /> Add Worker
         </button>
 
       </div>
@@ -237,56 +279,41 @@ const Workers = () => {
       <div className="worker-stats">
 
         <div className="worker-stat-card">
-
           <div className="worker-stat-icon total">
-            👥
+            <Users size={20} strokeWidth={2} />
           </div>
-
           <div>
             <span>Total Workers</span>
             <strong>{totalWorkers}</strong>
           </div>
-
         </div>
 
-
         <div className="worker-stat-card">
-
           <div className="worker-stat-icon active">
-            ✓
+            <CheckCircle2 size={20} strokeWidth={2} />
           </div>
-
           <div>
             <span>Active Workers</span>
             <strong>{activeWorkers}</strong>
           </div>
-
         </div>
 
-
         <div className="worker-stat-card">
-
           <div className="worker-stat-icon inactive">
-            ○
+            <CircleOff size={20} strokeWidth={2} />
           </div>
-
           <div>
             <span>Inactive Workers</span>
             <strong>{inactiveWorkers}</strong>
           </div>
-
         </div>
 
-
         <div className="worker-stat-card">
-
           <div className="worker-stat-icon available">
-            🔧
+            <Wrench size={20} strokeWidth={2} />
           </div>
-
           <div>
             <span>Available Now</span>
-
             <strong>
               {
                 workers.filter(
@@ -296,9 +323,7 @@ const Workers = () => {
                 ).length
               }
             </strong>
-
           </div>
-
         </div>
 
       </div>
@@ -311,8 +336,7 @@ const Workers = () => {
       <div className="worker-filters">
 
         <div className="worker-search">
-
-          <span>🔍</span>
+          <Search size={15} strokeWidth={2} />
 
           <input
             type="text"
@@ -320,7 +344,6 @@ const Workers = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-
         </div>
 
 
@@ -403,11 +426,13 @@ const Workers = () => {
                     <div className="contact-details">
 
                       <span>
-                        📞 {worker.phone}
+                        <Phone size={11} strokeWidth={2} className="inline-icon" />
+                        {worker.phone}
                       </span>
 
                       <span>
-                        ✉ {worker.email}
+                        <Mail size={11} strokeWidth={2} className="inline-icon" />
+                        {worker.email}
                       </span>
 
                     </div>
@@ -494,7 +519,7 @@ const Workers = () => {
             <div className="no-workers">
 
               <div className="no-worker-icon">
-                👥
+                <Users size={30} strokeWidth={1.5} />
               </div>
 
               <h3>
@@ -522,7 +547,7 @@ const Workers = () => {
 
         <div
           className="worker-modal-overlay"
-          onClick={() => setShowAddPopup(false)}
+          onClick={closeAddPopup}
         >
 
           <div
@@ -546,11 +571,9 @@ const Workers = () => {
 
               <button
                 className="modal-close"
-                onClick={() =>
-                  setShowAddPopup(false)
-                }
+                onClick={closeAddPopup}
               >
-                ×
+                <X size={18} strokeWidth={2.5} />
               </button>
 
             </div>
@@ -561,12 +584,19 @@ const Workers = () => {
               className="worker-form"
             >
 
+              {formError && (
+                <div className="form-error">
+                  <AlertTriangle size={14} strokeWidth={2.5} />
+                  {formError}
+                </div>
+              )}
+
               {/* Name */}
 
               <div className="form-group">
 
                 <label>
-                  Full Name *
+                  Full Name
                 </label>
 
                 <input
@@ -649,6 +679,81 @@ const Workers = () => {
               </div>
 
 
+              {/* Password + Confirm Password */}
+
+              <div className="form-group-row">
+
+                <div className="form-group">
+
+                  <label>
+                    Password *
+                  </label>
+
+                  <div className="password-field">
+                    
+
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      name="password"
+                      placeholder="Min. 6 characters"
+                      value={newWorker.password}
+                      onChange={handleInputChange}
+                    />
+
+                    <button
+                      type="button"
+                      className="password-toggle"
+                      onClick={() => setShowPassword(!showPassword)}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? (
+                        <EyeOff size={15} strokeWidth={2} />
+                      ) : (
+                        <Eye size={15} strokeWidth={2} />
+                      )}
+                    </button>
+                  </div>
+
+                </div>
+
+                <div className="form-group">
+
+                  <label>
+                    Confirm Password *
+                  </label>
+
+                  <div className="password-field">
+
+
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      name="confirmPassword"
+                      placeholder="Re-enter password"
+                      value={newWorker.confirmPassword}
+                      onChange={handleInputChange}
+                    />
+
+                    <button
+                      type="button"
+                      className="password-toggle"
+                      onClick={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
+                      tabIndex={-1}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff size={15} strokeWidth={2} />
+                      ) : (
+                        <Eye size={15} strokeWidth={2} />
+                      )}
+                    </button>
+                  </div>
+
+                </div>
+
+              </div>
+
+
               {/* Footer */}
 
               <div className="worker-modal-footer">
@@ -656,9 +761,7 @@ const Workers = () => {
                 <button
                   type="button"
                   className="modal-cancel-btn"
-                  onClick={() =>
-                    setShowAddPopup(false)
-                  }
+                  onClick={closeAddPopup}
                 >
                   Cancel
                 </button>
@@ -698,7 +801,7 @@ const Workers = () => {
           >
 
             <div className="remove-icon">
-              !
+              <AlertTriangle size={24} strokeWidth={2.2} />
             </div>
 
             <h2>
@@ -720,13 +823,12 @@ const Workers = () => {
             {selectedWorker.assignedWorks > 0 && (
 
               <div className="remove-warning">
-
-                ⚠ This worker currently has{" "}
+                <AlertTriangle size={13} strokeWidth={2.5} className="inline-icon" />
+                This worker currently has {" "}
                 <strong>
-                  {selectedWorker.assignedWorks}
+                   {selectedWorker.assignedWorks}
                 </strong>{" "}
-                assigned work(s).
-
+                 assigned work(s).
               </div>
 
             )}

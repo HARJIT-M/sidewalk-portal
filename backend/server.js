@@ -7,6 +7,7 @@ const connectDB = require("./src/config/db");
 
 // Routes
 const authRoutes = require("./src/routes/authRoutes");
+const complaintRoutes = require("./src/routes/complaintRoutes");
 
 // Load environment variables
 dotenv.config({
@@ -39,7 +40,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
-
+app.use("/api/complaints", complaintRoutes);
 
 // =============================
 // Server

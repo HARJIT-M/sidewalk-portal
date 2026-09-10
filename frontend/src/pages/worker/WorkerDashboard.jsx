@@ -6,6 +6,24 @@ import {
   getStoredProfile,
   getStoredNotifications,
 } from "./workerData";
+import {
+  ClipboardList,
+  Wrench,
+  CheckCircle2,
+  AlertTriangle,
+  Camera,
+  History,
+  Bell,
+  MapPin,
+  BarChart3,
+  PieChart,
+  TrendingUp,
+  Activity,
+  Navigation,
+  Clock,
+  ArrowRight,
+  Zap,
+} from "lucide-react";
 import "./WorkerDashboard.css";
 
 const WorkerDashboard = () => {
@@ -73,13 +91,15 @@ const WorkerDashboard = () => {
   return (
     <div className="worker-dashboard">
       {/* =========================================
-          1. HEADER (Manager Gradient Banner)
+          1. HEADER (Gradient Banner)
       ========================================= */}
       <div className="dashboard-header">
         <div>
+          <span className="header-eyebrow">Field Overview</span>
           <h1>Worker Dashboard</h1>
           <p>
-            Good Morning, {profile?.name || "Ravi Kumar"} 👋 • Here’s your work summary for today
+            Good morning, {profile?.name || "Ravi Kumar"} — here's your work
+            summary for today
           </p>
         </div>
 
@@ -89,7 +109,9 @@ const WorkerDashboard = () => {
           </div>
           <div>
             <h3>{profile?.name || "Ravi Kumar"}</h3>
-            <span>{profile?.zone || "Coimbatore"} ({profile?.id || "WRK001"})</span>
+            <span>
+              {profile?.zone || "Coimbatore"} ({profile?.id || "WRK001"})
+            </span>
           </div>
         </div>
       </div>
@@ -98,13 +120,15 @@ const WorkerDashboard = () => {
           2. QUICK ACTIONS BAR
       ========================================= */}
       <div className="quick-actions-card">
-        <span className="quick-actions-title">⚡ Quick Actions:</span>
+        <span className="quick-actions-title">
+          <Zap size={14} strokeWidth={2.5} /> Quick Actions
+        </span>
         <div className="quick-buttons-row">
           <button
             className="action-pill-btn"
             onClick={() => navigate("/worker/my-complaints")}
           >
-            📋 My Assigned Tasks
+            <ClipboardList size={14} strokeWidth={2} /> My Assigned Tasks
           </button>
           <button
             className="action-pill-btn"
@@ -112,7 +136,7 @@ const WorkerDashboard = () => {
               navigate(`/worker/complaints/${activeTask.id || "CMP001"}`)
             }
           >
-            🔧 Update Active Task
+            <Wrench size={14} strokeWidth={2} /> Update Active Task
           </button>
           <button
             className="action-pill-btn"
@@ -122,38 +146,38 @@ const WorkerDashboard = () => {
               )
             }
           >
-            📷 Upload Repair Proof
+            <Camera size={14} strokeWidth={2} /> Upload Repair Proof
           </button>
           <button
             className="action-pill-btn"
-            onClick={() =>
-              navigate("/worker/my-complaints?filter=RESOLVED")
-            }
+            onClick={() => navigate("/worker/my-complaints?filter=RESOLVED")}
           >
-            📜 Completed History
+            <History size={14} strokeWidth={2} /> Completed History
           </button>
           <button
             className="action-pill-btn notif"
             onClick={() => navigate("/worker/notifications")}
           >
-            🔔 Notifications {unreadCount > 0 && `(${unreadCount})`}
+            <Bell size={14} strokeWidth={2} /> Notifications{" "}
+            {unreadCount > 0 && `(${unreadCount})`}
           </button>
         </div>
       </div>
 
       {/* =========================================
-          3. FOUR STATISTICS CARDS (Manager Design)
+          3. FOUR STATISTICS CARDS
       ========================================= */}
       <div className="stats-container">
         <div
           className="stat-card"
           onClick={() => navigate("/worker/my-complaints")}
         >
-          <div className="stat-icon total">📋</div>
+          <div className="stat-icon total">
+            <ClipboardList size={22} strokeWidth={2} />
+          </div>
           <div>
             <p>Assigned Tasks</p>
             <h2>{totalAssigned}</h2>
-
           </div>
         </div>
 
@@ -161,11 +185,12 @@ const WorkerDashboard = () => {
           className="stat-card"
           onClick={() => navigate("/worker/my-complaints?filter=IN_PROGRESS")}
         >
-          <div className="stat-icon progress">🔧</div>
+          <div className="stat-icon progress">
+            <Wrench size={22} strokeWidth={2} />
+          </div>
           <div>
             <p>In Progress</p>
             <h2>{inProgressCount}</h2>
-
           </div>
         </div>
 
@@ -173,11 +198,12 @@ const WorkerDashboard = () => {
           className="stat-card"
           onClick={() => navigate("/worker/my-complaints?filter=RESOLVED")}
         >
-          <div className="stat-icon resolved">✓</div>
+          <div className="stat-icon resolved">
+            <CheckCircle2 size={22} strokeWidth={2} />
+          </div>
           <div>
             <p>Completed</p>
             <h2>{completedCount}</h2>
-
           </div>
         </div>
 
@@ -185,11 +211,12 @@ const WorkerDashboard = () => {
           className="stat-card"
           onClick={() => navigate("/worker/my-complaints?filter=ASSIGNED")}
         >
-          <div className="stat-icon pending">🚨</div>
+          <div className="stat-icon pending">
+            <AlertTriangle size={22} strokeWidth={2} />
+          </div>
           <div>
             <p>High Priority</p>
             <h2>{highPriorityCount}</h2>
-
           </div>
         </div>
       </div>
@@ -200,7 +227,10 @@ const WorkerDashboard = () => {
       <div className="complaints-section featured-work-box">
         <div className="section-header">
           <div>
-            <h2>📋 Today's Assigned Work</h2>
+            <h2>
+              <ClipboardList size={17} strokeWidth={2} /> Today's Assigned
+              Work
+            </h2>
             <p>Current active on-site repair task</p>
           </div>
           <span className="priority high">High Priority</span>
@@ -215,7 +245,8 @@ const WorkerDashboard = () => {
               </span>
             </div>
             <p className="location">
-              📍 {activeTask.location || "Gandhipuram, Coimbatore"}{" "}
+              <MapPin size={13} strokeWidth={2} className="inline-icon" />
+              {activeTask.location || "Gandhipuram, Coimbatore"}{" "}
               {activeTask.landmark && `(${activeTask.landmark})`}
             </p>
             <p className="featured-desc">
@@ -259,7 +290,7 @@ const WorkerDashboard = () => {
                 )
               }
             >
-              Update Progress →
+              Update Progress <ArrowRight size={14} strokeWidth={2.5} />
             </button>
           </div>
         </div>
@@ -273,7 +304,10 @@ const WorkerDashboard = () => {
         <div className="complaints-section">
           <div className="section-header">
             <div>
-              <h2>📊 Weekly Work Performance</h2>
+              <h2>
+                <BarChart3 size={17} strokeWidth={2} /> Weekly Work
+                Performance
+              </h2>
               <p>Tasks completed each day this week</p>
             </div>
             <span className="count-pill">Total: 33 Tasks</span>
@@ -323,7 +357,10 @@ const WorkerDashboard = () => {
         <div className="complaints-section">
           <div className="section-header">
             <div>
-              <h2>🥧 Task Status Distribution</h2>
+              <h2>
+                <PieChart size={17} strokeWidth={2} /> Task Status
+                Distribution
+              </h2>
               <p>Current workload breakdown</p>
             </div>
             <span className="count-pill">17 Total</span>
@@ -410,10 +447,15 @@ const WorkerDashboard = () => {
         <div className="complaints-section">
           <div className="section-header">
             <div>
-              <h2>🚨 High Priority Tasks</h2>
-              <p>Complaints needing immediate inspection & repair</p>
+              <h2>
+                <AlertTriangle size={17} strokeWidth={2} /> High Priority
+                Tasks
+              </h2>
+              <p>Complaints needing immediate inspection &amp; repair</p>
             </div>
-            <span className="priority high">{highPriorityTasks.length} Urgent</span>
+            <span className="priority high">
+              {highPriorityTasks.length} Urgent
+            </span>
           </div>
 
           <div className="priority-items-list">
@@ -424,15 +466,20 @@ const WorkerDashboard = () => {
                     <span className="complaint-id">#{task.id}</span>
                     <span className="issue-title">{task.issue}</span>
                   </div>
-                  <p className="location">📍 {task.location}</p>
-                  <span className="due-badge">⏳ Due: Today</span>
+                  <p className="location">
+                    <MapPin size={12} strokeWidth={2} className="inline-icon" />
+                    {task.location}
+                  </p>
+                  <span className="due-badge">
+                    <Clock size={11} strokeWidth={2.5} /> Due: Today
+                  </span>
                 </div>
 
                 <button
                   className="refresh-btn"
                   onClick={() => navigate(`/worker/complaints/${task.id}`)}
                 >
-                  View Task →
+                  View Task <ArrowRight size={13} strokeWidth={2.5} />
                 </button>
               </div>
             ))}
@@ -443,7 +490,10 @@ const WorkerDashboard = () => {
         <div className="complaints-section">
           <div className="section-header">
             <div>
-              <h2>📈 Overall Completion Progress</h2>
+              <h2>
+                <TrendingUp size={17} strokeWidth={2} /> Overall Completion
+                Progress
+              </h2>
               <p>Monthly target and performance metrics</p>
             </div>
             <span className="status resolved">80% Rate</span>
@@ -493,49 +543,62 @@ const WorkerDashboard = () => {
         <div className="complaints-section">
           <div className="section-header">
             <div>
-              <h2>🔔 Recent Activity</h2>
+              <h2>
+                <Activity size={17} strokeWidth={2} /> Recent Activity
+              </h2>
               <p>Live updates and work audit log</p>
             </div>
           </div>
 
           <div className="activity-list">
             <div className="activity-row">
-              <div className="activity-icon-pill resolved">✓</div>
+              <div className="activity-icon-pill resolved">
+                <CheckCircle2 size={16} strokeWidth={2} />
+              </div>
               <div className="activity-desc">
                 <p>
-                  Complaint <strong className="complaint-id">#CMP012</strong> marked{" "}
-                  <span className="status resolved">Resolved</span>
+                  Complaint <strong className="complaint-id">#CMP012</strong>{" "}
+                  marked <span className="status resolved">Resolved</span>
                 </p>
                 <span>10 minutes ago</span>
               </div>
             </div>
 
             <div className="activity-row">
-              <div className="activity-icon-pill progress">🔧</div>
+              <div className="activity-icon-pill progress">
+                <Wrench size={16} strokeWidth={2} />
+              </div>
               <div className="activity-desc">
                 <p>
-                  Complaint <strong className="complaint-id">#CMP001</strong> progress updated to{" "}
-                  <strong>80%</strong>
+                  Complaint <strong className="complaint-id">#CMP001</strong>{" "}
+                  progress updated to <strong>80%</strong>
                 </p>
                 <span>1 hour ago</span>
               </div>
             </div>
 
             <div className="activity-row">
-              <div className="activity-icon-pill assigned">📋</div>
+              <div className="activity-icon-pill assigned">
+                <ClipboardList size={16} strokeWidth={2} />
+              </div>
               <div className="activity-desc">
                 <p>
-                  New urgent task <strong className="complaint-id">#CMP004</strong> assigned by Manager
+                  New urgent task{" "}
+                  <strong className="complaint-id">#CMP004</strong> assigned
+                  by Manager
                 </p>
                 <span>2 hours ago</span>
               </div>
             </div>
 
             <div className="activity-row">
-              <div className="activity-icon-pill photo">📷</div>
+              <div className="activity-icon-pill photo">
+                <Camera size={16} strokeWidth={2} />
+              </div>
               <div className="activity-desc">
                 <p>
-                  Repair evidence photo uploaded for <strong className="complaint-id">#CMP012</strong>
+                  Repair evidence photo uploaded for{" "}
+                  <strong className="complaint-id">#CMP012</strong>
                 </p>
                 <span>Yesterday at 04:30 PM</span>
               </div>
@@ -547,24 +610,29 @@ const WorkerDashboard = () => {
         <div className="complaints-section">
           <div className="section-header">
             <div>
-              <h2>📍 Current Assigned Area & Schedule</h2>
+              <h2>
+                <MapPin size={17} strokeWidth={2} /> Current Assigned Area
+                &amp; Schedule
+              </h2>
               <p>Active field deployment zones</p>
             </div>
           </div>
 
           <div className="area-schedule-content">
             <div className="area-highlight-card">
-              <div className="area-icon">📍</div>
+              <div className="area-icon">
+                <Navigation size={18} strokeWidth={2} />
+              </div>
               <div>
                 <strong>Active Operational Zone:</strong>
-                <p>Gandhipuram Central & 100 Feet Road, Coimbatore</p>
+                <p>Gandhipuram Central &amp; 100 Feet Road, Coimbatore</p>
                 <a
                   href="https://maps.google.com/?q=Gandhipuram+Coimbatore"
                   target="_blank"
                   rel="noreferrer"
                   className="map-anchor"
                 >
-                  View Location on Google Maps →
+                  View Location on Google Maps <ArrowRight size={12} strokeWidth={2.5} />
                 </a>
               </div>
             </div>
@@ -575,7 +643,9 @@ const WorkerDashboard = () => {
                 <span className="schedule-day-badge">Tomorrow</span>
                 <div>
                   <strong>Saibaba Colony Sidewalk Repair</strong>
-                  <span className="location">Priority: Medium • 2 Workers Assigned</span>
+                  <span className="location">
+                    Priority: Medium • 2 Workers Assigned
+                  </span>
                 </div>
               </div>
 
@@ -583,7 +653,9 @@ const WorkerDashboard = () => {
                 <span className="schedule-day-badge">Friday</span>
                 <div>
                   <strong>Peelamedu Storm Drainage Paving</strong>
-                  <span className="location">Priority: High • Concrete Curing Check</span>
+                  <span className="location">
+                    Priority: High • Concrete Curing Check
+                  </span>
                 </div>
               </div>
             </div>

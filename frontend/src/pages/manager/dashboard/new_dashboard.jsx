@@ -1,7 +1,17 @@
 // Dashboard.jsx
 import React from "react";
 import "./new_dashboard.css";
-import UserDashboard from "../../user/dashboard/userdashboard";
+import {
+  ClipboardList,
+  Clock,
+  Wrench,
+  CheckCircle2,
+  MapPin,
+  RefreshCw,
+  ArrowRight,
+  Flag,
+  TrendingUp,
+} from "lucide-react";
 
 const WorkerDashboard = () => {
   // Temporary data
@@ -60,13 +70,24 @@ const WorkerDashboard = () => {
     (complaint) => complaint.status === "Resolved"
   ).length;
 
+  // Priority breakdown for insights panel
+  const priorityCounts = ["High", "Medium", "Low"].map((level) => ({
+    level,
+    count: complaints.filter((c) => c.priority === level).length,
+  }));
+
+  const resolutionRate = Math.round(
+    (resolvedComplaints / totalComplaints) * 100
+  );
+
   return (
     <div className="worker-dashboard">
 
       {/* Header */}
       <div className="dashboard-header">
         <div>
-          <h1>Worker Dashboard</h1>
+          <span className="header-eyebrow">Manager Overview</span>
+          <h1>Manager Dashboard</h1>
           <p>Manage and monitor assigned footpath complaints</p>
         </div>
 
@@ -83,7 +104,9 @@ const WorkerDashboard = () => {
       <div className="stats-container">
 
         <div className="stat-card">
-          <div className="stat-icon total">📋</div>
+          <div className="stat-icon total">
+            <ClipboardList size={22} strokeWidth={2} />
+          </div>
           <div>
             <p>Total Complaints</p>
             <h2>{totalComplaints}</h2>
@@ -91,7 +114,9 @@ const WorkerDashboard = () => {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon pending">⏳</div>
+          <div className="stat-icon pending">
+            <Clock size={22} strokeWidth={2} />
+          </div>
           <div>
             <p>Pending</p>
             <h2>{pendingComplaints}</h2>
@@ -99,7 +124,9 @@ const WorkerDashboard = () => {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon progress">🔧</div>
+          <div className="stat-icon progress">
+            <Wrench size={22} strokeWidth={2} />
+          </div>
           <div>
             <p>In Progress</p>
             <h2>{inProgressComplaints}</h2>
@@ -107,7 +134,9 @@ const WorkerDashboard = () => {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon resolved">✓</div>
+          <div className="stat-icon resolved">
+            <CheckCircle2 size={22} strokeWidth={2} />
+          </div>
           <div>
             <p>Resolved</p>
             <h2>{resolvedComplaints}</h2>
@@ -116,87 +145,161 @@ const WorkerDashboard = () => {
 
       </div>
 
-      {/* Complaints Section */}
-      <div className="complaints-section">
+      {/* Main content: table + insights sidebar */}
+      <div className="dashboard-main-grid">
 
-        <div className="section-header">
-          <div>
-            <h2>Assigned Complaints</h2>
-            <p>View and manage complaints assigned to you</p>
+        {/* Complaints Section */}
+        <div className="complaints-section">
+
+          <div className="section-header">
+            <div>
+              <h2>
+                <ClipboardList size={17} strokeWidth={2} /> Assigned Complaints
+              </h2>
+              <p>View and manage complaints assigned to you</p>
+            </div>
+
+            <button className="refresh-btn">
+              <RefreshCw size={14} strokeWidth={2.5} /> Refresh
+            </button>
           </div>
 
-          <button className="refresh-btn">↻ Refresh</button>
+          {/* Table */}
+          <div className="table-container">
+            <table className="complaints-table">
+
+              <thead>
+                <tr>
+                  <th>Complaint ID</th>
+                  <th>Issue</th>
+                  <th>Location</th>
+                  <th>Reported Date</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {complaints.map((complaint) => (
+                  <tr key={complaint.id}>
+
+                    <td>
+                      <span className="complaint-id">
+                        {complaint.id}
+                      </span>
+                    </td>
+
+                    <td>
+                      <span className="issue-title">
+                        {complaint.title}
+                      </span>
+                    </td>
+
+                    <td>
+                      <span className="location">
+                        <MapPin size={12} strokeWidth={2} className="inline-icon" />
+                        {complaint.location}
+                      </span>
+                    </td>
+
+                    <td>{complaint.date}</td>
+
+                    <td>
+                      <span
+                        className={`priority ${complaint.priority.toLowerCase()}`}
+                      >
+                        {complaint.priority}
+                      </span>
+                    </td>
+
+                    <td>
+                      <span
+                        className={`status ${complaint.status
+                          .toLowerCase()
+                          .replace(" ", "-")}`}
+                      >
+                        {complaint.status}
+                      </span>
+                    </td>
+
+                    <td>
+                      <button className="view-btn">
+                        View <ArrowRight size={12} strokeWidth={2.5} />
+                      </button>
+                    </td>
+
+                  </tr>
+                ))}
+              </tbody>
+
+            </table>
+          </div>
+
         </div>
 
-        {/* Table */}
-        <div className="table-container">
-          <table className="complaints-table">
+        {/* Insights Sidebar */}
+        <div className="insights-sidebar">
 
-            <thead>
-              <tr>
-                <th>Complaint ID</th>
-                <th>Issue</th>
-                <th>Location</th>
-                <th>Reported Date</th>
-                <th>Priority</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
+          <div className="insight-card">
 
-            <tbody>
-              {complaints.map((complaint) => (
-                <tr key={complaint.id}>
+            <div className="insight-card-header">
+              <TrendingUp size={16} strokeWidth={2} />
+              Resolution Rate
+            </div>
 
-                  <td>
-                    <span className="complaint-id">
-                      {complaint.id}
+            <div className="resolution-ring-wrap">
+              <svg width="110" height="110" viewBox="0 0 42 42" className="resolution-svg">
+                <circle
+                  cx="21" cy="21" r="15.91549430918954"
+                  fill="transparent" stroke="#f0f0f6" strokeWidth="5"
+                />
+                <circle
+                  cx="21" cy="21" r="15.91549430918954"
+                  fill="transparent" stroke="#16a34a" strokeWidth="5"
+                  strokeDasharray={`${resolutionRate} ${100 - resolutionRate}`}
+                  strokeDashoffset="25"
+                  transform="rotate(-90 21 21)"
+                />
+              </svg>
+              <div className="resolution-ring-label">
+                <strong>{resolutionRate}%</strong>
+                <span>Resolved</span>
+              </div>
+            </div>
+
+          </div>
+
+          <div className="insight-card">
+
+            <div className="insight-card-header">
+              <Flag size={16} strokeWidth={2} />
+              Priority Breakdown
+            </div>
+
+            <div className="priority-breakdown-list">
+              {priorityCounts.map((p) => (
+                <div className="priority-breakdown-row" key={p.level}>
+                  <div className="priority-breakdown-top">
+                    <span className={`priority ${p.level.toLowerCase()}`}>
+                      {p.level}
                     </span>
-                  </td>
-
-                  <td>
-                    <span className="issue-title">
-                      {complaint.title}
-                    </span>
-                  </td>
-
-                  <td>
-                    <span className="location">
-                      📍 {complaint.location}
-                    </span>
-                  </td>
-
-                  <td>{complaint.date}</td>
-
-                  <td>
-                    <span
-                      className={`priority ${complaint.priority.toLowerCase()}`}
-                    >
-                      {complaint.priority}
-                    </span>
-                  </td>
-
-                  <td>
-                    <span
-                      className={`status ${complaint.status
-                        .toLowerCase()
-                        .replace(" ", "-")}`}
-                    >
-                      {complaint.status}
-                    </span>
-                  </td>
-
-                  <td>
-                    <button className="view-btn">
-                      View
-                    </button>
-                  </td>
-
-                </tr>
+                    <strong>{p.count}</strong>
+                  </div>
+                  <div className="priority-breakdown-track">
+                    <div
+                      className={`priority-breakdown-fill ${p.level.toLowerCase()}`}
+                      style={{
+                        width: `${(p.count / totalComplaints) * 100}%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
               ))}
-            </tbody>
+            </div>
 
-          </table>
+          </div>
+
         </div>
 
       </div>
