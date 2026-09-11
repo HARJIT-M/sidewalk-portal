@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Search,
   Users,
@@ -13,46 +13,56 @@ import {
   AlertTriangle,
   X,
 } from "lucide-react";
+import { getAllUsers, updateUserStatus, deleteUser } from "../../services/adminApi";
 import "./adminmanagement.css";
 
 const ROLE_STYLE = {
   CITIZEN: { tone: "indigo", icon: Users },
   WORKER: { tone: "green", icon: Wrench },
   MANAGER: { tone: "amber", icon: UserCog },
+  ADMIN: { tone: "violet", icon: ShieldCheck },
 };
 
 const AdminManagement = () => {
-
-  // ================= SAMPLE USERS =================
-  const [users, setUsers] = useState([
-    { id: 1, name: "Radha Mahendran", email: "radha@example.com", role: "CITIZEN", status: "ACTIVE" },
-    { id: 2, name: "Arun Kumar", email: "arun@example.com", role: "CITIZEN", status: "ACTIVE" },
-    { id: 3, name: "Suresh Kumar", email: "suresh@example.com", role: "WORKER", status: "ACTIVE" },
-    { id: 4, name: "Priya Sharma", email: "priya@example.com", role: "WORKER", status: "INACTIVE" },
-    { id: 5, name: "Harrish", email: "harrish@example.com", role: "MANAGER", status: "ACTIVE" },
-    { id: 6, name: "Karthik Raj", email: "karthik@example.com", role: "MANAGER", status: "ACTIVE" },
-  ]);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
 
-  // Holds the user pending deletion (or null when the modal is closed)
   const [pendingDelete, setPendingDelete] = useState(null);
 
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
-  // ================= CHANGE STATUS =================
-  const handleStatusChange = (id) => {
-    setUsers((currentUsers) =>
-      currentUsers.map((user) =>
-        user.id === id
-          ? { ...user, status: user.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" }
-          : user
-      )
-    );
+  const fetchUsers = async () => {
+    try {
+      const res = await getAllUsers();
+      setUsers(res.data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  const handleStatusChange = async (id, currentStatus) => {
+    try {
+      const newStatus = currentStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+      await updateUserStatus(id, newStatus);
+      // Update local state instead of re-fetching to be faster
+      setUsers((currentUsers) =>
+        currentUsers.map((user) =>
+          user._id === id ? { ...user, status: newStatus } : user
+        )
+      );
+    } catch (err) {
+      alert("Failed to update status: " + err.message);
+    }
+  };
 
-  // ================= DELETE USER =================
   const requestDelete = (user) => {
     setPendingDelete(user);
   };
@@ -61,18 +71,32 @@ const AdminManagement = () => {
     setPendingDelete(null);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!pendingDelete) return;
-    setUsers((currentUsers) => currentUsers.filter((user) => user.id !== pendingDelete.id));
-    setPendingDelete(null);
+    try {
+      await deleteUser(pendingDelete._id);
+      setUsers((currentUsers) => currentUsers.filter((user) => user._id !== pendingDelete._id));
+    } catch (err) {
+      alert("Failed to delete user: " + err.message);
+    } finally {
+      setPendingDelete(null);
+    }
   };
+
+  if (loading) {
+    return <div className="admin-management">Loading accounts...</div>;
+  }
+
+  if (error) {
+    return <div className="admin-management">Error: {error}</div>;
+  }
 
 
   // ================= FILTER USERS =================
   const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(search.toLowerCase()) ||
-      user.email.toLowerCase().includes(search.toLowerCase());
+    const nameMatch = user?.name?.toLowerCase().includes(search.toLowerCase());
+    const emailMatch = user?.email?.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = nameMatch || emailMatch;
     const matchesRole = roleFilter === "ALL" || user.role === roleFilter;
     return matchesSearch && matchesRole;
   });
@@ -206,21 +230,21 @@ const AdminManagement = () => {
             <tbody>
               {filteredUsers.length > 0 ? (
                 filteredUsers.map((user) => {
-                  const roleMeta = ROLE_STYLE[user.role];
+                  const roleMeta = ROLE_STYLE[user.role] || { tone: "gray", icon: Users };
                   const RoleIcon = roleMeta.icon;
 
                   return (
-                    <tr key={user.id}>
+                    <tr key={user._id}>
 
                       {/* ACCOUNT */}
                       <td>
                         <div className="admin-user-info">
                           <div className={`admin-user-avatar ${roleMeta.tone}`}>
-                            {user.name.charAt(0).toUpperCase()}
+                            {user?.name?.charAt(0).toUpperCase() || "?"}
                           </div>
                           <div>
                             <strong>{user.name}</strong>
-                            <span>Account ID #{String(user.id).padStart(4, "0")}</span>
+                            <span>Account ID #{String(user._id).substring(0, 6)}</span>
                           </div>
                         </div>
                       </td>
@@ -232,17 +256,17 @@ const AdminManagement = () => {
 
                       {/* ROLE */}
                       <td>
-                        <span className={`admin-role-badge ${user.role.toLowerCase()}`}>
+                        <span className={`admin-role-badge ${user?.role?.toLowerCase() || "unknown"}`}>
                           <RoleIcon size={11} strokeWidth={2.2} />
-                          {user.role}
+                          {user.role || "UNKNOWN"}
                         </span>
                       </td>
 
                       {/* STATUS */}
                       <td>
-                        <span className={`admin-status-badge ${user.status.toLowerCase()}`}>
+                        <span className={`admin-status-badge ${user?.status?.toLowerCase() || "unknown"}`}>
                           <span className="admin-status-dot"></span>
-                          {user.status}
+                          {user.status || "UNKNOWN"}
                         </span>
                       </td>
 
@@ -256,7 +280,7 @@ const AdminManagement = () => {
                                 ? "admin-action-btn revoke"
                                 : "admin-action-btn activate"
                             }
-                            onClick={() => handleStatusChange(user.id)}
+                            onClick={() => handleStatusChange(user._id, user.status)}
                             title={
                               user.status === "ACTIVE"
                                 ? "Revoke login access"

@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { getAdminDashboardStats } from "../../services/adminApi";
 import {
   Users,
   UserCheck,
@@ -34,37 +35,52 @@ const SEVERITY_TONE = {
 };
 
 const AdminDashboard = () => {
-  // Temporary data
+  const [statsData, setStatsData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await getAdminDashboardStats();
+        setStatsData(res.data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, []);
+
+  if (loading) {
+    return <div className="admin-dashboard">Loading dashboard...</div>;
+  }
+
+  if (error) {
+    return <div className="admin-dashboard">Error: {error}</div>;
+  }
+
+  const { users: uData, complaints: cData, hotspotAreas, recentActivity } = statsData || {};
+
   const userStats = [
-    { label: "Total Citizens", value: 245, note: "Registered citizens", icon: Users, tone: "indigo" },
-    { label: "Total Workers", value: 32, note: "Registered workers", icon: Wrench, tone: "blue" },
-    { label: "Total Managers", value: 8, note: "Registered managers", icon: UserCog, tone: "violet" },
-    { label: "Active Accounts", value: 278, note: "Currently active", icon: UserCheck, tone: "green" },
+    { label: "Total Citizens", value: uData?.totalCitizens || 0, note: "Registered citizens", icon: Users, tone: "indigo" },
+    { label: "Total Workers", value: uData?.totalWorkers || 0, note: "Registered workers", icon: Wrench, tone: "blue" },
+    { label: "Total Managers", value: uData?.totalManagers || 0, note: "Registered managers", icon: UserCog, tone: "violet" },
+    { label: "Active Accounts", value: uData?.activeAccounts || 0, note: "Currently active", icon: UserCheck, tone: "green" },
   ];
 
   const complaintStats = [
-    { label: "Total Complaints", value: 156, note: "All reported issues", icon: ClipboardList, tone: "indigo" },
-    { label: "Pending", value: 42, note: "Waiting for action", icon: Clock, tone: "amber" },
-    { label: "In Progress", value: 38, note: "Currently being repaired", icon: Wrench, tone: "blue" },
-    { label: "Resolved", value: 76, note: "Successfully completed", icon: CheckCircle2, tone: "green" },
+    { label: "Total Complaints", value: cData?.totalComplaints || 0, note: "All reported issues", icon: ClipboardList, tone: "indigo" },
+    { label: "Pending", value: cData?.pendingComplaints || 0, note: "Waiting for action", icon: Clock, tone: "amber" },
+    { label: "In Progress", value: cData?.inProgressComplaints || 0, note: "Currently being repaired", icon: Wrench, tone: "blue" },
+    { label: "Resolved", value: cData?.resolvedComplaints || 0, note: "Successfully completed", icon: CheckCircle2, tone: "green" },
   ];
 
-  const hotspotAreas = [
-    { area: "Gandhipuram, Coimbatore", complaints: 24, severity: "High" },
-    { area: "RS Puram, Coimbatore", complaints: 18, severity: "High" },
-    { area: "Saibaba Colony, Coimbatore", complaints: 13, severity: "Medium" },
-    { area: "Peelamedu, Coimbatore", complaints: 9, severity: "Medium" },
-    { area: "Singanallur, Coimbatore", complaints: 6, severity: "Low" },
-  ];
+  const maxHotspotComplaints = hotspotAreas?.length ? Math.max(...hotspotAreas.map((a) => a.complaints)) : 1;
 
-  const maxHotspotComplaints = Math.max(...hotspotAreas.map((a) => a.complaints));
-
-  const activity = [
-    { icon: UserPlus, title: "New citizen registered", meta: "Priya S. joined the portal", time: "5m ago", tone: "indigo" },
-    { icon: ClipboardList, title: "New complaint submitted", meta: "CMP001 · CSE LAB 1", time: "22m ago", tone: "amber" },
-    { icon: Wrench, title: "Complaint assigned to worker", meta: "Footpath repair · Gandhipuram", time: "1h ago", tone: "blue" },
-    { icon: CheckCircle2, title: "Complaint resolved", meta: "CMP098 · RS Puram", time: "3h ago", tone: "green" },
-    { icon: UserCog, title: "Manager approved a repair", meta: "Sign-off for CMP092", time: "5h ago", tone: "violet" },
+  const activity = recentActivity?.length ? recentActivity : [
+    { icon: UserPlus, title: "No recent activity", meta: "", time: "", tone: "indigo" },
   ];
 
   return (
