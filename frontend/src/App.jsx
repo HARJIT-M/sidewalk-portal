@@ -16,6 +16,10 @@ import Complaint from "./pages/manager/complaints/new_complaint";
 import WorkTracking from "./pages/manager/trackwork/new_track";
 import Workers from "./pages/manager/workers/new_worker";
 
+// Admin Pages
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminManagement from "./pages/admin/AdminManagement";
+
 // User Pages
 import UserDashboard from "./pages/user/dashboard/userdashboard";
 import ReportComplaint from "./pages/user/complaintreport/addcomplaint";
@@ -110,6 +114,26 @@ function App() {
             element={<Workers />}
           />
 
+        </Route>
+
+
+        {/* =========================
+            ADMIN PORTAL
+        ========================= */}
+
+        <Route path="/admin">
+          <Route
+            index
+            element={<Navigate to="/admin/dashboard" replace />}
+          />
+          <Route
+            path="dashboard"
+            element={<AdminDashboard />}
+          />
+          <Route
+            path="management"
+            element={<AdminManagement />}
+          />
         </Route>
 
 
