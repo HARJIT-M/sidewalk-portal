@@ -63,6 +63,9 @@ app.use("/api/worker", workerRoutes);
 app.use("/api/manager", managerRoutes);
 app.use("/api/users", userRoutes);
 
+const adminRoutes = require("./src/routes/adminRoutes");
+app.use("/api/admin", adminRoutes);
+
 // Root route
 app.get("/", (req, res) => {
   res.send("Smart Footpath Portal Backend Running");
