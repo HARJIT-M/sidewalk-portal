@@ -118,39 +118,39 @@ const ViewComplaints = () => {
           STATISTICS
       ============================ */}
 
-    <div className="view-stats-grid">
-      <div className="view-stat-card">
-        <div className="view-stat-icon total-icon">
+    <div className="stats-container">
+      <div className="stat-card">
+        <div className="stat-icon total">
           <ClipboardList size={22} strokeWidth={2} />
         </div>
-        <div className="view-stat-info">
-          <span>Total Reported</span>
-          <strong>{stats.total}</strong>
+        <div>
+          <p>Total Reported</p>
+          <h2>{stats.total}</h2>
         </div>
       </div>
 
-      <div className="view-stat-card">
-        <div className="view-stat-icon pending-icon">
+      <div className="stat-card">
+        <div className="stat-icon pending">
           <CircleDot size={22} strokeWidth={2} />
         </div>
-        <div className="view-stat-info">
-          <span>Not Assigned</span>
-          <strong>{stats.pending}</strong>
+        <div>
+          <p>Not Assigned</p>
+          <h2>{stats.pending}</h2>
         </div>
       </div>
 
-      <div className="view-stat-card">
-        <div className="view-stat-icon progress-icon">
+      <div className="stat-card">
+        <div className="stat-icon progress">
           <Wrench size={22} strokeWidth={2} />
         </div>
-        <div className="view-stat-info">
-          <span>In Progress</span>
-          <strong>{stats.progress}</strong>
+        <div>
+          <p>In Progress</p>
+          <h2>{stats.progress}</h2>
         </div>
       </div>
 
-      <div className="view-stat-card">
-        <div className="view-stat-icon completed-icon">
+      <div className="stat-card">
+        <div className="stat-icon resolved">
           <CheckCircle2 size={22} strokeWidth={2} />
         </div>
         <div>
@@ -158,7 +158,6 @@ const ViewComplaints = () => {
           <h2>{completedComplaints}</h2>
         </div>
       </div>
-
     </div>
 
 

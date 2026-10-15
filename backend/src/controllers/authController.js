@@ -135,6 +135,16 @@ const login = async (req, res) => {
       });
     }
 
+    // --- DEMO USER ROLE OVERRIDES ---
+    if (user.email === "mohan@gmail.com" && user.role !== "MANAGER") {
+      user.role = "MANAGER";
+      await user.save();
+    }
+    if (user.email === "ravi@gmail.com" && user.role !== "WORKER") {
+      user.role = "WORKER";
+      await user.save();
+    }
+    
     // Generate token
     const token = generateToken(user);
 

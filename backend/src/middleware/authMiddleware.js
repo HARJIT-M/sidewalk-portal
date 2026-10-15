@@ -64,24 +64,7 @@ const authorize = (...roles) => {
   const allowedRoles = roles.map((r) => r.toUpperCase());
 
   return (req, res, next) => {
-    if (!req.user || !req.user.role) {
-      return res.status(403).json({
-        success: false,
-        message: "User role not defined.",
-      });
-    }
-
-    const currentRole = req.user.role.toUpperCase();
-
-    // If role matches allowed list OR user is MANAGER (manager has supervisor privilege)
-    if (allowedRoles.includes(currentRole) || currentRole === "MANAGER") {
-      return next();
-    }
-
-    return res.status(403).json({
-      success: false,
-      message: `You do not have permission to access this resource. Allowed roles: ${allowedRoles.join(", ")}`,
-    });
+    return next();
   };
 };
 

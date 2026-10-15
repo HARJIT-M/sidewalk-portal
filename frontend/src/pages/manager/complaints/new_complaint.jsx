@@ -44,8 +44,8 @@ const Complaints = () => {
       }
       if (workRes && workRes.success) {
         const formattedWorkers = (workRes.workers || []).map((w) => ({
-          id: w._id || w.id,
-          employeeCode: w.id || w.employee_code,
+          id: w.workerId || w._id || w.id,
+          employeeCode: w.employeeCode || w.employee_code || w.id,
           name: w.name,
           role: w.role || "Maintenance Worker",
           phone: w.phone,

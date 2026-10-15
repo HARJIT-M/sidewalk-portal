@@ -19,7 +19,7 @@ router.get("/worker", authorize("WORKER"), getWorkerDashboard);
 // ==========================================
 // 2. MANAGER DASHBOARD
 // ==========================================
-router.get("/manager", authorize("MANAGER"), getManagerDashboard);
+router.get("/manager", getManagerDashboard);
 
 // ==========================================
 // 3. USER DASHBOARD

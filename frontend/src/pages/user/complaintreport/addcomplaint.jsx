@@ -188,7 +188,17 @@ const ReportComplaint = () => {
       if (res.success) {
         alert(res.message || "Complaint submitted successfully!");
 
-        navigate("/user/my-complaints");
+        // Reset form to stay on the same page
+        setFormData({
+          title: "",
+          description: "",
+          issueType: "",
+          location: "",
+          area: "",
+        });
+        setImages([]);
+        setCoords(null);
+        setLocationStatus("idle");
       } else {
         alert(res.message || "Failed to submit complaint.");
       }
