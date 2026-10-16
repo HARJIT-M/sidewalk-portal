@@ -11,14 +11,14 @@ dotenv.config({ path: [path.resolve(__dirname, ".env"), path.resolve(__dirname, 
 const connectDB = require("./src/config/db");
 const cloudinary = require("./src/config/cloudinary");
 
-cloudinary.api.ping()
-  .then(() => {
-    console.log("✅ Cloudinary connected successfully");
-  })
-  .catch((error) => {
-    console.error("❌ Cloudinary connection failed");
-    console.error(error);
-  });
+// cloudinary.api.ping()
+//   .then(() => {
+//     console.log("✅ Cloudinary connected successfully");
+//   })
+//   .catch((error) => {
+//     console.error("❌ Cloudinary connection failed");
+//     console.error(error);
+//   });
 
 // Route module imports
 const authRoutes = require("./src/routes/authRoutes");

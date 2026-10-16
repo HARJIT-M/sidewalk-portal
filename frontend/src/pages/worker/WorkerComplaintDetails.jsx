@@ -73,6 +73,7 @@ const WorkerComplaintDetails = () => {
     try {
       setSubmitting(true);
       setErrorAlert("");
+      console.log("Id from handleStartWork :",id);
       const res = await startComplaintWork(id);
       if (res.success) {
         setSuccessAlert("Work status updated to In Progress in MongoDB!");

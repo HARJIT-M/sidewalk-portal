@@ -56,14 +56,14 @@ const Login = () => {
       // If backend fails or for quick simulation fallback
       console.error("Login attempt failed:", err);
       // Fallback role routing if offline
-      const emailLower = email.toLowerCase();
-      if (emailLower.includes("ravi") || emailLower.includes("worker") || emailLower.includes("wrk")) {
-        navigate("/worker/dashboard");
-      } else if (emailLower.includes("user") || emailLower.includes("citizen")) {
-        navigate("/user/dashboard");
-      } else {
-        navigate("/dashboard");
-      }
+      // const emailLower = email.toLowerCase();
+      // if (emailLower.includes("ravi") || emailLower.includes("worker") || emailLower.includes("wrk")) {
+      //   navigate("/worker/dashboard");
+      // } else if (emailLower.includes("user") || emailLower.includes("citizen")) {
+      //   navigate("/user/dashboard");
+      // } else {
+      //   navigate("/dashboard");
+      // }
     } finally {
       setLoading(false);
     }

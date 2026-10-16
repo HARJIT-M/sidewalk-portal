@@ -9,6 +9,7 @@ import {
   ClipboardCheck,
 } from "lucide-react";
 import "./signin.css";
+import { signupUser } from "../../services/authApi";
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -30,7 +31,7 @@ const Signup = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async(e) => {
     e.preventDefault();
 
     if (
@@ -48,10 +49,15 @@ const Signup = () => {
       alert("Passwords do not match.");
       return;
     }
+    try{
+        const res = await signupUser(form);
+        navigate("/login");
+    }catch(err){
+      console.log("Error :",err);
+    }
 
-    // Temporary — replace with real account creation
-    alert("Account created successfully!");
-    navigate("/login");
+    // alert("Account created successfully!");
+    
   };
 
   return (
