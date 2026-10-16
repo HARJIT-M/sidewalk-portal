@@ -73,12 +73,7 @@ const UserDashboard = () => {
           <p>Track your reported footpath and sidewalk issues.</p>
         </div>
 
-        <button
-          className="report-btn"
-          onClick={() => navigate("/user/add-complaint")}
-        >
-          <Plus size={16} strokeWidth={2.5} /> Report an Issue
-        </button>
+        
       </div>
 
       {/* =========================
@@ -146,7 +141,7 @@ const UserDashboard = () => {
           </div>
         </div>
 
-        <button onClick={() => navigate("/add-complaint")}>
+        <button onClick={() => navigate("/user/add-complaint")}>
           Report Now
         </button>
       </div>

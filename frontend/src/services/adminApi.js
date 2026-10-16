@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 const adminApi = axios.create({
   baseURL: API_BASE_URL,
@@ -64,5 +64,17 @@ export const deleteUser = async (id) => {
     );
   }
 };
+
+export const createUser = async (userData) => {
+  try {
+    const response = await adminApi.post("/api/admin/add-user",  userData );
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error?.response?.data?.message || "Failed to create user."
+    );
+  }
+};
+
 
 export default adminApi;

@@ -32,6 +32,7 @@ import MyComplaints from "./pages/worker/MyComplaints";
 import WorkerComplaintDetails from "./pages/worker/WorkerComplaintDetails";
 import WorkerProfile from "./pages/worker/WorkerProfile";
 import WorkerNotifications from "./pages/worker/WorkerNotifications";
+import AdminLayout from "./components/admin/layout";
 
 function App() {
   return (
@@ -120,7 +121,7 @@ function App() {
         {/* =========================
             ADMIN PORTAL
         ========================= */}
-
+       <Route element={<AdminLayout />}>
         <Route path="/admin">
           <Route
             index
@@ -135,7 +136,7 @@ function App() {
             element={<AdminManagement />}
           />
         </Route>
-
+          </Route>
 
         {/* =========================
             WORKER PORTAL

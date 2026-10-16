@@ -797,3 +797,185 @@
   }
 
 }
+
+/* ===== Append to adminmanagement.css ===== */
+
+/* Add User button (sits at the end of the toolbar) */
+.admin-add-user-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 9px 16px;
+  border: none;
+  border-radius: 10px;
+  background: #4f46e5;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.admin-add-user-btn:hover {
+  background: #4338ca;
+  transform: translateY(-1px);
+}
+
+/* Wider modal for the form */
+.admin-modal.admin-modal-wide {
+  max-width: 520px;
+  width: 92%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Icon variant for the add modal (the base .admin-modal-icon is the red warning style) */
+.admin-modal-icon.add {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+/* Form */
+.admin-add-form {
+  margin-top: 18px;
+  text-align: left;
+}
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.admin-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.admin-form-field.full {
+  grid-column: 1 / -1;
+}
+.admin-form-field label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #374151;
+}
+.admin-form-field label em {
+  color: #dc2626;
+  font-style: normal;
+}
+.admin-form-field input,
+.admin-form-field select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fff;
+  color: #111827;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.admin-form-field input:focus,
+.admin-form-field select:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+.admin-form-field input.invalid {
+  border-color: #dc2626;
+}
+.admin-field-error {
+  font-size: 12px;
+  color: #dc2626;
+}
+
+/* Password field with show/hide toggle */
+.admin-password-wrap {
+  position: relative;
+}
+.admin-password-wrap input {
+  padding-right: 40px;
+}
+.admin-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  padding: 6px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+}
+.admin-password-toggle:hover {
+  color: #111827;
+}
+
+/* Server-side error banner */
+.admin-form-alert {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+/* Primary action button inside modals */
+.admin-modal-btn.primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #4f46e5;
+  color: #fff;
+  border: none;
+}
+.admin-modal-btn.primary:hover:not(:disabled) {
+  background: #4338ca;
+}
+.admin-modal-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Role chips */
+.admin-role-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.admin-role-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 999px;
+  background: #fff;
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.admin-role-chip:hover {
+  border-color: #c7d2fe;
+  background: #f9fafb;
+}
+.admin-role-chip.selected.indigo { background: #eef2ff; border-color: #4f46e5; color: #4338ca; }
+.admin-role-chip.selected.green  { background: #ecfdf5; border-color: #16a34a; color: #15803d; }
+.admin-role-chip.selected.amber  { background: #fffbeb; border-color: #d97706; color: #b45309; }
+.admin-role-chip.selected.violet { background: #f5f3ff; border-color: #7c3aed; color: #6d28d9; }
+
+@media (max-width: 560px) {
+  .admin-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .admin-add-user-btn {
+    margin-left: 0;
+    width: 100%;
+    justify-content: center;
+  }
+}

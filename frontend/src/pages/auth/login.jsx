@@ -44,13 +44,17 @@ const Login = () => {
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
       }
-
+      console.log("Login successful:", data.user?.role);
       if (data.user?.role === "WORKER" || email.toLowerCase().includes("ravi") || email.toLowerCase().includes("worker")) {
         navigate("/worker/dashboard");
       } else if (data.user?.role === "CITIZEN" || email.toLowerCase().includes("citizen")) {
         navigate("/user/dashboard");
-      } else {
+      }
+      else if (data.user?.role === "MANAGER" ) {
         navigate("/dashboard");
+      }
+       else if (data.user?.role === "ADMIN" ){
+        navigate("/admin/dashboard");
       }
     } catch (err) {
       // If backend fails or for quick simulation fallback

@@ -6,14 +6,17 @@ import {
   Wrench,
   UserCheck,
   UserX,
+  UserPlus,
   Trash2,
   ShieldOff,
   ShieldCheck,
   SlidersHorizontal,
   AlertTriangle,
+  Eye,
+  EyeOff,
   X,
 } from "lucide-react";
-import { getAllUsers, updateUserStatus, deleteUser } from "../../services/adminApi";
+import { getAllUsers, updateUserStatus, deleteUser,createUser } from "../../services/adminApi";
 import "./adminmanagement.css";
 
 const ROLE_STYLE = {
@@ -22,6 +25,24 @@ const ROLE_STYLE = {
   MANAGER: { tone: "amber", icon: UserCog },
   ADMIN: { tone: "violet", icon: ShieldCheck },
 };
+
+const EMPTY_FORM = {
+  name: "",
+  email: "",
+  phone: "",
+  zone: "",
+  password: "",
+  role: "CITIZEN",
+};
+
+const ROLE_OPTIONS = [
+  { key: "CITIZEN", label: "Citizen" },
+  { key: "WORKER", label: "Worker" },
+  { key: "MANAGER", label: "Manager" },
+  { key: "ADMIN", label: "Admin" },
+];
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const AdminManagement = () => {
   const [users, setUsers] = useState([]);
@@ -32,6 +53,14 @@ const AdminManagement = () => {
   const [roleFilter, setRoleFilter] = useState("ALL");
 
   const [pendingDelete, setPendingDelete] = useState(null);
+
+  // ---- Add user modal state ----
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [formErrors, setFormErrors] = useState({});
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -80,6 +109,74 @@ const AdminManagement = () => {
       alert("Failed to delete user: " + err.message);
     } finally {
       setPendingDelete(null);
+    }
+  };
+
+  // ================= ADD USER =================
+  const openAddModal = () => {
+    setForm(EMPTY_FORM);
+    setFormErrors({});
+    setSubmitError("");
+    setShowPassword(false);
+    setShowAddModal(true);
+  };
+
+  const closeAddModal = () => {
+    if (submitting) return;
+    setShowAddModal(false);
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+    if (formErrors[name]) {
+      setFormErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+  };
+
+  const validateForm = () => {
+    const errs = {};
+    if (!form.name.trim()) errs.name = "Name is required";
+    if (!form.email.trim()) errs.email = "Email is required";
+    else if (!EMAIL_REGEX.test(form.email.trim())) errs.email = "Enter a valid email address";
+    if (form.phone.trim() && !/^[0-9+\-\s()]{7,15}$/.test(form.phone.trim())) {
+      errs.phone = "Enter a valid phone number";
+    }
+    if (!form.password) errs.password = "Password is required";
+    else if (form.password.length < 6) errs.password = "Password must be at least 6 characters";
+    return errs;
+  };
+
+  const handleAddUser = async (e) => {
+    e.preventDefault();
+    setSubmitError("");
+
+    const errs = validateForm();
+    setFormErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        phone: form.phone.trim(),
+        zone: form.zone.trim(),
+        password: form.password,
+        role: form.role,
+        status: "ACTIVE", // new accounts are always created as active
+      };
+      console.log("Submitting new user:", payload);
+      const res = await createUser(payload);
+      // API returns the newly created user (without password)
+      setUsers((currentUsers) => [res.data, ...currentUsers]);
+      setShowAddModal(false);
+    } catch (err) {
+      const message =
+        err?.response?.data?.message || err.message || "Failed to create user";
+      setSubmitError(message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -209,6 +306,11 @@ const AdminManagement = () => {
             ))}
           </div>
 
+          <button className="admin-add-user-btn" onClick={openAddModal}>
+            <UserPlus size={16} strokeWidth={2} />
+            Add User
+          </button>
+
         </div>
 
 
@@ -331,6 +433,159 @@ const AdminManagement = () => {
         </div>
 
       </div>
+
+
+      {/* ================= ADD USER MODAL ================= */}
+      {showAddModal && (
+        <div className="admin-modal-overlay" onClick={closeAddModal}>
+          <div
+            className="admin-modal admin-modal-wide"
+            onClick={(e) => e.stopPropagation()}
+          >
+
+            <button className="admin-modal-close" onClick={closeAddModal} type="button">
+              <X size={16} strokeWidth={2} />
+            </button>
+
+            <div className="admin-modal-icon add">
+              <UserPlus size={22} strokeWidth={2} />
+            </div>
+
+            <h2>Add New Account</h2>
+            <p>Create a new account and assign its role and access status.</p>
+
+            <form className="admin-add-form" onSubmit={handleAddUser} noValidate>
+
+              <div className="admin-form-grid">
+
+                <div className="admin-form-field full">
+                  <label htmlFor="add-name">Full Name <em>*</em></label>
+                  <input
+                    id="add-name"
+                    type="text"
+                    name="name"
+                    value={form.name}
+                    onChange={handleFormChange}
+                    placeholder="e.g. Priya Sharma"
+                    className={formErrors.name ? "invalid" : ""}
+                    autoFocus
+                  />
+                  {formErrors.name && <span className="admin-field-error">{formErrors.name}</span>}
+                </div>
+
+                <div className="admin-form-field full">
+                  <label htmlFor="add-email">Email <em>*</em></label>
+                  <input
+                    id="add-email"
+                    type="email"
+                    name="email"
+                    value={form.email}
+                    onChange={handleFormChange}
+                    placeholder="name@example.com"
+                    className={formErrors.email ? "invalid" : ""}
+                  />
+                  {formErrors.email && <span className="admin-field-error">{formErrors.email}</span>}
+                </div>
+
+                <div className="admin-form-field">
+                  <label htmlFor="add-phone">Phone</label>
+                  <input
+                    id="add-phone"
+                    type="tel"
+                    name="phone"
+                    value={form.phone}
+                    onChange={handleFormChange}
+                    placeholder="Optional"
+                    className={formErrors.phone ? "invalid" : ""}
+                  />
+                  {formErrors.phone && <span className="admin-field-error">{formErrors.phone}</span>}
+                </div>
+
+                <div className="admin-form-field">
+                  <label htmlFor="add-zone">Zone</label>
+                  <input
+                    id="add-zone"
+                    type="text"
+                    name="zone"
+                    value={form.zone}
+                    onChange={handleFormChange}
+                    placeholder="Optional"
+                  />
+                </div>
+
+                <div className="admin-form-field full">
+                  <label htmlFor="add-password">Password <em>*</em></label>
+                  <div className="admin-password-wrap">
+                    <input
+                      id="add-password"
+                      type={showPassword ? "text" : "password"}
+                      name="password"
+                      value={form.password}
+                      onChange={handleFormChange}
+                      placeholder="Minimum 6 characters"
+                      className={formErrors.password ? "invalid" : ""}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      className="admin-password-toggle"
+                      onClick={() => setShowPassword((s) => !s)}
+                      title={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                  {formErrors.password && <span className="admin-field-error">{formErrors.password}</span>}
+                </div>
+
+                <div className="admin-form-field full">
+                  <label>Role</label>
+                  <div className="admin-role-chips" role="radiogroup" aria-label="Role">
+                    {ROLE_OPTIONS.map((opt) => {
+                      const meta = ROLE_STYLE[opt.key];
+                      const ChipIcon = meta.icon;
+                      const selected = form.role === opt.key;
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          className={`admin-role-chip ${meta.tone}${selected ? " selected" : ""}`}
+                          onClick={() => setForm((prev) => ({ ...prev, role: opt.key }))}
+                        >
+                          <ChipIcon size={13} strokeWidth={2.2} />
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+              </div>
+
+              {submitError && <div className="admin-form-alert">{submitError}</div>}
+
+              <div className="admin-modal-actions">
+                <button
+                  type="button"
+                  className="admin-modal-btn cancel"
+                  onClick={closeAddModal}
+                  disabled={submitting}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="admin-modal-btn primary" disabled={submitting}>
+                  <UserPlus size={14} strokeWidth={2} />
+                  {submitting ? "Creating..." : "Create Account"}
+                </button>
+              </div>
+
+            </form>
+
+          </div>
+        </div>
+      )}
 
 
       {/* ================= DELETE CONFIRMATION MODAL ================= */}

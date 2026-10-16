@@ -5,6 +5,7 @@ const {
   getAllUsers,
   updateUserStatus,
   deleteUser,
+  createUser
 } = require("../controllers/adminController");
 const { protect, authorize } = require("../middleware/authMiddleware");
 
@@ -16,6 +17,7 @@ router.use(authorize("ADMIN"));
 
 router.get("/dashboard", getDashboardStats);
 router.get("/users", getAllUsers);
+router.post("/add-user", createUser);
 router.put("/users/:id/status", updateUserStatus);
 router.delete("/users/:id", deleteUser);
 

@@ -227,7 +227,7 @@ const ReportComplaint = () => {
   const progressPercent = Math.round(
     (filledCount / requiredFields.length) * 100
   );
-
+  
   return (
     <div className="report-page">
 
@@ -555,7 +555,7 @@ const ReportComplaint = () => {
 
             <div className="summary-row">
               <span>Issue Type</span>
-              <strong>{formData.issueType || "—"}</strong>
+              <strong>{ISSUE_TYPES[formData.issueType]?.label || "—"}</strong>
             </div>
 
             <div className="summary-row">
