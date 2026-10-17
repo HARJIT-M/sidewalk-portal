@@ -9,6 +9,12 @@ import {
   ShieldCheck,
   MapPinned,
   Timer,
+  MapPin,
+  Loader2,
+  AlertCircle,
+  ArrowRight,
+  Mail,
+  Lock,
 } from "lucide-react";
 import "./login.css";
 import { loginUser } from "../../services/authApi";
@@ -16,22 +22,19 @@ import { loginUser } from "../../services/authApi";
 const Login = () => {
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({
-    email: "",
-    password: "",
-  });
-
+  const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
-  const [remember, setRemember] = useState(false);
-
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [shakeKey, setShakeKey] = useState(0); // changing this replays the shake animation
+
+  const showError = (msg) => {
+    setErrorMsg(msg);
+    setShakeKey((k) => k + 1);
+  };
 
   const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
+    setForm({ ...form, [e.target.name]: e.target.value });
     setErrorMsg("");
   };
 
@@ -49,25 +52,14 @@ const Login = () => {
         navigate("/worker/dashboard");
       } else if (data.user?.role === "CITIZEN" || email.toLowerCase().includes("citizen")) {
         navigate("/user/dashboard");
-      }
-      else if (data.user?.role === "MANAGER" ) {
+      } else if (data.user?.role === "MANAGER") {
         navigate("/dashboard");
-      }
-       else if (data.user?.role === "ADMIN" ){
+      } else if (data.user?.role === "ADMIN") {
         navigate("/admin/dashboard");
       }
     } catch (err) {
-      // If backend fails or for quick simulation fallback
       console.error("Login attempt failed:", err);
-      // Fallback role routing if offline
-      // const emailLower = email.toLowerCase();
-      // if (emailLower.includes("ravi") || emailLower.includes("worker") || emailLower.includes("wrk")) {
-      //   navigate("/worker/dashboard");
-      // } else if (emailLower.includes("user") || emailLower.includes("citizen")) {
-      //   navigate("/user/dashboard");
-      // } else {
-      //   navigate("/dashboard");
-      // }
+      showError("Sign in failed. Please check your email and password.");
     } finally {
       setLoading(false);
     }
@@ -75,12 +67,10 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!form.email || !form.password) {
-      setErrorMsg("Please enter your email and password.");
+      showError("Please enter your email and password.");
       return;
     }
-
     await doLogin(form.email, form.password);
   };
 
@@ -98,159 +88,131 @@ const Login = () => {
   };
 
   return (
-    <div className="auth-page">
+    <div className="lg-page">
 
-      {/* Decorative background */}
-      <div className="auth-bg-blob blob-one"></div>
-      <div className="auth-bg-blob blob-two"></div>
-      <div className="auth-bg-blob blob-three"></div>
+      {/* ================= LEFT: ORANGE SHOWCASE ================= */}
 
-      <div className="auth-shell">
+      <section className="lg-hero">
 
-        {/* ================= BRAND ================= */}
+        {/* animated decoration */}
+        <div className="lg-rings" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div className="lg-slabs" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i>
+        </div>
 
-        <div className="auth-brand-center">
-          <div className="auth-brand-icon">F</div>
+        <div className="lg-brand">
+          <div className="lg-brand-icon">P</div>
           <div>
-            <h2>Footpath</h2>
-            <span>Repair Portal</span>
+            <b>Paadhai</b>
+            <span>Footpath Repair Portal</span>
           </div>
         </div>
 
+        <div className="lg-hero-body">
+          <h1>
+            Broken footpath?
+            <br />
+            <span className="lg-hl">Pin it. We fix it.</span>
+          </h1>
+          <p>
+            Report damaged sidewalks in seconds and follow the repair from
+            report to done.
+          </p>
 
-        {/* ================= CARD ================= */}
+          {/* road with a pin that drops, and a ring that ripples */}
+          <div className="lg-road" aria-hidden="true">
+            <div className="lg-road-dash"></div>
+            <div className="lg-pin"><MapPin size={34} strokeWidth={2.2} /></div>
+            <div className="lg-ripple"></div>
+          </div>
+        </div>
 
-        <div className="auth-card">
+        <ul className="lg-points">
+          <li><ShieldCheck size={17} strokeWidth={2.2} /> Secure sign-in</li>
+          <li><MapPinned size={17} strokeWidth={2.2} /> Live issue tracking</li>
+          <li><Timer size={17} strokeWidth={2.2} /> Fast repair updates</li>
+        </ul>
 
-          <div className="auth-card-head">
-            <h1>Welcome back</h1>
+      </section>
+
+
+      {/* ================= RIGHT: FORM ================= */}
+
+      <section className="lg-panel">
+        <div className="lg-box">
+
+          <div className="lg-head">
+            <h2>Welcome back</h2>
             <p>Sign in to continue to your dashboard</p>
           </div>
 
-          {/* Role Switcher */}
+          
 
-          <div className="role-switch">
+          <form onSubmit={handleSubmit} className="lg-form" noValidate>
 
-            <button
-              type="button"
-              className="role-option worker"
-              onClick={() => handleQuickLogin("worker")}
-            >
-              <HardHat size={18} strokeWidth={2} />
-              <span>Worker</span>
-            </button>
+            {errorMsg && (
+              <div className="lg-error" key={shakeKey} role="alert">
+                <AlertCircle size={16} strokeWidth={2.2} />
+                <span>{errorMsg}</span>
+              </div>
+            )}
 
-            <button
-              type="button"
-              className="role-option manager"
-              onClick={() => handleQuickLogin("manager")}
-            >
-              <Building2 size={18} strokeWidth={2} />
-              <span>Manager</span>
-            </button>
-
-            <button
-              type="button"
-              className="role-option citizen"
-              onClick={() => handleQuickLogin("user")}
-            >
-              <UserRound size={18} strokeWidth={2} />
-              <span>Citizen</span>
-            </button>
-
-          </div>
-
-          <div className="auth-divider">
-            <span>or sign in manually</span>
-          </div>
-
-          {/* Form */}
-
-          <form onSubmit={handleSubmit} className="auth-form">
-
-            <div className="float-group">
+            <label className="lg-field">
+              <Mail size={18} strokeWidth={2} className="lg-field-icon" />
               <input
                 type="email"
                 name="email"
-                placeholder=" "
+                placeholder="Email address"
                 value={form.email}
                 onChange={handleChange}
+                autoComplete="email"
               />
-              <label>Email Address</label>
-            </div>
+            </label>
 
-            <div className="float-group">
+            <label className="lg-field">
+              <Lock size={18} strokeWidth={2} className="lg-field-icon" />
               <input
                 type={showPassword ? "text" : "password"}
                 name="password"
-                placeholder=" "
+                placeholder="Password"
                 value={form.password}
                 onChange={handleChange}
+                autoComplete="current-password"
               />
-              <label>Password</label>
-
               <button
                 type="button"
-                className="password-toggle"
+                className="lg-eye"
                 onClick={() => setShowPassword(!showPassword)}
                 tabIndex={-1}
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
-                {showPassword ? (
-                  <EyeOff size={17} strokeWidth={2} />
-                ) : (
-                  <Eye size={17} strokeWidth={2} />
-                )}
+                {showPassword ? <EyeOff size={18} strokeWidth={2} /> : <Eye size={18} strokeWidth={2} />}
               </button>
-            </div>
+            </label>
 
-            <div className="form-row">
-              <label className="remember-check">
-                <input
-                  type="checkbox"
-                  checked={remember}
-                  onChange={(e) => setRemember(e.target.checked)}
-                />
-                Remember me
-              </label>
-
-              <Link to="/forgot-password" className="auth-link">
-                Forgot password?
-              </Link>
-            </div>
-
-            <button type="submit" className="auth-submit-btn">
-              Sign In
+            <button type="submit" className="lg-submit" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 size={19} strokeWidth={2.4} className="lg-spin" />
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  Sign In
+                  <ArrowRight size={19} strokeWidth={2.4} className="lg-arrow" />
+                </>
+              )}
             </button>
           </form>
 
-          <p className="auth-switch">
-            Don't have an account? <Link to="/signup">Create one</Link>
+          <p className="lg-switch">
+            New to Paadhai? <Link to="/signup">Create an account</Link>
           </p>
 
         </div>
-
-
-        {/* ================= TRUST STRIP ================= */}
-
-        <div className="trust-strip">
-
-          <div className="trust-item">
-            <ShieldCheck size={16} strokeWidth={2} />
-            <span>Secure sign-in</span>
-          </div>
-
-          <div className="trust-item">
-            <MapPinned size={16} strokeWidth={2} />
-            <span>Live issue tracking</span>  
-          </div>
-          <div className="trust-item">
-            <Timer size={16} strokeWidth={2} />
-            <span>Fast repair updates</span>
-          </div>
-
-        </div>
-
-      </div>
+      </section>
 
     </div>
   );

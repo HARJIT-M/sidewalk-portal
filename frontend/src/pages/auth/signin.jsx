@@ -1,12 +1,19 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   Eye,
   EyeOff,
-  UserPlus,
   ShieldCheck,
-  Users,
-  ClipboardCheck,
+  MapPinned,
+  Timer,
+  MapPin,
+  Loader2,
+  AlertCircle,
+  ArrowRight,
+  Mail,
+  Lock,
+  UserRound,
+  Phone,
 } from "lucide-react";
 import "./signin.css";
 import { signupUser } from "../../services/authApi";
@@ -23,15 +30,29 @@ const Signup = () => {
   });
 
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [shakeKey, setShakeKey] = useState(0); // changing this replays the shake animation
+  const [success, setSuccess] = useState(false);
 
-  const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
+  // after a successful signup, wait for the loader to finish and then go to login
+  useEffect(() => {
+    if (!success) return;
+    const timer = setTimeout(() => navigate("/login"), 3000);
+    return () => clearTimeout(timer);
+  }, [success, navigate]);
+
+  const showError = (msg) => {
+    setErrorMsg(msg);
+    setShakeKey((k) => k + 1);
   };
 
-  const handleSubmit = async(e) => {
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+    setErrorMsg("");
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (
@@ -41,167 +62,221 @@ const Signup = () => {
       !form.password ||
       !form.confirmPassword
     ) {
-      alert("Please fill all required fields.");
+      showError("Please fill all required fields.");
       return;
     }
 
     if (form.password !== form.confirmPassword) {
-      alert("Passwords do not match.");
+      showError("Passwords do not match.");
       return;
     }
-    try{
-        const res = await signupUser(form);
-        navigate("/login");
-    }catch(err){
-      console.log("Error :",err);
-    }
 
-    // alert("Account created successfully!");
-    
+    setLoading(true);
+    setErrorMsg("");
+    try {
+      await signupUser(form);
+      setSuccess(true);
+    } catch (err) {
+      console.error("Signup failed:", err);
+      showError(
+        err?.response?.data?.message ||
+          "Could not create your account. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="auth-page">
+    <div className="su-page">
 
-      {/* Decorative background */}
-      <div className="auth-bg-blob blob-one"></div>
-      <div className="auth-bg-blob blob-two"></div>
-      <div className="auth-bg-blob blob-three"></div>
+      {/* ================= LEFT: ORANGE SHOWCASE ================= */}
 
-      <div className="auth-shell signup-shell">
+      <section className="su-hero">
 
-        {/* ================= BRAND ================= */}
+        {/* animated decoration */}
+        <div className="su-rings" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div className="su-slabs" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i>
+        </div>
 
-        <div className="auth-brand-center">
-          <div className="auth-brand-icon">F</div>
+        <div className="su-brand">
+          <div className="su-brand-icon">P</div>
           <div>
-            <h2>Footpath</h2>
-            <span>Repair Portal</span>
+            <b>Paadhai</b>
+            <span>Footpath Repair Portal</span>
           </div>
         </div>
 
+        <div className="su-hero-body">
+          <h1>
+            Join Paadhai.
+            <br />
+            <span className="su-hl">Fix your street.</span>
+          </h1>
+          <p>
+            Create an account to report damaged footpaths and follow every
+            repair from report to done.
+          </p>
 
-        {/* ================= CARD ================= */}
+          {/* road with a pin that drops, and a ring that ripples */}
+          <div className="su-road" aria-hidden="true">
+            <div className="su-road-dash"></div>
+            <div className="su-pin"><MapPin size={34} strokeWidth={2.2} /></div>
+            <div className="su-ripple"></div>
+          </div>
+        </div>
 
-        <div className="auth-card">
+        <ul className="su-points">
+          <li><ShieldCheck size={17} strokeWidth={2.2} /> Data kept secure</li>
+          <li><MapPinned size={17} strokeWidth={2.2} /> Live issue tracking</li>
+          <li><Timer size={17} strokeWidth={2.2} /> Fast repair updates</li>
+        </ul>
 
-          <div className="auth-card-head">
-            <div className="auth-card-icon">
-              <UserPlus size={20} strokeWidth={2} />
+      </section>
+
+
+      {/* ================= RIGHT: FORM ================= */}
+
+      <section className="su-panel">
+        <div className="su-box">
+
+          {success ? (
+            <div className="su-success" role="status" aria-live="polite">
+              <div className="su-check" aria-hidden="true">
+                <svg viewBox="0 0 52 52">
+                  <circle cx="26" cy="26" r="23" />
+                  <path d="M15 27 l7 7 l15 -16" />
+                </svg>
+              </div>
+
+              <h2>Account created successfully</h2>
+              <p>
+                Welcome to Paadhai, {form.name.trim().split(" ")[0]}. Taking
+                you to the login page...
+              </p>
+
+              {/* footpath loader: slabs get laid one after another */}
+              <div className="su-path" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><i></i>
+              </div>
+
+              <Link to="/login" className="su-skip">
+                Go to login now
+              </Link>
             </div>
-            <h1>Join the team</h1>
-            <p>Create an account to start managing footpath repairs</p>
+          ) : (
+          <>
+
+          <div className="su-head">
+            <h2>Create your account</h2>
+            <p>It takes less than a minute</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="auth-form">
+          <form onSubmit={handleSubmit} className="su-form" noValidate>
 
-            <div className="float-group">
+            {errorMsg && (
+              <div className="su-error" key={shakeKey} role="alert">
+                <AlertCircle size={16} strokeWidth={2.2} />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            <label className="su-field">
+              <UserRound size={18} strokeWidth={2} className="su-field-icon" />
               <input
                 type="text"
                 name="name"
-                placeholder=" "
+                placeholder="Full name"
                 value={form.name}
                 onChange={handleChange}
+                autoComplete="name"
               />
-              <label>Full Name</label>
-            </div>
+            </label>
 
-            <div className="float-group">
+            <label className="su-field">
+              <Mail size={18} strokeWidth={2} className="su-field-icon" />
               <input
                 type="email"
                 name="email"
-                placeholder=" "
+                placeholder="Email address"
                 value={form.email}
                 onChange={handleChange}
+                autoComplete="email"
               />
-              <label>Email Address</label>
-            </div>
+            </label>
 
-            <div className="float-group">
+            <label className="su-field">
+              <Phone size={18} strokeWidth={2} className="su-field-icon" />
               <input
-                type="text"
+                type="tel"
                 name="phone"
-                placeholder=" "
+                placeholder="Phone number"
                 value={form.phone}
                 onChange={handleChange}
+                autoComplete="tel"
               />
-              <label>Phone Number</label>
-            </div>
+            </label>
 
-            <div className="form-group-row">
+            <label className="su-field">
+              <Lock size={18} strokeWidth={2} className="su-field-icon" />
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                placeholder="Password"
+                value={form.password}
+                onChange={handleChange}
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                className="su-eye"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff size={18} strokeWidth={2} /> : <Eye size={18} strokeWidth={2} />}
+              </button>
+            </label>
 
-              <div className="float-group">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  placeholder=" "
-                  value={form.password}
-                  onChange={handleChange}
-                />
-                <label>Password</label>
+            <label className="su-field">
+              <Lock size={18} strokeWidth={2} className="su-field-icon" />
+              <input
+                type={showPassword ? "text" : "password"}
+                name="confirmPassword"
+                placeholder="Confirm password"
+                value={form.confirmPassword}
+                onChange={handleChange}
+                autoComplete="new-password"
+              />
+            </label>
 
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => setShowPassword(!showPassword)}
-                  tabIndex={-1}
-                >
-                  {showPassword ? (
-                    <EyeOff size={16} strokeWidth={2} />
-                  ) : (
-                    <Eye size={16} strokeWidth={2} />
-                  )}
-                </button>
-              </div>
-
-              <div className="float-group">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="confirmPassword"
-                  placeholder=" "
-                  value={form.confirmPassword}
-                  onChange={handleChange}
-                />
-                <label>Confirm Password</label>
-              </div>
-
-            </div>
-
-            <button type="submit" className="auth-submit-btn">
-              Create Account
+            <button type="submit" className="su-submit" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 size={19} strokeWidth={2.4} className="su-spin" />
+                  Creating account...
+                </>
+              ) : (
+                <>
+                  Create Account
+                  <ArrowRight size={19} strokeWidth={2.4} className="su-arrow" />
+                </>
+              )}
             </button>
-
           </form>
 
-          <p className="auth-switch">
+          <p className="su-switch">
             Already have an account? <Link to="/login">Sign in</Link>
           </p>
 
-        </div>
-
-
-        {/* ================= TRUST STRIP ================= */}
-
-        <div className="trust-strip">
-
-          <div className="trust-item">
-            <ShieldCheck size={16} strokeWidth={2} />
-            <span>Data kept secure</span>
-          </div>
-
-          <div className="trust-item">
-            <Users size={16} strokeWidth={2} />
-            <span>Manage your team</span>
-          </div>
-
-          <div className="trust-item">
-            <ClipboardCheck size={16} strokeWidth={2} />
-            <span>Track every complaint</span>
-          </div>
+          </>
+          )}
 
         </div>
-
-      </div>
+      </section>
 
     </div>
   );
