@@ -28,9 +28,11 @@ const workerSchema = new mongoose.Schema(
       type: String,
       default: "Day Shift (08:00 AM - 05:00 PM)",
     },
-    zone: {
-      type: String,
-      default: "Zone 2 - Gandhipuram Central",
+    manager_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: [true, "Manager reference is required"],
+      index: true,
     },
     emergency_contact: {
       type: String,

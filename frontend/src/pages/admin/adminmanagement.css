@@ -604,6 +604,310 @@
   color: #57536b;
 }
 
+.city-manager-panel {
+  margin-bottom: 22px;
+  padding: 22px;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(30, 27, 46, 0.06);
+}
+
+.area-mapping-create-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.6fr) minmax(140px, 0.8fr) minmax(180px, 1.2fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.area-mapping-create-form label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: #57536b;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.area-place-search-field {
+  display: grid;
+  align-self: end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.area-place-search-field > label {
+  color: #57536b;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.area-mapping-create-form input,
+.area-mapping-create-form select,
+.area-mapping-create-form button {
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid #dedcea;
+  border-radius: 7px;
+  background: #fff;
+  color: #1e1b2e;
+  font: inherit;
+}
+
+.area-mapping-create-form button {
+  padding: 0 16px;
+  border-color: #4f46e5;
+  background: #4f46e5;
+  color: #fff;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.area-mapping-create-form button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.selected-area-name,
+.area-place-search-note,
+.area-place-search-error {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.selected-area-name {
+  color: #047857;
+}
+
+.area-place-search-note {
+  color: #6b7280;
+}
+
+.area-place-search-error {
+  color: #b91c1c;
+}
+
+.area-place-search-results {
+  display: grid;
+  max-height: 210px;
+  overflow-y: auto;
+  border: 1px solid #dedcea;
+  border-radius: 7px;
+}
+
+.area-mapping-create-form .area-place-search-results button {
+  display: grid;
+  gap: 3px;
+  min-height: 0;
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid #edecf5;
+  border-radius: 0;
+  background: #fff;
+  color: #1e1b2e;
+  text-align: left;
+}
+
+.area-mapping-create-form .area-place-search-results button:last-child {
+  border-bottom: 0;
+}
+
+.area-mapping-create-form .area-place-search-results button:hover {
+  background: #f5f3ff;
+}
+
+.area-place-search-results small {
+  color: #7b7794;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.area-hierarchy-hint {
+  margin: -6px 0 16px;
+  color: #7b7794;
+  font-size: 12px;
+}
+
+.deletion-dependency-note,
+.deletion-dependency-error {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.deletion-dependency-note {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.deletion-dependency-error {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.deletion-dependency-list {
+  display: grid;
+  gap: 7px;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 12px;
+}
+
+.deletion-dependency-list > span {
+  margin-top: 4px;
+  font-weight: 650;
+}
+
+.admin-modal-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.routing-queue-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.routing-queue-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.routing-queue-details {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.routing-queue-details span {
+  color: #6b7280;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.routing-queue-details a {
+  color: #4f46e5;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.routing-queue-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.routing-queue-actions select,
+.routing-queue-actions button {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.routing-queue-actions button {
+  border-color: #4f46e5;
+  background: #4f46e5;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.routing-queue-actions button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+@media (max-width: 700px) {
+  .area-mapping-create-form {
+    grid-template-columns: 1fr;
+  }
+
+  .routing-queue-item {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .routing-queue-actions {
+    align-items: stretch;
+  }
+
+  .routing-queue-actions select {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.city-manager-panel h2 {
+  margin: 0;
+  color: #1e1b2e;
+  font-size: 17px;
+}
+
+.city-manager-panel > div:first-child p,
+.city-manager-empty {
+  margin: 6px 0 16px;
+  color: #7b7794;
+  font-size: 12.5px;
+}
+
+.city-manager-error {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 12.5px;
+}
+
+.city-manager-table-wrap {
+  overflow-x: auto;
+}
+
+.city-manager-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.city-manager-table th,
+.city-manager-table td {
+  padding: 12px;
+  border-bottom: 1px solid #edecf5;
+  text-align: left;
+  font-size: 12.5px;
+}
+
+.city-manager-table th {
+  color: #7b7794;
+  font-weight: 700;
+}
+
+.city-manager-table select {
+  min-width: 230px;
+  max-width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #e5e3ed;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #3b374f;
+}
+
 
 /* =========================================================
    DELETE CONFIRMATION MODAL

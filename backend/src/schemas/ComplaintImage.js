@@ -12,6 +12,10 @@ const complaintImageSchema = new mongoose.Schema(
       required: [true, "Image URL is required"],
       trim: true,
     },
+    image_public_id: {
+      type: String,
+      trim: true,
+    },
     image_type: {
       type: String,
       enum: ["BEFORE", "AFTER"],

@@ -64,6 +64,12 @@ const authorize = (...roles) => {
   const allowedRoles = roles.map((r) => r.toUpperCase());
 
   return (req, res, next) => {
+    if (!req.user || !allowedRoles.includes(String(req.user.role).toUpperCase())) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to perform this action.",
+      });
+    }
     return next();
   };
 };

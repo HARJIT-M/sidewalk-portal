@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getWorkerComplaints, getWorkerProfile } from "../../services/workerApi";
 import {
@@ -17,14 +17,22 @@ import "./MyComplaints.css";
 const MyComplaints = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const initialFilter = searchParams.get("filter");
   const [complaints, setComplaints] = useState([]);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [priorityFilter, setPriorityFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState(() => {
+    if (initialFilter === "ASSIGNED") return "Pending";
+    if (initialFilter === "IN_PROGRESS") return "In Progress";
+    if (initialFilter === "RESOLVED") return "Completed";
+    return "All";
+  });
+  const [priorityFilter, setPriorityFilter] = useState(() =>
+    initialFilter === "HIGH_PRIORITY" ? "High / Critical" : "All"
+  );
 
   const loadData = useCallback(async () => {
     try {
@@ -34,34 +42,38 @@ const MyComplaints = () => {
       const [complaintsRes, profileRes] = await Promise.allSettled([
         getWorkerComplaints({
           status: statusFilter !== "All" ? statusFilter : undefined,
-          priority: priorityFilter !== "All" ? priorityFilter : undefined,
+          priority:
+            priorityFilter !== "All" && priorityFilter !== "High / Critical"
+              ? priorityFilter
+              : undefined,
           search: search.trim() ? search.trim() : undefined,
         }),
         getWorkerProfile(),
       ]);
 
-      if (complaintsRes.status === "fulfilled" && complaintsRes.value.success) {
-        setComplaints(complaintsRes.value.complaints);
+      if (complaintsRes.status === "rejected") {
+        throw complaintsRes.reason;
       }
-      if (profileRes.status === "fulfilled" && profileRes.value.success) {
+      if (!complaintsRes.value?.success) {
+        throw new Error(
+          complaintsRes.value?.message || "The server did not return complaints."
+        );
+      }
+      setComplaints(
+        Array.isArray(complaintsRes.value.complaints)
+          ? complaintsRes.value.complaints
+          : []
+      );
+      if (profileRes.status === "fulfilled" && profileRes.value?.success) {
         setProfile(profileRes.value.profile);
       }
     } catch (err) {
       console.error("Failed to fetch complaints:", err);
-      setError("Failed to load assigned complaints from database.");
+      setError(err.message || "Failed to load assigned complaints.");
     } finally {
       setLoading(false);
     }
   }, [statusFilter, priorityFilter, search]);
-
-  useEffect(() => {
-    const qFilter = searchParams.get("filter");
-    if (qFilter) {
-      if (qFilter === "ASSIGNED") setStatusFilter("Pending");
-      else if (qFilter === "IN_PROGRESS") setStatusFilter("In Progress");
-      else if (qFilter === "RESOLVED") setStatusFilter("Completed");
-    }
-  }, [searchParams]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -70,27 +82,39 @@ const MyComplaints = () => {
     return () => clearTimeout(timeoutId);
   }, [loadData]);
 
-  const getStatusDisplay = (status) => {
-    if (status === "ASSIGNED" || status === "PENDING") return "Pending";
-    if (status === "IN_PROGRESS") return "In Progress";
+  const getStatusDisplay = (status, assignmentStatus) => {
+    if (assignmentStatus === "COMPLETED") return "Completed";
+    if (assignmentStatus === "IN_PROGRESS" || status === "IN_PROGRESS")
+      return "In Progress";
+    if (
+      assignmentStatus === "ASSIGNED" ||
+      status === "ASSIGNED" ||
+      status === "PENDING"
+    )
+      return "Pending";
     if (status === "RESOLVED" || status === "COMPLETED" || status === "CLOSED") return "Completed";
     return status;
   };
 
   // Client-side quick filter / safety pass
   const filteredComplaints = complaints.filter((complaint) => {
-    const displayStatus = getStatusDisplay(complaint.status);
+    const displayStatus = getStatusDisplay(
+      complaint.status,
+      complaint.assignmentStatus
+    );
     const matchesSearch =
       search === "" ||
-      complaint.id.toLowerCase().includes(search.toLowerCase()) ||
-      complaint.issue.toLowerCase().includes(search.toLowerCase()) ||
-      complaint.location.toLowerCase().includes(search.toLowerCase());
+      String(complaint.id || "").toLowerCase().includes(search.toLowerCase()) ||
+      String(complaint.issue || "").toLowerCase().includes(search.toLowerCase()) ||
+      String(complaint.location || "").toLowerCase().includes(search.toLowerCase());
 
     const matchesStatus =
       statusFilter === "All" || displayStatus === statusFilter;
 
     const matchesPriority =
       priorityFilter === "All" ||
+      (priorityFilter === "High / Critical" &&
+        ["high", "critical"].includes(complaint.priority?.toLowerCase())) ||
       complaint.priority?.toLowerCase() === priorityFilter.toLowerCase();
 
     return matchesSearch && matchesStatus && matchesPriority;
@@ -99,13 +123,13 @@ const MyComplaints = () => {
   // Stats
   const totalCount = complaints.length;
   const pendingCount = complaints.filter(
-    (c) => getStatusDisplay(c.status) === "Pending"
+    (c) => getStatusDisplay(c.status, c.assignmentStatus) === "Pending"
   ).length;
   const progressCount = complaints.filter(
-    (c) => getStatusDisplay(c.status) === "In Progress"
+    (c) => getStatusDisplay(c.status, c.assignmentStatus) === "In Progress"
   ).length;
   const completedCount = complaints.filter(
-    (c) => getStatusDisplay(c.status) === "Completed"
+    (c) => getStatusDisplay(c.status, c.assignmentStatus) === "Completed"
   ).length;
 
   const statusIcon = (status) => {
@@ -220,6 +244,7 @@ const MyComplaints = () => {
           <option value="High">High</option>
           <option value="Medium">Medium</option>
           <option value="Low">Low</option>
+          <option value="High / Critical">High / Critical</option>
         </select>
       </div>
 
@@ -233,7 +258,10 @@ const MyComplaints = () => {
       ) : filteredComplaints.length > 0 ? (
         <div className="complaint-cards-grid">
           {filteredComplaints.map((complaint) => {
-            const statusDisplay = getStatusDisplay(complaint.status);
+            const statusDisplay = getStatusDisplay(
+              complaint.status,
+              complaint.assignmentStatus
+            );
             const statusClass = statusDisplay.toLowerCase().replace(" ", "-");
             const priorityClass = complaint.priority?.toLowerCase() || "medium";
 

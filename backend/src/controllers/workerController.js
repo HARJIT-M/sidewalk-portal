@@ -1,6 +1,10 @@
 const bcrypt = require("bcryptjs");
 const { User, Worker, Assignment } = require("../schemas");
 const { getWorkerForUser } = require("../utils/workerHelper");
+const {
+  parseScheduleRange,
+  getBusyAssignmentsFilter,
+} = require("../utils/scheduleRange");
 
 // ==========================================
 // 1. GET WORKER PROFILE
@@ -51,7 +55,7 @@ const getWorkerProfile = async (req, res) => {
         status: worker.availability_status === "ACTIVE" ? "Active" : worker.availability_status,
         shift: worker.shift || "Day Shift (08:00 AM - 05:00 PM)",
         joinedDate: formattedJoinedDate,
-        zone: worker.zone || "Zone 2 - Gandhipuram Central",
+        team: worker.manager_id?.name || "Assigned Team",
         emergencyContact: worker.emergency_contact || "",
         address: worker.address || "",
         skills: worker.skills || [],
@@ -81,7 +85,7 @@ const getWorkerProfile = async (req, res) => {
 // ==========================================
 const updateWorkerProfile = async (req, res) => {
   try {
-    const { name, phone, email, zone, emergencyContact, address, skills } = req.body;
+    const { name, phone, email, emergencyContact, address, skills } = req.body;
 
     const worker = await getWorkerForUser(req.user._id);
     if (!worker) {
@@ -100,7 +104,6 @@ const updateWorkerProfile = async (req, res) => {
       await User.findByIdAndUpdate(req.user._id, userUpdate);
     }
 
-    if (zone !== undefined) worker.zone = zone;
     if (emergencyContact !== undefined) worker.emergency_contact = emergencyContact;
     if (address !== undefined) worker.address = address;
     if (skills && Array.isArray(skills)) worker.skills = skills;
@@ -173,16 +176,20 @@ const changeWorkerPassword = async (req, res) => {
 // ==========================================
 const getAllWorkers = async (req, res) => {
   try {
-    const workers = await Worker.find()
+    const workers = await Worker.find({ manager_id: req.user._id })
       .populate("user_id", "name email phone status")
+      .populate("manager_id", "name")
       .sort({ createdAt: -1 });
 
     const formattedWorkers = await Promise.all(
       workers.map(async (worker) => {
-        const activeAssignedCount = await Assignment.countDocuments({
+        const activeAssignments = await Assignment.find({
           worker_id: worker._id,
           status: { $in: ["ASSIGNED", "IN_PROGRESS"] },
-        });
+        })
+          .populate("complaint_id", "complaint_code title")
+          .select("status complaint_id")
+          .lean();
 
         const joinedDateFormatted = worker.joined_date
           ? new Date(worker.joined_date).toLocaleDateString("en-GB", {
@@ -202,12 +209,18 @@ const getAllWorkers = async (req, res) => {
           role: worker.worker_role || "Maintenance Worker",
           status: worker.availability_status === "ACTIVE" ? "Active" : "Inactive",
           availabilityStatus: worker.availability_status,
-          zone: worker.zone || "Zone 2 - Gandhipuram Central",
+          team: worker.manager_id?.name || "Assigned Team",
           shift: worker.shift || "Day Shift (08:00 AM - 05:00 PM)",
           skills: worker.skills || [],
           assignedEquipment: worker.assigned_equipment || "",
           joinedDate: joinedDateFormatted,
-          assignedWorks: activeAssignedCount,
+          assignedWorks: activeAssignments.length,
+          activeAssignments: activeAssignments.map((assignment) => ({
+            id: assignment._id,
+            status: assignment.status,
+            complaintCode: assignment.complaint_id?.complaint_code || "",
+            complaintTitle: assignment.complaint_id?.title || "Complaint",
+          })),
         };
       })
     );
@@ -232,9 +245,28 @@ const getAllWorkers = async (req, res) => {
 // ==========================================
 const getAvailableWorkers = async (req, res) => {
   try {
-    const activeWorkers = await Worker.find({ availability_status: "ACTIVE" })
+    const { startDate, endDate } = req.query;
+    const schedule = parseScheduleRange(startDate, endDate);
+    if (!schedule) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid startDate and endDate are required in YYYY-MM-DD format.",
+      });
+    }
+
+    const busyWorkerIds = await Assignment.distinct(
+      "worker_id",
+      getBusyAssignmentsFilter(schedule.start, schedule.end)
+    );
+
+    const activeWorkers = await Worker.find({
+      availability_status: "ACTIVE",
+      ...(req.user.role === "MANAGER" ? { manager_id: req.user._id } : {}),
+      _id: { $nin: busyWorkerIds },
+    })
       .populate("user_id", "name email phone")
-      .select("employee_code worker_role zone skills user_id");
+      .populate("manager_id", "name")
+      .select("employee_code worker_role skills user_id manager_id");
 
     const workerOptions = activeWorkers.map((w, index) => ({
       id: index + 1,
@@ -242,7 +274,7 @@ const getAvailableWorkers = async (req, res) => {
       employeeCode: w.employee_code,
       name: w.user_id ? w.user_id.name : `Worker ${w.employee_code}`,
       role: w.worker_role || "Maintenance Worker",
-      zone: w.zone || "Zone 2 - Gandhipuram Central",
+      team: w.manager_id?.name || "Assigned Team",
       skills: w.skills || [],
     }));
 
@@ -266,7 +298,7 @@ const getAvailableWorkers = async (req, res) => {
 // ==========================================
 const addWorker = async (req, res) => {
   try {
-    const { name, phone, email, role, zone, shift, address, skills } = req.body;
+    const { name, phone, email, shift, address, skills } = req.body;
 
     if (!name || !email || !phone) {
       return res.status(400).json({
@@ -308,17 +340,15 @@ const addWorker = async (req, res) => {
       status: "ACTIVE",
     });
 
-    const managerZone = req.user.zone || "Central Municipal Area";
-
     const newWorkerProfile = await Worker.create({
       user_id: newUser._id,
+      manager_id: req.user._id,
       employee_code: employeeCode,
       worker_role: "Maintenance Worker",
       availability_status: "ACTIVE",
       shift: shift || "Day Shift (08:00 AM - 05:00 PM)",
-      zone: managerZone,
       emergency_contact: phone.trim(),
-      address: address || "Gandhipuram, Coimbatore",
+      ...(address ? { address } : {}),
       skills: Array.isArray(skills) && skills.length > 0 ? skills : ["Footpath Tile Paving", "Concrete Crack Sealing"],
       assigned_equipment: "Toolkit #T-110",
       rating: 5.0,
@@ -336,6 +366,7 @@ const addWorker = async (req, res) => {
         email: newUser.email,
         phone: newUser.phone,
         role: newWorkerProfile.worker_role,
+        team: req.user.name,
         status: "Active",
         joinedDate: "Today",
         assignedWorks: 0,
@@ -361,9 +392,9 @@ const updateWorkerStatus = async (req, res) => {
 
     let worker;
     if (id.match(/^[0-9a-fA-F]{24}$/)) {
-      worker = await Worker.findById(id);
+      worker = await Worker.findOne({ _id: id, manager_id: req.user._id });
     } else {
-      worker = await Worker.findOne({ employee_code: id });
+      worker = await Worker.findOne({ employee_code: id, manager_id: req.user._id });
     }
 
     if (!worker) {
@@ -411,15 +442,35 @@ const deleteWorker = async (req, res) => {
 
     let worker;
     if (id.match(/^[0-9a-fA-F]{24}$/)) {
-      worker = await Worker.findById(id);
+      worker = await Worker.findOne({ _id: id, manager_id: req.user._id });
     } else {
-      worker = await Worker.findOne({ employee_code: id });
+      worker = await Worker.findOne({ employee_code: id, manager_id: req.user._id });
     }
 
     if (!worker) {
       return res.status(404).json({
         success: false,
         message: "Worker not found.",
+      });
+    }
+
+    const activeAssignments = await Assignment.find({
+      worker_id: worker._id,
+      status: { $in: ["ASSIGNED", "IN_PROGRESS"] },
+    })
+      .populate("complaint_id", "complaint_code title")
+      .select("status complaint_id")
+      .lean();
+
+    if (activeAssignments.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: "This worker has active assignments. Reassign or complete them before removing the worker.",
+        dependencies: activeAssignments.map((assignment) => ({
+          status: assignment.status,
+          complaintCode: assignment.complaint_id?.complaint_code || "",
+          complaintTitle: assignment.complaint_id?.title || "Complaint",
+        })),
       });
     }
 

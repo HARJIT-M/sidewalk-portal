@@ -1,5 +1,5 @@
 // WorkerDashboard.jsx
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getWorkerDashboard } from "../../services/workerApi";
 import "./WorkerDashboard.css";
@@ -11,20 +11,25 @@ const WorkerDashboard = () => {
   const [error, setError] = useState(null);
   const [activeBarIndex, setActiveBarIndex] = useState(null);
 
-  const loadDashboard = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await getWorkerDashboard();
-      if (res && res.success) {
-        setDashboardData(res.dashboard);
-      }
-    } catch (err) {
-      console.error("Failed to load worker dashboard:", err);
-      setError("Could not load dashboard data from server.");
-    } finally {
-      setLoading(false);
-    }
+  const loadDashboard = () => {
+    Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        setError(null);
+        return getWorkerDashboard();
+      })
+      .then((res) => {
+        if (res && res.success) {
+          setDashboardData(res.dashboard);
+        } else {
+          throw new Error(res?.message || "Server returned no dashboard data.");
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load worker dashboard:", err);
+        setError(err.message || "Could not load dashboard data from server.");
+      })
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
@@ -34,7 +39,7 @@ const WorkerDashboard = () => {
   const worker = dashboardData?.worker || {
     id: "",
     name: "Worker",
-    zone: "",
+    team: "Assigned Team",
     rating: 0,
     onTimeRate: 0,
   };
@@ -58,6 +63,7 @@ const WorkerDashboard = () => {
     stats.totalAssigned > 0
       ? Math.round((stats.completed / stats.totalAssigned) * 100)
       : 0;
+  const weeklyMaximum = Math.max(1, ...weeklyData.map((item) => item.count));
 
   if (loading && !dashboardData) {
     return (
@@ -89,7 +95,7 @@ const WorkerDashboard = () => {
           <div>
             <h3>{worker.name}</h3>
             <span>
-              {worker.zone ? `${worker.zone} (${worker.id})` : worker.id}
+              {worker.team} · {worker.id}
             </span>
           </div>
         </div>
@@ -136,9 +142,7 @@ const WorkerDashboard = () => {
           </button>
           <button
             className="action-pill-btn"
-            onClick={() =>
-              navigate("/worker/my-complaints?filter=RESOLVED")
-            }
+            onClick={() => navigate("/worker/my-complaints?filter=RESOLVED")}
           >
             📜 Completed History
           </button>
@@ -190,7 +194,7 @@ const WorkerDashboard = () => {
 
         <div
           className="stat-card"
-          onClick={() => navigate("/worker/my-complaints?filter=ASSIGNED")}
+          onClick={() => navigate("/worker/my-complaints?filter=HIGH_PRIORITY")}
         >
           <div className="stat-icon pending">🚨</div>
           <div>
@@ -227,6 +231,24 @@ const WorkerDashboard = () => {
                 📍 {activeTask.location}{" "}
                 {activeTask.landmark && `(${activeTask.landmark})`}
               </p>
+              {(activeTask.locality || activeTask.city) && (
+                <p className="location">
+                  {[activeTask.locality, activeTask.city, activeTask.state]
+                    .filter(Boolean)
+                    .join(", ")}
+                </p>
+              )}
+              {Number.isFinite(activeTask.latitude) &&
+                Number.isFinite(activeTask.longitude) && (
+                  <a
+                    href={activeTask.navigationUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="map-anchor"
+                  >
+                    Navigate to exact pin ({activeTask.latitude}, {activeTask.longitude})
+                  </a>
+                )}
               <p className="featured-desc">
                 {activeTask.description}
               </p>
@@ -300,21 +322,22 @@ const WorkerDashboard = () => {
               <h2>📊 Weekly Work Performance</h2>
               <p>Tasks completed and logged this week</p>
             </div>
-            <span className="count-pill">Live Active Stats</span>
+            <span className="count-pill">Completed this week</span>
           </div>
 
           <div className="bar-chart-container">
             <div className="y-axis-labels">
-              <span>8</span>
-              <span>6</span>
-              <span>4</span>
-              <span>2</span>
+              <span>{weeklyMaximum}</span>
+              <span>{Math.round(weeklyMaximum * 0.75)}</span>
+              <span>{Math.round(weeklyMaximum * 0.5)}</span>
+              <span>{Math.round(weeklyMaximum * 0.25)}</span>
+              <span>0</span>
               <span>0</span>
             </div>
 
             <div className="bars-area">
               {weeklyData.map((item, index) => {
-                const heightPercent = Math.min(100, (item.count / 8) * 100);
+                const heightPercent = (item.count / weeklyMaximum) * 100;
                 const isHovered = activeBarIndex === index;
                 return (
                   <div
@@ -550,31 +573,21 @@ const WorkerDashboard = () => {
           </div>
         </div>
 
-        {/* Current Assigned Area & Schedule */}
+        {/* Worker team and schedule */}
         <div className="complaints-section">
           <div className="section-header">
             <div>
-              <h2>📍 Current Assigned Area & Schedule</h2>
-              <p>Active field deployment zones</p>
+              <h2>🧰 Team & Schedule</h2>
+              <p>Your assignments are scheduled by your team manager</p>
             </div>
           </div>
 
           <div className="area-schedule-content">
             <div className="area-highlight-card">
-              <div className="area-icon">📍</div>
+              <div className="area-icon">🧰</div>
               <div>
-                <strong>Active Operational Zone:</strong>
-                <p>{worker.zone || "Operational Zone Assigned by Field Manager"}</p>
-                {worker.zone && (
-                  <a
-                    href={`https://maps.google.com/?q=${encodeURIComponent(worker.zone)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="map-anchor"
-                  >
-                    View Location on Google Maps →
-                  </a>
-                )}
+                <strong>Assigned team:</strong>
+                <p>{worker.team || "Team not assigned"}</p>
               </div>
             </div>
 

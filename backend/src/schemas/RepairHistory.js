@@ -12,6 +12,10 @@ const repairHistorySchema = new mongoose.Schema(
       ref: "Worker",
       required: [true, "Worker reference is required"],
     },
+    assignment_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Assignment",
+    },
     started_at: {
       type: Date,
     },
@@ -26,14 +30,6 @@ const repairHistorySchema = new mongoose.Schema(
     materials_used: {
       type: [String],
       default: [],
-    },
-    before_image: {
-      type: String, // URL to image
-      trim: true,
-    },
-    after_image: {
-      type: String, // URL to image
-      trim: true,
     },
     repair_cost: {
       type: Number,

@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 const managerApi = axios.create({
   baseURL: API_BASE_URL,
@@ -103,9 +103,9 @@ export const getAllWorkers = async () => {
   }
 };
 
-export const getAvailableWorkers = async () => {
+export const getAvailableWorkers = async (params) => {
   try {
-    const response = await managerApi.get("/api/workers/available");
+    const response = await managerApi.get("/api/workers/available", { params });
     return response.data;
   } catch (error) {
     throw new Error(

@@ -234,8 +234,30 @@ const WorkerComplaintDetails = () => {
             <div className="meta-field">
               <label>Location</label>
               <p>📍 {complaint.location}</p>
+              {(complaint.locality || complaint.city) && (
+                <span className="landmark-hint">
+                  {[complaint.locality, complaint.city, complaint.state]
+                    .filter(Boolean)
+                    .join(", ")}
+                </span>
+              )}
               {complaint.landmark && (
                 <span className="landmark-hint">Landmark: {complaint.landmark}</span>
+              )}
+              {Number.isFinite(complaint.latitude) && Number.isFinite(complaint.longitude) && (
+                <div>
+                  <span className="landmark-hint">
+                    Coordinates: {complaint.latitude}, {complaint.longitude}
+                  </span>
+                  <a
+                    href={complaint.navigationUrl || `https://www.google.com/maps/dir/?api=1&destination=${complaint.latitude},${complaint.longitude}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="primary-action-btn"
+                  >
+                    Open exact location in Maps
+                  </a>
+                </div>
               )}
             </div>
 
@@ -247,6 +269,17 @@ const WorkerComplaintDetails = () => {
             <div className="meta-field">
               <label>Assigned Date</label>
               <p>{complaint.assignedDate || "Assigned"}</p>
+            </div>
+
+            <div className="meta-field">
+              <label>Scheduled Work</label>
+              <p>
+                {complaint.scheduledStartAt
+                  ? new Date(complaint.scheduledStartAt).toLocaleDateString()
+                  : "Not scheduled"}
+                {complaint.scheduledEndAt &&
+                  ` – ${new Date(complaint.scheduledEndAt).toLocaleDateString()}`}
+              </p>
             </div>
           </div>
 

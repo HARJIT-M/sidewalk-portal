@@ -19,6 +19,7 @@ const Workers = () => {
   const [showAddPopup, setShowAddPopup] = useState(false);
   const [showRemovePopup, setShowRemovePopup] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [removingWorker, setRemovingWorker] = useState(false);
 
   const [selectedWorker, setSelectedWorker] = useState(null);
 
@@ -28,7 +29,6 @@ const Workers = () => {
     phone: "",
     email: "",
     role: "",
-    zone: "",
   });
 
   const loadWorkers = async () => {
@@ -116,7 +116,6 @@ const Workers = () => {
           phone: "",
           email: "",
           role: "",
-          zone: "",
         });
         await loadWorkers();
       }
@@ -152,7 +151,8 @@ const Workers = () => {
   // REMOVE WORKER
   // ==============================
   const handleRemoveWorker = async () => {
-    if (!selectedWorker) return;
+    if (!selectedWorker || selectedWorker.activeAssignments?.length || removingWorker) return;
+    setRemovingWorker(true);
     try {
       await deleteWorker(selectedWorker.id || selectedWorker.mongoId);
       setWorkers(workers.filter((worker) => worker.id !== selectedWorker.id));
@@ -163,6 +163,8 @@ const Workers = () => {
     } catch (err) {
       console.error("Error removing worker:", err);
       alert(err.message || "Failed to remove worker.");
+    } finally {
+      setRemovingWorker(false);
     }
   };
 
@@ -299,7 +301,7 @@ const Workers = () => {
               <tr>
                 <th>Worker</th>
                 <th>Contact</th>
-                <th>Zone / Role</th>
+                <th>Team / Role</th>
                 <th>Status</th>
                 <th>Tasks</th>
                 <th>Joined Date</th>
@@ -348,7 +350,8 @@ const Workers = () => {
 
                       <td>
                         <div className="role-text">
-                          {worker.zone || worker.role}
+                          {worker.team || "Assigned Team"}
+                          <small>{worker.role}</small>
                         </div>
                       </td>
 
@@ -479,18 +482,33 @@ const Workers = () => {
             <h2>Remove Field Worker</h2>
 
             <p>
-              Are you sure you want to deactivate worker{" "}
+              Are you sure you want to remove worker{" "}
               <strong>{selectedWorker.name}</strong> ({selectedWorker.id})?
             </p>
 
-            <div className="remove-warning">
-              This action will prevent the worker from logging in and unassign them from any active tasks.
-            </div>
+            {selectedWorker.activeAssignments?.length > 0 ? (
+              <div className="remove-warning">
+                <strong>This worker is actively assigned to work:</strong>
+                <ul>
+                  {selectedWorker.activeAssignments.map((assignment) => (
+                    <li key={assignment.id}>
+                      {assignment.complaintCode} — {assignment.complaintTitle} ({assignment.status})
+                    </li>
+                  ))}
+                </ul>
+                Reassign or complete these tasks before removing the worker.
+              </div>
+            ) : (
+              <div className="remove-warning">
+                This worker has no active assignments and can be removed from the roster.
+              </div>
+            )}
 
             <div className="remove-actions">
               <button
                 className="cancel-remove-btn"
                 onClick={() => setShowRemovePopup(false)}
+                disabled={removingWorker}
               >
                 Cancel
               </button>
@@ -498,8 +516,11 @@ const Workers = () => {
               <button
                 className="confirm-remove-btn"
                 onClick={handleRemoveWorker}
+                disabled={
+                  removingWorker || Boolean(selectedWorker.activeAssignments?.length)
+                }
               >
-                Deactivate Worker
+                {removingWorker ? "Removing..." : "Remove Worker"}
               </button>
             </div>
           </div>

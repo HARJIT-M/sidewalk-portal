@@ -18,9 +18,9 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    zone: {
-      type: String,
-      trim: true,
+    area_ids: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Area" }],
+      default: [],
     },
 
     password: {

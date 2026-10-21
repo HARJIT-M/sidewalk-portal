@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Search,
   Users,
@@ -16,7 +16,19 @@ import {
   EyeOff,
   X,
 } from "lucide-react";
-import { getAllUsers, updateUserStatus, deleteUser,createUser } from "../../services/adminApi";
+import {
+  getAllUsers,
+  updateUserStatus,
+  deleteUser,
+  getUserDeletionDependencies,
+  createUser,
+  getCityManagerMappings,
+  searchTamilNaduPlaces,
+  createCityManagerArea,
+  updateCityManager,
+  getAdminRoutingComplaints,
+  routeComplaintToManager,
+} from "../../services/adminApi";
 import "./adminmanagement.css";
 
 const ROLE_STYLE = {
@@ -30,9 +42,9 @@ const EMPTY_FORM = {
   name: "",
   email: "",
   phone: "",
-  zone: "",
   password: "",
   role: "CITIZEN",
+  manager_id: "",
 };
 
 const ROLE_OPTIONS = [
@@ -48,11 +60,31 @@ const AdminManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [cityMappings, setCityMappings] = useState([]);
+  const [mappingError, setMappingError] = useState("");
+  const [savingCityId, setSavingCityId] = useState("");
+  const [newAreaName, setNewAreaName] = useState("");
+  const [placeSearchQuery, setPlaceSearchQuery] = useState("");
+  const [placeSearchResults, setPlaceSearchResults] = useState([]);
+  const [placeSearchError, setPlaceSearchError] = useState("");
+  const [searchingPlaces, setSearchingPlaces] = useState(false);
+  const [newAreaType, setNewAreaType] = useState("DISTRICT");
+  const [newAreaParent, setNewAreaParent] = useState("");
+  const [creatingArea, setCreatingArea] = useState(false);
+  const [routingComplaints, setRoutingComplaints] = useState([]);
+  const [routingSelections, setRoutingSelections] = useState({});
+  const [routingError, setRoutingError] = useState("");
+  const [savingComplaintId, setSavingComplaintId] = useState("");
 
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
 
   const [pendingDelete, setPendingDelete] = useState(null);
+  const deletionCheckRef = useRef(0);
+  const [deletionDependencies, setDeletionDependencies] = useState(null);
+  const [deletionDependencyError, setDeletionDependencyError] = useState("");
+  const [loadingDeletionDependencies, setLoadingDeletionDependencies] = useState(false);
+  const [deletingUser, setDeletingUser] = useState(false);
 
   // ---- Add user modal state ----
   const [showAddModal, setShowAddModal] = useState(false);
@@ -63,17 +95,167 @@ const AdminManagement = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    fetchUsers();
+    let cancelled = false;
+    getAllUsers()
+      .then((response) => {
+        if (!cancelled) setUsers(response.data);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    getCityManagerMappings()
+      .then((response) => {
+        if (!cancelled) {
+          setCityMappings(response.areas || []);
+          setMappingError("");
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setMappingError(err.message || "Failed to load city manager mappings.");
+        }
+      });
+    getAdminRoutingComplaints()
+      .then((response) => {
+        if (!cancelled) setRoutingComplaints(response.complaints || []);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setRoutingError(err.message || "Failed to load complaints needing routing.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const fetchUsers = async () => {
+  useEffect(() => {
+    const query = placeSearchQuery.trim();
+    if (query.length < 2) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const timeoutId = setTimeout(async () => {
+      setSearchingPlaces(true);
+      setPlaceSearchError("");
+      try {
+        const response = await searchTamilNaduPlaces(
+          query,
+          newAreaType,
+          newAreaParent
+            ? cityMappings.find((area) => area.id === newAreaParent)?.name
+            : ""
+        );
+        if (!cancelled) setPlaceSearchResults(response.places || []);
+      } catch (err) {
+        if (!cancelled) {
+          setPlaceSearchResults([]);
+          setPlaceSearchError(err.message || "Place search failed.");
+        }
+      } finally {
+        if (!cancelled) setSearchingPlaces(false);
+      }
+    }, 700);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [placeSearchQuery, newAreaType, newAreaParent, cityMappings]);
+
+  const handleRouteComplaint = async (complaintId) => {
+    const managerId = routingSelections[complaintId];
+    if (!managerId) {
+      setRoutingError("Select an active manager before routing the complaint.");
+      return;
+    }
+
+    setSavingComplaintId(complaintId);
+    setRoutingError("");
     try {
-      const res = await getAllUsers();
-      setUsers(res.data);
+      await routeComplaintToManager(complaintId, managerId);
+      setRoutingComplaints((current) =>
+        current.filter((complaint) => complaint.id !== complaintId)
+      );
+      setRoutingSelections((current) => {
+        const next = { ...current };
+        delete next[complaintId];
+        return next;
+      });
     } catch (err) {
-      setError(err.message);
+      setRoutingError(err.message || "Failed to route complaint.");
     } finally {
-      setLoading(false);
+      setSavingComplaintId("");
+    }
+  };
+
+  const handleCityManagerChange = async (area, managerId) => {
+    setSavingCityId(area.id);
+    setMappingError("");
+    try {
+      await updateCityManager(area.id, managerId || null);
+      const manager = users.find((user) => user._id === managerId) || null;
+      setCityMappings((current) =>
+        current.map((item) =>
+          item.id === area.id
+            ? {
+                ...item,
+                manager: manager
+                  ? { id: manager._id, name: manager.name, email: manager.email }
+                  : null,
+              }
+            : item
+        )
+      );
+    } catch (err) {
+      setMappingError(err.message || "Failed to update city manager mapping.");
+    } finally {
+      setSavingCityId("");
+    }
+  };
+
+  const handleCreateArea = async (event) => {
+    event.preventDefault();
+    if (!newAreaName) {
+      setMappingError("Choose a location from the search results before adding it.");
+      return;
+    }
+    if (newAreaType !== "DISTRICT" && !newAreaParent) {
+      setMappingError("Choose a parent district or city before adding this area.");
+      return;
+    }
+    setMappingError("");
+    setCreatingArea(true);
+    try {
+      const response = await createCityManagerArea({
+        name: newAreaName,
+        type: newAreaType,
+        parent_id: newAreaParent || null,
+      });
+      const parentArea = cityMappings.find((area) => area.id === newAreaParent);
+      setCityMappings((current) =>
+        [...current, { ...response.area, parent: parentArea?.name || null }]
+          .sort((first, second) => first.name.localeCompare(second.name))
+      );
+      setNewAreaName("");
+      setPlaceSearchQuery("");
+      setPlaceSearchResults([]);
+      if (newAreaType === "DISTRICT") {
+        setNewAreaParent(response.area.id);
+        setNewAreaType("CITY");
+      } else if (newAreaType === "CITY") {
+        setNewAreaParent(response.area.id);
+        setNewAreaType("WARD");
+      }
+    } catch (err) {
+      setMappingError(err.message || "Failed to create area mapping.");
+    } finally {
+      setCreatingArea(false);
     }
   };
 
@@ -92,23 +274,66 @@ const AdminManagement = () => {
     }
   };
 
-  const requestDelete = (user) => {
+  const requestDelete = async (user) => {
+    const requestId = ++deletionCheckRef.current;
     setPendingDelete(user);
+    setDeletionDependencies(null);
+    setDeletionDependencyError("");
+    setLoadingDeletionDependencies(true);
+    try {
+      const response = await getUserDeletionDependencies(user._id);
+      if (requestId === deletionCheckRef.current) {
+        setDeletionDependencies(response.dependencies);
+      }
+    } catch (err) {
+      if (requestId === deletionCheckRef.current) {
+        setDeletionDependencyError(err.message || "Unable to check account dependencies.");
+      }
+    } finally {
+      if (requestId === deletionCheckRef.current) {
+        setLoadingDeletionDependencies(false);
+      }
+    }
   };
 
   const cancelDelete = () => {
+    if (deletingUser) return;
+    deletionCheckRef.current += 1;
     setPendingDelete(null);
+    setDeletionDependencies(null);
+    setDeletionDependencyError("");
+    setLoadingDeletionDependencies(false);
   };
 
   const confirmDelete = async () => {
-    if (!pendingDelete) return;
+    if (
+      !pendingDelete ||
+      loadingDeletionDependencies ||
+      deletionDependencyError ||
+      deletionDependencies?.activeAssignments?.length ||
+      deletionDependencies?.managedWorkers ||
+      deletionDependencies?.mappedAreas?.length
+    ) return;
+    setDeletingUser(true);
+    let deleted = false;
     try {
       await deleteUser(pendingDelete._id);
       setUsers((currentUsers) => currentUsers.filter((user) => user._id !== pendingDelete._id));
+      deleted = true;
     } catch (err) {
-      alert("Failed to delete user: " + err.message);
+      const conflictDependencies = err.cause?.response?.data?.dependencies;
+      if (conflictDependencies) {
+        setDeletionDependencies(conflictDependencies);
+        setDeletionDependencyError("");
+      } else {
+        setDeletionDependencyError(err.message || "Failed to delete user.");
+      }
     } finally {
-      setPendingDelete(null);
+      setDeletingUser(false);
+      if (deleted) {
+        setPendingDelete(null);
+        setDeletionDependencies(null);
+      }
     }
   };
 
@@ -144,6 +369,9 @@ const AdminManagement = () => {
     }
     if (!form.password) errs.password = "Password is required";
     else if (form.password.length < 6) errs.password = "Password must be at least 6 characters";
+    if (form.role === "WORKER" && !form.manager_id) {
+      errs.manager_id = "Select the manager whose team this worker will join";
+    }
     return errs;
   };
 
@@ -161,9 +389,9 @@ const AdminManagement = () => {
         name: form.name.trim(),
         email: form.email.trim().toLowerCase(),
         phone: form.phone.trim(),
-        zone: form.zone.trim(),
         password: form.password,
         role: form.role,
+        ...(form.role === "WORKER" ? { manager_id: form.manager_id } : {}),
         status: "ACTIVE", // new accounts are always created as active
       };
       console.log("Submitting new user:", payload);
@@ -275,6 +503,233 @@ const AdminManagement = () => {
 
       </div>
 
+      <section className="city-manager-panel">
+        <div>
+          <h2>City / Area Manager Mapping</h2>
+          <p>
+            Search public place data to build a district-to-city-to-locality hierarchy, then assign
+            managers to the specific areas they serve.
+          </p>
+        </div>
+        {mappingError && <p className="city-manager-error">{mappingError}</p>}
+        <form className="area-mapping-create-form" onSubmit={handleCreateArea}>
+          <div className="area-place-search-field">
+            <label htmlFor="area-place-search">Search Tamil Nadu locations</label>
+            <input
+              id="area-place-search"
+              value={placeSearchQuery}
+              onChange={(event) => {
+                setPlaceSearchQuery(event.target.value);
+                setNewAreaName("");
+                setPlaceSearchResults([]);
+                setPlaceSearchError("");
+                setSearchingPlaces(false);
+              }}
+              placeholder="e.g. Coimbatore or Ukkadam"
+              maxLength={100}
+            />
+            {newAreaName && (
+              <span className="selected-area-name">Selected: {newAreaName}</span>
+            )}
+            {searchingPlaces && <span className="area-place-search-note">Searching places...</span>}
+            {placeSearchError && (
+              <span className="area-place-search-error">{placeSearchError}</span>
+            )}
+            {placeSearchResults.length > 0 && (
+              <div className="area-place-search-results">
+                {placeSearchResults.map((place) => (
+                  <button
+                    key={`${place.osmType}-${place.osmId}-${place.name}`}
+                    type="button"
+                    onClick={() => {
+                      setNewAreaName(place.name);
+                      setPlaceSearchQuery("");
+                      setPlaceSearchResults([]);
+                    }}
+                  >
+                    <strong>{place.name}</strong>
+                    <small>{place.displayName}</small>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <label>
+            Area level
+            <select
+              value={newAreaType}
+              onChange={(event) => {
+                const type = event.target.value;
+                setNewAreaType(type);
+                setNewAreaName("");
+                setPlaceSearchQuery("");
+                setPlaceSearchResults([]);
+                setPlaceSearchError("");
+                setSearchingPlaces(false);
+                if (type === "DISTRICT") setNewAreaParent("");
+              }}
+            >
+              <option value="DISTRICT">District</option>
+              <option value="CITY">City</option>
+              <option value="WARD">Locality / Ward</option>
+              <option value="ZONE">Zone</option>
+            </select>
+          </label>
+          <label>
+            Parent district / city
+            <select
+              value={newAreaParent}
+              disabled={newAreaType === "DISTRICT"}
+              required={newAreaType !== "DISTRICT"}
+              onChange={(event) => {
+                setNewAreaParent(event.target.value);
+                setNewAreaName("");
+                setPlaceSearchQuery("");
+                setPlaceSearchResults([]);
+                setPlaceSearchError("");
+                setSearchingPlaces(false);
+              }}
+            >
+              <option value="">Select parent area</option>
+              {cityMappings
+                .filter((area) => ["CITY", "DISTRICT", "ZONE"].includes(area.type))
+                .map((area) => (
+                  <option key={area.id} value={area.id}>
+                    {area.name} ({area.type})
+                  </option>
+                ))}
+            </select>
+          </label>
+          <button type="submit" disabled={creatingArea || !newAreaName}>
+            {creatingArea ? "Adding..." : "Add area"}
+          </button>
+        </form>
+        <p className="area-hierarchy-hint">
+          Add a district first, then select it as the parent to search its cities. Add a city next
+          to search its localities. Workers remain on their manager&apos;s team.
+        </p>
+        {cityMappings.length === 0 ? (
+          <p className="city-manager-empty">
+            No cities or localities are configured yet. Add one above to create manager routing.
+          </p>
+        ) : (
+          <div className="city-manager-table-wrap">
+            <table className="city-manager-table">
+              <thead>
+                <tr>
+                  <th>Area</th>
+                  <th>Level</th>
+                  <th>Parent</th>
+                  <th>Manager</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cityMappings.map((area) => (
+                  <tr key={area.id}>
+                    <td>{area.name}</td>
+                    <td>{area.type}</td>
+                    <td>{area.parent || "—"}</td>
+                    <td>
+                      <select
+                        value={area.manager?.id || ""}
+                        disabled={savingCityId === area.id}
+                        onChange={(event) =>
+                          handleCityManagerChange(area, event.target.value)
+                        }
+                        aria-label={`Manager for ${area.name}`}
+                      >
+                        <option value="">Use parent area's manager</option>
+                        {users
+                          .filter(
+                            (user) =>
+                              user.role === "MANAGER" && user.status === "ACTIVE"
+                          )
+                          .map((manager) => (
+                            <option key={manager._id} value={manager._id}>
+                              {manager.name} ({manager.email})
+                            </option>
+                          ))}
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="city-manager-panel routing-queue-panel">
+        <div>
+          <h2>Complaints Awaiting Admin Routing</h2>
+          <p>
+            Submissions received before area boundaries are configured appear here.
+            Select an active manager to place each complaint in their work queue.
+          </p>
+        </div>
+        {routingError && <p className="city-manager-error">{routingError}</p>}
+        {routingComplaints.length === 0 ? (
+          <p className="city-manager-empty">
+            No complaints are waiting for administrator routing.
+          </p>
+        ) : (
+          <div className="routing-queue-list">
+            {routingComplaints.map((complaint) => (
+              <article className="routing-queue-item" key={complaint.id}>
+                <div className="routing-queue-details">
+                  <strong>{complaint.title} · {complaint.code}</strong>
+                  <span>{complaint.address}</span>
+                  <span>
+                    {[complaint.locality, complaint.city, complaint.state]
+                      .filter(Boolean)
+                      .join(", ") || "Location area not resolved"}
+                  </span>
+                  <span>
+                    {complaint.latitude}, {complaint.longitude}
+                    {complaint.area ? ` · ${complaint.area}` : ""}
+                  </span>
+                  {complaint.navigationUrl && (
+                    <a href={complaint.navigationUrl} target="_blank" rel="noreferrer">
+                      Open exact pin in Maps
+                    </a>
+                  )}
+                </div>
+                <div className="routing-queue-actions">
+                  <select
+                    value={routingSelections[complaint.id] || ""}
+                    onChange={(event) =>
+                      setRoutingSelections((current) => ({
+                        ...current,
+                        [complaint.id]: event.target.value,
+                      }))
+                    }
+                    aria-label={`Manager for complaint ${complaint.code}`}
+                  >
+                    <option value="">Select manager</option>
+                    {users
+                      .filter(
+                        (user) =>
+                          user.role === "MANAGER" && user.status === "ACTIVE"
+                      )
+                      .map((manager) => (
+                        <option key={manager._id} value={manager._id}>
+                          {manager.name}
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={savingComplaintId === complaint.id}
+                    onClick={() => handleRouteComplaint(complaint.id)}
+                  >
+                    {savingComplaintId === complaint.id ? "Routing..." : "Route"}
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* ================= MANAGEMENT PANEL ================= */}
       <div className="admin-management-panel">
@@ -501,18 +956,6 @@ const AdminManagement = () => {
                   {formErrors.phone && <span className="admin-field-error">{formErrors.phone}</span>}
                 </div>
 
-                <div className="admin-form-field">
-                  <label htmlFor="add-zone">Zone</label>
-                  <input
-                    id="add-zone"
-                    type="text"
-                    name="zone"
-                    value={form.zone}
-                    onChange={handleFormChange}
-                    placeholder="Optional"
-                  />
-                </div>
-
                 <div className="admin-form-field full">
                   <label htmlFor="add-password">Password <em>*</em></label>
                   <div className="admin-password-wrap">
@@ -552,7 +995,13 @@ const AdminManagement = () => {
                           role="radio"
                           aria-checked={selected}
                           className={`admin-role-chip ${meta.tone}${selected ? " selected" : ""}`}
-                          onClick={() => setForm((prev) => ({ ...prev, role: opt.key }))}
+                          onClick={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              role: opt.key,
+                              manager_id: opt.key === "WORKER" ? prev.manager_id : "",
+                            }))
+                          }
                         >
                           <ChipIcon size={13} strokeWidth={2.2} />
                           {opt.label}
@@ -561,6 +1010,33 @@ const AdminManagement = () => {
                     })}
                   </div>
                 </div>
+
+                {form.role === "WORKER" && (
+                  <div className="admin-form-field full">
+                    <label htmlFor="add-worker-manager">Manager team <em>*</em></label>
+                    <select
+                      id="add-worker-manager"
+                      name="manager_id"
+                      value={form.manager_id}
+                      onChange={handleFormChange}
+                      className={formErrors.manager_id ? "invalid" : ""}
+                    >
+                      <option value="">Select an active manager</option>
+                      {users
+                        .filter(
+                          (user) => user.role === "MANAGER" && user.status === "ACTIVE"
+                        )
+                        .map((manager) => (
+                          <option key={manager._id} value={manager._id}>
+                            {manager.name} ({manager.email})
+                          </option>
+                        ))}
+                    </select>
+                    {formErrors.manager_id && (
+                      <span className="admin-field-error">{formErrors.manager_id}</span>
+                    )}
+                  </div>
+                )}
 
               </div>
 
@@ -593,7 +1069,7 @@ const AdminManagement = () => {
         <div className="admin-modal-overlay" onClick={cancelDelete}>
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
 
-            <button className="admin-modal-close" onClick={cancelDelete}>
+            <button className="admin-modal-close" onClick={cancelDelete} disabled={deletingUser}>
               <X size={16} strokeWidth={2} />
             </button>
 
@@ -607,13 +1083,73 @@ const AdminManagement = () => {
               ({pendingDelete.email}) from the portal. This action can't be undone.
             </p>
 
+            {loadingDeletionDependencies && (
+              <p className="deletion-dependency-note">Checking active work and mappings...</p>
+            )}
+            {deletionDependencyError && (
+              <p className="deletion-dependency-error">{deletionDependencyError}</p>
+            )}
+            {deletionDependencies && (
+              <div className="deletion-dependency-list">
+                {deletionDependencies.activeAssignments?.length > 0 && (
+                  <>
+                    <strong>This account is linked to active work:</strong>
+                    {deletionDependencies.activeAssignments.map((assignment, index) => (
+                      <div key={assignment._id || `${assignment.complaint_id?._id}-${index}`}>
+                        {assignment.worker_id?.employee_code
+                          ? `${assignment.worker_id.employee_code}: `
+                          : ""}
+                        {assignment.complaint_id?.complaint_code || "Complaint"} —{" "}
+                        {assignment.complaint_id?.title || "Untitled complaint"} (
+                        {assignment.status})
+                      </div>
+                    ))}
+                  </>
+                )}
+                {deletionDependencies.managedWorkers > 0 && (
+                  <div>Manages {deletionDependencies.managedWorkers} worker(s).</div>
+                )}
+                {deletionDependencies.mappedAreas?.length > 0 && (
+                  <div>
+                    Manager for: {deletionDependencies.mappedAreas.map((area) => area.name).join(", ")}.
+                  </div>
+                )}
+                {!deletionDependencies.activeAssignments?.length &&
+                  !deletionDependencies.managedWorkers &&
+                  !deletionDependencies.mappedAreas?.length && (
+                    <span>No active work or manager mappings found.</span>
+                  )}
+                {(deletionDependencies.activeAssignments?.length > 0 ||
+                  deletionDependencies.managedWorkers > 0 ||
+                  deletionDependencies.mappedAreas?.length > 0) && (
+                  <span>Reassign or resolve these dependencies before deleting this account.</span>
+                )}
+              </div>
+            )}
+
             <div className="admin-modal-actions">
-              <button className="admin-modal-btn cancel" onClick={cancelDelete}>
+              <button
+                className="admin-modal-btn cancel"
+                onClick={cancelDelete}
+                disabled={deletingUser}
+              >
                 Cancel
               </button>
-              <button className="admin-modal-btn confirm" onClick={confirmDelete}>
+              <button
+                className="admin-modal-btn confirm"
+                onClick={confirmDelete}
+                disabled={
+                  loadingDeletionDependencies ||
+                  Boolean(deletionDependencyError) ||
+                  !deletionDependencies ||
+                  Boolean(deletionDependencies.activeAssignments?.length) ||
+                  Boolean(deletionDependencies.managedWorkers) ||
+                  Boolean(deletionDependencies.mappedAreas?.length) ||
+                  deletingUser
+                }
+              >
                 <Trash2 size={14} strokeWidth={2} />
-                Remove Account
+                {deletingUser ? "Removing..." : "Remove Account"}
               </button>
             </div>
 

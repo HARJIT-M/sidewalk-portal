@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   getManagerComplaints,
   getAvailableWorkers,
@@ -10,10 +10,17 @@ import "./new_complaint.css";
 
 const PRIORITY_LEVELS = ["Not Set", "Low", "Medium", "High", "Critical"];
 const STATUS_FLOW = ["Not Assigned", "Assigned", "In Progress", "Completed"];
+const toDateInputValue = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const Complaints = () => {
   const [complaints, setComplaints] = useState([]);
   const [availableWorkers, setAvailableWorkers] = useState([]);
+  const [loadingWorkers, setLoadingWorkers] = useState(false);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -30,39 +37,68 @@ const Complaints = () => {
   const [statusFilter, setStatusFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      setErrorMsg("");
-      const [compRes, workRes] = await Promise.all([
-        getManagerComplaints(),
-        getAvailableWorkers(),
-      ]);
-
-      if (compRes && compRes.success) {
+  const loadData = () => {
+    Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        setErrorMsg("");
+        return getManagerComplaints();
+      })
+      .then((compRes) => {
+        if (!compRes?.success) {
+          throw new Error(compRes?.message || "Server returned no complaints.");
+        }
         setComplaints(compRes.complaints || []);
-      }
-      if (workRes && workRes.success) {
-        const formattedWorkers = (workRes.workers || []).map((w) => ({
-          id: w.workerId || w._id || w.id,
-          employeeCode: w.employeeCode || w.employee_code || w.id,
-          name: w.name,
-          role: w.role || "Maintenance Worker",
-          phone: w.phone,
-        }));
-        setAvailableWorkers(formattedWorkers);
-      }
-    } catch (err) {
-      console.error("Error loading complaints data:", err);
-      setErrorMsg(err.message || "Failed to load complaints.");
-    } finally {
-      setLoading(false);
-    }
+      })
+      .catch((err) => {
+        console.error("Error loading complaints data:", err);
+        setErrorMsg(err.message || "Failed to load complaints.");
+      })
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (!showAssignPopup || !startDate || !endDate) {
+      return undefined;
+    }
+
+    let isCurrentRequest = true;
+    Promise.resolve()
+      .then(() => {
+        if (!isCurrentRequest) return null;
+        setLoadingWorkers(true);
+        return getAvailableWorkers({ startDate, endDate });
+      })
+      .then((res) => {
+        if (!isCurrentRequest || !res) return;
+        setAvailableWorkers(
+          (res.workers || []).map((worker) => ({
+            id: worker.workerId,
+            employeeCode: worker.employeeCode,
+            name: worker.name,
+            role: worker.role || "Maintenance Worker",
+            team: worker.team || "Assigned Team",
+            phone: worker.phone || "",
+          }))
+        );
+      })
+      .catch((err) => {
+        if (!isCurrentRequest) return;
+        setAvailableWorkers([]);
+        setErrorMsg(err.message || "Failed to load available workers.");
+      })
+      .finally(() => {
+        if (isCurrentRequest) setLoadingWorkers(false);
+      });
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [showAssignPopup, startDate, endDate]);
 
   const filteredComplaints = complaints.filter((complaint) => {
     const q = search.toLowerCase();
@@ -70,6 +106,8 @@ const Complaints = () => {
       (complaint.id && complaint.id.toLowerCase().includes(q)) ||
       (complaint.title && complaint.title.toLowerCase().includes(q)) ||
       (complaint.location && complaint.location.toLowerCase().includes(q)) ||
+      (complaint.city && complaint.city.toLowerCase().includes(q)) ||
+      (complaint.locality && complaint.locality.toLowerCase().includes(q)) ||
       (complaint.reportedBy && complaint.reportedBy.toLowerCase().includes(q));
 
     const matchesStatus =
@@ -129,22 +167,32 @@ const Complaints = () => {
       return;
     }
     setSelectedComplaint(complaint);
-    setSelectedWorkers(complaint.assignedWorkers || []);
-    setStartDate(complaint.workStartDate ? complaint.workStartDate.split("T")[0] : "");
-    setEndDate(complaint.workEndDate ? complaint.workEndDate.split("T")[0] : "");
+    setSelectedWorkers([]);
+    const start = complaint.workStartDate
+      ? complaint.workStartDate.split("T")[0]
+      : toDateInputValue(new Date());
+    setStartDate(start);
+    setEndDate(
+      complaint.workEndDate ? complaint.workEndDate.split("T")[0] : start
+    );
     setShowAssignPopup(true);
   };
 
-  const toggleWorker = (workerName) => {
-    if (selectedWorkers.includes(workerName)) {
-      setSelectedWorkers(selectedWorkers.filter((w) => w !== workerName));
+  const toggleWorker = (workerId) => {
+    if (selectedWorkers.includes(workerId)) {
+      setSelectedWorkers(selectedWorkers.filter((id) => id !== workerId));
     } else {
       if (selectedWorkers.length >= 3) {
         alert("You can assign a maximum of 3 workers.");
         return;
       }
-      setSelectedWorkers([...selectedWorkers, workerName]);
+      setSelectedWorkers([...selectedWorkers, workerId]);
     }
+  };
+
+  const updateScheduleDate = (setter, value) => {
+    setSelectedWorkers([]);
+    setter(value);
   };
 
   const handleAssignWorkers = async () => {
@@ -178,7 +226,10 @@ const Complaints = () => {
             c.id === selectedComplaint.id
               ? {
                   ...c,
-                  assignedWorkers: selectedWorkers,
+                  assignedWorkerIds: selectedWorkers,
+                  assignedWorkers: availableWorkers
+                    .filter((worker) => selectedWorkers.includes(worker.id))
+                    .map((worker) => worker.name),
                   status: "Assigned",
                   workStartDate: startDate,
                   workEndDate: endDate,
@@ -189,7 +240,10 @@ const Complaints = () => {
 
         setSelectedComplaint((prev) => ({
           ...prev,
-          assignedWorkers: selectedWorkers,
+          assignedWorkerIds: selectedWorkers,
+          assignedWorkers: availableWorkers
+            .filter((worker) => selectedWorkers.includes(worker.id))
+            .map((worker) => worker.name),
           status: "Assigned",
           workStartDate: startDate,
           workEndDate: endDate,
@@ -338,154 +392,129 @@ const Complaints = () => {
         </button>
       </div>
 
-      {/* ================= COMPLAINT TABLE ================= */}
-      <div className="complaints-card">
-        <div className="table-wrapper">
-          <table className="complaints-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Complaint</th>
-                <th>Location</th>
-                <th>Reported By</th>
-                <th>Date</th>
-                <th>Priority</th>
-                <th>Status</th>
-                <th>Timeline</th>
-                <th>Assigned Team</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan="10" style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
-                    Loading complaints from database...
-                  </td>
-                </tr>
-              ) : filteredComplaints.length === 0 ? (
-                <tr>
-                  <td colSpan="10" style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
-                    No complaints match the filter criteria.
-                  </td>
-                </tr>
-              ) : (
-                filteredComplaints.map((complaint) => {
-                  const overdue = getOverdueInfo(complaint);
-
-                  return (
-                    <tr key={complaint.id || complaint.mongoId}>
-                      <td>
-                        <span className="complaint-id">{complaint.id}</span>
-                      </td>
-
-                      <td>
-                        <strong>{complaint.title}</strong>
-                      </td>
-
-                      <td>
-                        <span className="location-text">
-                          📍 {complaint.location}
-                        </span>
-                      </td>
-
-                      <td>{complaint.reportedBy || "Citizen"}</td>
-                      <td>{complaint.date}</td>
-
-                      {/* PRIORITY DROPDOWN */}
-                      <td>
-                        <select
-                          className={`priority-select ${priorityClass(
-                            complaint.priority
-                          )}`}
-                          value={complaint.priority || "Not Set"}
-                          onChange={(e) =>
-                            handlePriorityChange(complaint.id, e.target.value)
-                          }
-                        >
-                          {PRIORITY_LEVELS.map((p) => (
-                            <option key={p} value={p}>
-                              {p}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-
-                      <td>
-                        <span
-                          className={`status-badge ${statusClass(
-                            complaint.status
-                          )}`}
-                        >
-                          {complaint.status}
-                        </span>
-                      </td>
-
-                      {/* TIMELINE */}
-                      <td>
-                        {complaint.workStartDate ? (
-                          <div className="timeline-cell">
-                            <span className="timeline-text">
-                              {formatDate(complaint.workStartDate)} →{" "}
-                              {formatDate(complaint.workEndDate)}
-                            </span>
-                            {overdue && (
-                              <span className={`overdue-badge ${overdue.type}`}>
-                                {overdue.label}
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="not-assigned">—</span>
-                        )}
-                      </td>
-
-                      <td>
-                        {!complaint.assignedWorkers || complaint.assignedWorkers.length === 0 ? (
-                          <span className="not-assigned">Not Assigned</span>
-                        ) : (
-                          <div className="team-names">
-                            {complaint.assignedWorkers.map((worker) => (
-                              <span key={worker}>{worker}</span>
-                            ))}
-                          </div>
-                        )}
-                      </td>
-
-                      <td>
-                        <div className="action-buttons">
-                          <button
-                            className="details-btn"
-                            onClick={() => handleViewDetails(complaint)}
-                          >
-                            View
-                          </button>
-
-                          {(complaint.status === "Not Assigned" || complaint.status === "Pending") && (
-                            <button
-                              className="assign-btn"
-                              disabled={complaint.priority === "Not Set"}
-                              title={
-                                complaint.priority === "Not Set"
-                                  ? "Set priority first"
-                                  : ""
-                              }
-                              onClick={() => handleOpenAssign(complaint)}
-                            >
-                              Assign
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+      {/* ================= COMPLAINT CARDS ================= */}
+      {loading ? (
+        <div className="manager-complaints-state">Loading city complaints…</div>
+      ) : filteredComplaints.length === 0 ? (
+        <div className="manager-complaints-state">
+          No complaints match the selected filters.
         </div>
-      </div>
+      ) : (
+        <div className="manager-complaint-grid">
+          {filteredComplaints.map((complaint) => {
+            const overdue = getOverdueInfo(complaint);
+            const canAssign =
+              complaint.status === "Not Assigned" ||
+              complaint.status === "Pending";
+
+            return (
+              <article
+                className="manager-complaint-card"
+                key={complaint.id || complaint.mongoId}
+              >
+                {complaint.image && (
+                  <img
+                    className="manager-complaint-image"
+                    src={complaint.image}
+                    alt={`Reported issue: ${complaint.title}`}
+                  />
+                )}
+                <div className="manager-complaint-content">
+                  <div className="manager-complaint-topline">
+                    <span className="complaint-id">{complaint.id}</span>
+                    <span className={`status-badge ${statusClass(complaint.status)}`}>
+                      {complaint.status}
+                    </span>
+                  </div>
+
+                  <h2>{complaint.title}</h2>
+                  <p className="manager-complaint-location">
+                    📍 {complaint.location}
+                    {(complaint.locality || complaint.city) &&
+                      ` · ${[complaint.locality, complaint.city]
+                        .filter(Boolean)
+                        .join(", ")}`}
+                  </p>
+
+                  <div className="manager-complaint-meta">
+                    <span>Reported by {complaint.reportedBy || "Citizen"}</span>
+                    <span>{complaint.date}</span>
+                  </div>
+
+                  <div className="manager-complaint-controls">
+                    <label>
+                      Priority
+                      <select
+                        className={`priority-select ${priorityClass(complaint.priority)}`}
+                        value={complaint.priority || "Not Set"}
+                        onChange={(event) =>
+                          handlePriorityChange(complaint.id, event.target.value)
+                        }
+                      >
+                        {PRIORITY_LEVELS.map((priority) => (
+                          <option key={priority} value={priority}>
+                            {priority}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="manager-complaint-schedule">
+                      <strong>
+                        {complaint.workStartDate
+                          ? `${formatDate(complaint.workStartDate)} → ${formatDate(
+                              complaint.workEndDate
+                            )}`
+                          : "Not scheduled"}
+                      </strong>
+                      {overdue && (
+                        <span className={`overdue-badge ${overdue.type}`}>
+                          {overdue.label}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="manager-complaint-team">
+                    <strong>Assigned team</strong>
+                    {complaint.assignedWorkers?.length ? (
+                      <div className="team-names">
+                        {complaint.assignedWorkers.map((worker) => (
+                          <span key={worker}>{worker}</span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="not-assigned">Not assigned</span>
+                    )}
+                  </div>
+
+                  <div className="manager-complaint-actions">
+                    <button
+                      className="details-btn"
+                      onClick={() => handleViewDetails(complaint)}
+                    >
+                      View complaint
+                    </button>
+                    {canAssign && (
+                      <button
+                        className="assign-btn"
+                        disabled={complaint.priority === "Not Set"}
+                        title={
+                          complaint.priority === "Not Set"
+                            ? "Set priority first"
+                            : ""
+                        }
+                        onClick={() => handleOpenAssign(complaint)}
+                      >
+                        Assign workers
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
 
       {/* ================================================= */}
       {/* COMPLAINT DETAILS POPUP */}
@@ -564,6 +593,22 @@ const Complaints = () => {
                   <div>
                     <span>Location</span>
                     <strong>{selectedComplaint.location}</strong>
+                    {(selectedComplaint.locality || selectedComplaint.city) && (
+                      <small>
+                        {[selectedComplaint.locality, selectedComplaint.city]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </small>
+                    )}
+                    {selectedComplaint.navigationUrl && (
+                      <a
+                        href={selectedComplaint.navigationUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open exact pin in Maps
+                      </a>
+                    )}
                   </div>
                 </div>
 
@@ -700,7 +745,7 @@ const Complaints = () => {
                   <input
                     type="date"
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                    onChange={(e) => updateScheduleDate(setStartDate, e.target.value)}
                   />
                 </div>
 
@@ -710,7 +755,7 @@ const Complaints = () => {
                     type="date"
                     value={endDate}
                     min={startDate || undefined}
-                    onChange={(e) => setEndDate(e.target.value)}
+                    onChange={(e) => updateScheduleDate(setEndDate, e.target.value)}
                   />
                 </div>
               </div>
@@ -732,22 +777,29 @@ const Complaints = () => {
               </div>
 
               <div className="workers-list">
-                {availableWorkers.length === 0 ? (
+                {loadingWorkers ? (
                   <p style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>
-                    No available workers found in this zone. Add workers from the Workers tab.
+                    Checking team availability for these dates...
+                  </p>
+                ) : !startDate || !endDate ? (
+                  <p style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>
+                    Select a valid work date range to check availability.
+                  </p>
+                ) : availableWorkers.length === 0 ? (
+                  <p style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>
+                    No available workers in your team for the selected dates.
                   </p>
                 ) : (
                   availableWorkers.map((worker) => {
-                    const identifier = worker.employeeCode || worker.name;
-                    const isSelected = selectedWorkers.includes(identifier) || selectedWorkers.includes(worker.name);
+                    const isSelected = selectedWorkers.includes(worker.id);
 
                     return (
                       <div
-                        key={worker.id || worker.employeeCode}
+                        key={worker.id}
                         className={`worker-option ${
                           isSelected ? "selected" : ""
                         }`}
-                        onClick={() => toggleWorker(identifier)}
+                        onClick={() => toggleWorker(worker.id)}
                       >
                         <div className="worker-avatar-small">
                           {worker.name.charAt(0)}
@@ -755,7 +807,9 @@ const Complaints = () => {
 
                         <div className="worker-details">
                           <strong>{worker.name} ({worker.employeeCode || "WRK"})</strong>
-                          <span>{worker.role} • {worker.phone}</span>
+                          <span>
+                            {worker.team} • {worker.role} • {worker.phone}
+                          </span>
                         </div>
 
                         <div className="worker-checkbox">

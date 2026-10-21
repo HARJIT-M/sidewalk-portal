@@ -138,11 +138,11 @@ const seedDatabase = async () => {
     console.log("Creating Worker Profiles...");
     const worker1 = await Worker.create({
       user_id: workerUser1._id,
+      manager_id: managerUser._id,
       employee_code: "WRK001",
       worker_role: "Maintenance Worker",
       availability_status: "ACTIVE",
       shift: "Day Shift (08:00 AM - 05:00 PM)",
-      zone: "Zone 2 - Gandhipuram Central",
       emergency_contact: "9876543219",
       address: "42 Cross Road, Gandhipuram, Coimbatore - 641012",
       skills: [
@@ -160,11 +160,11 @@ const seedDatabase = async () => {
 
     const worker2 = await Worker.create({
       user_id: workerUser2._id,
+      manager_id: managerUser._id,
       employee_code: "WRK002",
       worker_role: "Maintenance Worker",
       availability_status: "ACTIVE",
       shift: "Day Shift (08:00 AM - 05:00 PM)",
-      zone: "Zone 1 - RS Puram",
       emergency_contact: "9876543220",
       address: "15 DB Road, RS Puram, Coimbatore",
       skills: ["Pothole Repair", "Kerbstone Alignment"],
@@ -176,11 +176,11 @@ const seedDatabase = async () => {
 
     const worker3 = await Worker.create({
       user_id: workerUser3._id,
+      manager_id: managerUser._id,
       employee_code: "WRK003",
       worker_role: "Maintenance Worker",
       availability_status: "ACTIVE",
       shift: "Day Shift (08:00 AM - 05:00 PM)",
-      zone: "Zone 3 - Peelamedu",
       emergency_contact: "9876543221",
       address: "88 Avinashi Road, Peelamedu, Coimbatore",
       skills: ["Footpath Tile Paving", "Drainage Slab Repair"],
@@ -192,11 +192,11 @@ const seedDatabase = async () => {
 
     const worker4 = await Worker.create({
       user_id: workerUser4._id,
+      manager_id: managerUser._id,
       employee_code: "WRK004",
       worker_role: "Maintenance Worker",
       availability_status: "INACTIVE",
       shift: "Night Shift (10:00 PM - 06:00 AM)",
-      zone: "Zone 4 - Town Hall",
       emergency_contact: "9876543222",
       address: "10 Oppanakara Street, Coimbatore",
       skills: ["Asphalt Patching"],
@@ -208,11 +208,11 @@ const seedDatabase = async () => {
 
     const worker5 = await Worker.create({
       user_id: workerUser5._id,
+      manager_id: managerUser._id,
       employee_code: "WRK005",
       worker_role: "Maintenance Worker",
       availability_status: "ACTIVE",
       shift: "Day Shift (08:00 AM - 05:00 PM)",
-      zone: "Zone 2 - Gandhipuram Central",
       emergency_contact: "9876543223",
       address: "100 Feet Road, Gandhipuram, Coimbatore",
       skills: ["Concrete Crack Sealing", "Kerbstone Alignment"],
@@ -224,11 +224,11 @@ const seedDatabase = async () => {
 
     const worker6 = await Worker.create({
       user_id: workerUser6._id,
+      manager_id: managerUser._id,
       employee_code: "WRK006",
       worker_role: "Maintenance Worker",
       availability_status: "ACTIVE",
       shift: "Day Shift (08:00 AM - 05:00 PM)",
-      zone: "Zone 5 - Saibaba Colony",
       emergency_contact: "9876543224",
       address: "4 NSR Road, Saibaba Colony, Coimbatore",
       skills: ["Footpath Tile Paving"],
@@ -470,6 +470,8 @@ const seedDatabase = async () => {
       worker_id: worker1._id,
       assigned_by: managerUser._id,
       assigned_at: new Date("2026-08-22T10:00:00Z"),
+      scheduled_start_at: new Date("2026-08-22T00:00:00Z"),
+      scheduled_end_at: new Date("2026-08-23T23:59:59.999Z"),
       started_at: new Date("2026-08-22T11:30:00Z"),
       status: "IN_PROGRESS",
       remarks: "High priority pedestrian corridor. Cones placed.",
@@ -480,6 +482,8 @@ const seedDatabase = async () => {
       worker_id: worker4._id,
       assigned_by: managerUser._id,
       assigned_at: new Date("2026-08-20T12:00:00Z"),
+      scheduled_start_at: new Date("2026-08-21T00:00:00Z"),
+      scheduled_end_at: new Date("2026-08-22T23:59:59.999Z"),
       started_at: new Date("2026-08-21T09:00:00Z"),
       status: "IN_PROGRESS",
       remarks: "Drain water pumped out. Filling aggregate.",
@@ -490,6 +494,8 @@ const seedDatabase = async () => {
       worker_id: worker1._id,
       assigned_by: managerUser._id,
       assigned_at: new Date("2026-08-24T09:00:00Z"),
+      scheduled_start_at: new Date("2026-08-24T00:00:00Z"),
+      scheduled_end_at: new Date("2026-08-25T23:59:59.999Z"),
       status: "ASSIGNED",
       remarks: "Urgent: Near primary school.",
     });
@@ -499,6 +505,8 @@ const seedDatabase = async () => {
       worker_id: worker1._id,
       assigned_by: managerUser._id,
       assigned_at: new Date("2026-08-22T10:15:00Z"),
+      scheduled_start_at: new Date("2026-08-23T00:00:00Z"),
+      scheduled_end_at: new Date("2026-08-24T23:59:59.999Z"),
       started_at: new Date("2026-08-23T08:45:00Z"),
       status: "IN_PROGRESS",
       remarks: "Curb ramp realignment in progress.",
@@ -509,6 +517,8 @@ const seedDatabase = async () => {
       worker_id: worker1._id,
       assigned_by: managerUser._id,
       assigned_at: new Date("2026-08-25T08:30:00Z"),
+      scheduled_start_at: new Date("2026-08-25T00:00:00Z"),
+      scheduled_end_at: new Date("2026-08-26T23:59:59.999Z"),
       status: "ASSIGNED",
       remarks: "Tactile pavers requisitioned from depot.",
     });
@@ -518,6 +528,8 @@ const seedDatabase = async () => {
       worker_id: worker1._id,
       assigned_by: managerUser._id,
       assigned_at: new Date("2026-08-19T09:30:00Z"),
+      scheduled_start_at: new Date("2026-08-19T00:00:00Z"),
+      scheduled_end_at: new Date("2026-08-20T23:59:59.999Z"),
       started_at: new Date("2026-08-19T11:00:00Z"),
       completed_at: new Date("2026-08-20T16:30:00Z"),
       status: "COMPLETED",

@@ -21,6 +21,12 @@ const assignmentSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    scheduled_start_at: {
+      type: Date,
+    },
+    scheduled_end_at: {
+      type: Date,
+    },
     started_at: {
       type: Date,
     },
@@ -42,7 +48,21 @@ const assignmentSchema = new mongoose.Schema(
   }
 );
 
-// Compound index to prevent duplicate assignment of the same worker to the same complaint
-assignmentSchema.index({ complaint_id: 1, worker_id: 1 }, { unique: true });
+assignmentSchema.index(
+  { complaint_id: 1, worker_id: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status: { $in: ["ASSIGNED", "IN_PROGRESS"] },
+    },
+  }
+);
+assignmentSchema.index({ worker_id: 1, status: 1 });
+assignmentSchema.index({
+  worker_id: 1,
+  status: 1,
+  scheduled_start_at: 1,
+  scheduled_end_at: 1,
+});
 
 module.exports = mongoose.model("Assignment", assignmentSchema);

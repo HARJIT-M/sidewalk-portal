@@ -1,4 +1,4 @@
-const { User, Worker, Complaint } = require("../schemas");
+const { User, Worker, Complaint, Area } = require("../schemas");
 
 // ==========================================
 // 1. GET MANAGER PROFILE
@@ -14,10 +14,25 @@ const getManagerProfile = async (req, res) => {
       });
     }
 
-    const [totalWorkers, totalComplaints, activeRepairs] = await Promise.all([
-      Worker.countDocuments({ availability_status: "ACTIVE" }),
-      Complaint.countDocuments(),
-      Complaint.countDocuments({ status: "IN_PROGRESS" }),
+    const [totalWorkers, totalComplaints, activeRepairs, managerArea, latestComplaint] = await Promise.all([
+      Worker.countDocuments({
+        manager_id: req.user._id,
+        availability_status: "ACTIVE",
+      }),
+      Complaint.countDocuments({ manager_id: req.user._id }),
+      Complaint.countDocuments({
+        manager_id: req.user._id,
+        status: "IN_PROGRESS",
+      }),
+      Area.findOne({ manager_id: req.user._id, active: true })
+        .sort({ type: 1 })
+        .select("name type"),
+      Complaint.findOne({
+        manager_id: req.user._id,
+        city: { $exists: true, $ne: "" },
+      })
+        .sort({ reported_at: -1 })
+        .select("city"),
     ]);
 
     return res.status(200).json({
@@ -29,8 +44,11 @@ const getManagerProfile = async (req, res) => {
         phone: managerUser.phone || "+91 98765 43200",
         role: managerUser.role,
         status: managerUser.status,
-        city: "Coimbatore",
-        zone: "Central Municipal Zone",
+        city:
+          managerArea?.type === "CITY"
+            ? managerArea.name
+            : latestComplaint?.city || managerArea?.name || "",
+        zone: managerArea?.type === "CITY" ? "" : managerArea?.name || "",
         stats: {
           activeWorkers: totalWorkers,
           totalComplaints,

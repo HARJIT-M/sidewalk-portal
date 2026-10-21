@@ -6,6 +6,7 @@ const Assignment = require("./Assignment");
 const StatusHistory = require("./StatusHistory");
 const RepairHistory = require("./RepairHistory");
 const Notification = require("./Notification");
+const Area = require("./Area");
 
 module.exports = {
   User,
@@ -16,4 +17,5 @@ module.exports = {
   StatusHistory,
   RepairHistory,
   Notification,
+  Area,
 };

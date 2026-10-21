@@ -1,6 +1,54 @@
-const User = require("../schemas/User");
-const Complaint = require("../schemas/Complaint");
+const {
+  User,
+  Complaint,
+  Worker,
+  Assignment,
+  Area,
+} = require("../schemas");
+const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+
+const getUserDeletionDependencies = async (userId) => {
+  const user = await User.findById(userId).select("role");
+  if (!user) return null;
+
+  const dependencies = {
+    activeAssignments: [],
+    managedWorkers: 0,
+    mappedAreas: [],
+  };
+
+  if (user.role === "WORKER") {
+    const worker = await Worker.findOne({ user_id: userId }).select("_id");
+    if (worker) {
+      dependencies.activeAssignments = await Assignment.find({
+        worker_id: worker._id,
+        status: { $in: ["ASSIGNED", "IN_PROGRESS"] },
+      })
+        .populate("complaint_id", "complaint_code title locality city")
+        .select("status scheduled_start_at scheduled_end_at complaint_id")
+        .lean();
+    }
+  }
+
+  if (user.role === "MANAGER") {
+    const workerIds = await Worker.find({ manager_id: userId }).distinct("_id");
+    dependencies.managedWorkers = workerIds.length;
+    dependencies.activeAssignments = await Assignment.find({
+      worker_id: { $in: workerIds },
+      status: { $in: ["ASSIGNED", "IN_PROGRESS"] },
+    })
+      .populate("worker_id", "employee_code")
+      .populate("complaint_id", "complaint_code title locality city")
+      .select("status worker_id complaint_id")
+      .lean();
+    dependencies.mappedAreas = await Area.find({ manager_id: userId, active: true })
+      .select("name")
+      .lean();
+  }
+
+  return dependencies;
+};
 // @desc    Get dashboard statistics
 // @route   GET /api/admin/dashboard
 // @access  Private (Admin)
@@ -113,6 +161,19 @@ const deleteUser = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
+    const dependencies = await getUserDeletionDependencies(id);
+    if (
+      dependencies.activeAssignments.length > 0 ||
+      dependencies.managedWorkers > 0 ||
+      dependencies.mappedAreas.length > 0
+    ) {
+      return res.status(409).json({
+        success: false,
+        message: "This account has active work or management dependencies and cannot be deleted.",
+        dependencies,
+      });
+    }
+
     await User.findByIdAndDelete(id);
 
     res.json({ success: true, message: "User deleted successfully" });
@@ -122,13 +183,32 @@ const deleteUser = async (req, res) => {
   }
 };
 
+const getUserDeletionDependencySummary = async (req, res) => {
+  try {
+    const dependencies = await getUserDeletionDependencies(req.params.id);
+    if (!dependencies) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    return res.status(200).json({ success: true, dependencies });
+  } catch (error) {
+    console.error("Error checking user deletion dependencies:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to check this account's dependencies.",
+    });
+  }
+};
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ROLES = ["CITIZEN", "WORKER", "MANAGER", "ADMIN"];
 // const STATUSES = ["ACTIVE", "INACTIVE"];
  
 const createUser = async (req, res) => {
+  let createdUser;
+  let createdWorker;
   try {
-    const { name, email, phone, zone, password, role, status } = req.body;
+    const { name, email, phone, password, role, status, manager_id: managerId } = req.body;
  
     // ---- validation ----
     if (!name || !name.trim()) {
@@ -143,6 +223,11 @@ const createUser = async (req, res) => {
     if (role && !ROLES.includes(role)) {
       return res.status(400).json({ message: "Invalid role" });
     }
+    if (role === "WORKER" && !mongoose.Types.ObjectId.isValid(managerId)) {
+      return res.status(400).json({
+        message: "Select an active manager to add this worker to their team.",
+      });
+    }
     // if (status && !STATUSES.includes(status)) {
     //   return res.status(400).json({ message: "Invalid status" });
     // }
@@ -153,26 +238,66 @@ const createUser = async (req, res) => {
     if (existing) {
       return res.status(409).json({ message: "A user with this email already exists" });
     }
+
+    if (role === "WORKER") {
+      const manager = await User.findOne({
+        _id: managerId,
+        role: "MANAGER",
+        status: "ACTIVE",
+      }).select("_id");
+      if (!manager) {
+        return res.status(400).json({ message: "Select a valid active manager." });
+      }
+    }
  
     // ---- create ----
     const hashedPassword = await bcrypt.hash(password, 10);
  
-    const user = await User.create({
+    createdUser = await User.create({
       name: name.trim(),
       email: normalizedEmail,
       phone: phone ? phone.trim() : undefined,
-      zone: zone ? zone.trim() : undefined,
       password: hashedPassword,
       role: role || "CITIZEN",
       status: status || "ACTIVE",
     });
+
+    if (createdUser.role === "WORKER") {
+      let nextCodeNumber = (await Worker.countDocuments()) + 1;
+      let employeeCode;
+      do {
+        employeeCode = `WRK${String(nextCodeNumber).padStart(3, "0")}`;
+        nextCodeNumber += 1;
+      } while (await Worker.exists({ employee_code: employeeCode }));
+
+      createdWorker = await Worker.create({
+        user_id: createdUser._id,
+        manager_id: managerId,
+        employee_code: employeeCode,
+        worker_role: "Maintenance Worker",
+        availability_status: createdUser.status === "ACTIVE" ? "ACTIVE" : "INACTIVE",
+        emergency_contact: phone ? phone.trim() : undefined,
+        joined_date: new Date(),
+      });
+    }
  
     // never send the password hash back
-    const safeUser = user.toObject();
+    const safeUser = createdUser.toObject();
     delete safeUser.password;
+    if (createdWorker) safeUser.employee_code = createdWorker.employee_code;
  
     return res.status(201).json({ success: true, data: safeUser });
   } catch (err) {
+    if (createdWorker) {
+      await Worker.deleteOne({ _id: createdWorker._id }).catch((cleanupError) => {
+        console.error("Failed to clean up worker profile after account creation error:", cleanupError);
+      });
+    }
+    if (createdUser) {
+      await User.deleteOne({ _id: createdUser._id }).catch((cleanupError) => {
+        console.error("Failed to clean up user after account creation error:", cleanupError);
+      });
+    }
     // unique index race condition
     if (err.code === 11000) {
       return res.status(409).json({ message: "A user with this email already exists" });
@@ -189,6 +314,7 @@ module.exports = {
   getDashboardStats,
   getAllUsers,
   updateUserStatus,
+  getUserDeletionDependencySummary,
   deleteUser,
   createUser
 };

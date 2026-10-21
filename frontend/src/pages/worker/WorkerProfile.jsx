@@ -39,7 +39,6 @@ const WorkerProfile = () => {
     name: "",
     phone: "",
     email: "",
-    zone: "",
     emergencyContact: "",
     address: "",
   });
@@ -60,7 +59,6 @@ const WorkerProfile = () => {
           name: res.profile.name || "",
           phone: res.profile.phone || "",
           email: res.profile.email || "",
-          zone: res.profile.zone || "Zone 2 - Gandhipuram Central",
           emergencyContact: res.profile.emergencyContact || "",
           address: res.profile.address || "",
         });
@@ -148,7 +146,7 @@ const WorkerProfile = () => {
           <div>
             <span className="header-eyebrow">Worker Profile</span>
             <h1>{profile.name}</h1>
-            <p>{profile.role} · {profile.zone}</p>
+            <p>{profile.role} · {profile.team || "Assigned Team"}</p>
           </div>
         </div>
 
@@ -267,7 +265,7 @@ const WorkerProfile = () => {
 
             <div className="side-contact-item">
               <MapPin size={15} strokeWidth={2} />
-              <span>{profile.zone}</span>
+              <span>{profile.team || "Assigned Team"}</span>
             </div>
           </div>
 
@@ -327,8 +325,8 @@ const WorkerProfile = () => {
               </div>
 
               <div className="info-item">
-                <span className="label"><MapPin size={14} strokeWidth={2} /> Assigned Zone</span>
-                <strong className="value">{profile.zone}</strong>
+                <span className="label"><MapPin size={14} strokeWidth={2} /> Team</span>
+                <strong className="value">{profile.team || "Assigned Team"}</strong>
               </div>
 
               <div className="info-item">
@@ -458,17 +456,6 @@ const WorkerProfile = () => {
                     setEditForm({ ...editForm, email: e.target.value })
                   }
                   required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Assigned Zone</label>
-                <input
-                  type="text"
-                  value={editForm.zone}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, zone: e.target.value })
-                  }
                 />
               </div>
 

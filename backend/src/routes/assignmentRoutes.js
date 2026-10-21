@@ -17,8 +17,8 @@ router.use(protect);
 // ==========================================
 // 1. ASSIGNMENT CREATION & DISPATCH (MANAGER)
 // ==========================================
-router.post("/assign", authorize("MANAGER"), assignComplaint);
-router.get("/all", authorize("MANAGER"), getAllAssignments);
+router.post("/assign", authorize("MANAGER", "ADMIN"), assignComplaint);
+router.get("/all", authorize("MANAGER", "ADMIN"), getAllAssignments);
 
 // ==========================================
 // 2. WORKER ASSIGNMENT RETRIEVAL
@@ -30,7 +30,7 @@ router.get("/worker", getWorkerAssignments);
 // 3. SINGLE ASSIGNMENT OPERATIONS
 // ==========================================
 router.get("/:id", getAssignmentById);
-router.put("/:id/reassign", authorize("MANAGER"), reassignWorker);
-router.delete("/:id", authorize("MANAGER"), removeAssignment);
+router.put("/:id/reassign", authorize("MANAGER", "ADMIN"), reassignWorker);
+router.delete("/:id", authorize("MANAGER", "ADMIN"), removeAssignment);
 
 module.exports = router;

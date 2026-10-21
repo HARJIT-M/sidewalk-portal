@@ -1,3 +1,5 @@
+const mongoose = require("mongoose");
+const crypto = require("crypto");
 const {
   Complaint,
   ComplaintImage,
@@ -9,6 +11,13 @@ const {
   User,
 } = require("../schemas");
 const { getWorkerForUser } = require("../utils/workerHelper");
+const { findManagerForPoint } = require("../utils/findManagerForPoint");
+const { isTamilNaduState } = require("../utils/isTamilNaduState");
+const {
+  parseScheduleRange,
+  getBusyAssignmentsFilter,
+} = require("../utils/scheduleRange");
+const cloudinary = require("../config/cloudinary");
 
 // ==========================================
 // 1. GET ASSIGNED COMPLAINTS (WORKER)
@@ -25,12 +34,32 @@ const getAssignedComplaints = async (req, res) => {
 
     const { status, priority, search } = req.query;
 
-    const assignments = await Assignment.find({ worker_id: worker._id })
+    const assignments = await Assignment.find({
+      worker_id: worker._id,
+      status: { $ne: "CANCELLED" },
+    })
       .populate({
         path: "complaint_id",
-        populate: { path: "reported_by", select: "name phone" },
+        populate: [
+          { path: "reported_by", select: "name phone" },
+          { path: "area_id", select: "name type" },
+        ],
       })
       .sort({ assigned_at: -1 });
+
+    const complaintIds = assignments
+      .filter((assignment) => assignment.complaint_id)
+      .map((assignment) => assignment.complaint_id._id);
+    const images = await ComplaintImage.find({
+      complaint_id: { $in: complaintIds },
+      image_type: "BEFORE",
+    }).sort({ uploaded_at: 1 });
+    const imageByComplaint = new Map();
+    images.forEach((image) => {
+      if (!imageByComplaint.has(String(image.complaint_id))) {
+        imageByComplaint.set(String(image.complaint_id), image.image_url);
+      }
+    });
 
     let complaints = assignments
       .filter((a) => a.complaint_id)
@@ -46,9 +75,19 @@ const getAssignedComplaints = async (req, res) => {
           priority: c.priority,
           status: c.status,
           assignmentStatus: a.status,
-          location: c.location,
+          location: c.address,
           landmark: c.landmark || "",
-          area: c.area || "",
+          area: c.area_id?.name || c.locality || c.city || "",
+          locality: c.locality || "",
+          city: c.city || "",
+          state: c.state || "",
+          latitude: c.geo_location?.coordinates?.[1] ?? null,
+          longitude: c.geo_location?.coordinates?.[0] ?? null,
+          navigationUrl: c.geo_location?.coordinates
+            ? `https://www.google.com/maps/dir/?api=1&destination=${c.geo_location.coordinates[1]},${c.geo_location.coordinates[0]}`
+            : null,
+          scheduledStartAt: a.scheduled_start_at,
+          scheduledEndAt: a.scheduled_end_at,
           reportedDate: c.reported_at
             ? new Date(c.reported_at).toLocaleDateString("en-GB", {
               day: "2-digit",
@@ -63,7 +102,7 @@ const getAssignedComplaints = async (req, res) => {
               year: "numeric",
             })
             : "",
-          reportedImage: c.image_url || null,
+          reportedImage: imageByComplaint.get(String(c._id)) || null,
           reporterName: c.reported_by ? c.reported_by.name : "Citizen",
           estimatedHours: "4 Hours",
         };
@@ -72,16 +111,24 @@ const getAssignedComplaints = async (req, res) => {
     if (status && status !== "All") {
       if (status === "Pending" || status === "ASSIGNED") {
         complaints = complaints.filter(
-          (c) => c.status === "ASSIGNED" || c.status === "PENDING"
+          (c) =>
+            c.assignmentStatus === "ASSIGNED" ||
+            c.status === "ASSIGNED" ||
+            c.status === "PENDING"
         );
       } else if (status === "In Progress" || status === "IN_PROGRESS") {
-        complaints = complaints.filter((c) => c.status === "IN_PROGRESS");
+        complaints = complaints.filter(
+          (c) =>
+            c.assignmentStatus === "IN_PROGRESS" ||
+            c.status === "IN_PROGRESS"
+        );
       } else if (status === "Completed" || status === "RESOLVED") {
         complaints = complaints.filter(
           (c) =>
             c.status === "RESOLVED" ||
             c.status === "COMPLETED" ||
-            c.status === "CLOSED"
+            c.status === "CLOSED" ||
+            c.assignmentStatus === "COMPLETED"
         );
       }
     }
@@ -98,8 +145,8 @@ const getAssignedComplaints = async (req, res) => {
         (c) =>
           c.id.toLowerCase().includes(q) ||
           c.issue.toLowerCase().includes(q) ||
-          c.location.toLowerCase().includes(q) ||
-          c.area.toLowerCase().includes(q)
+          (c.location || "").toLowerCase().includes(q) ||
+          (c.area || "").toLowerCase().includes(q)
       );
     }
 
@@ -127,15 +174,13 @@ const getComplaintDetails = async (req, res) => {
 
     let complaint;
     if (id.match(/^[0-9a-fA-F]{24}$/)) {
-      complaint = await Complaint.findById(id).populate(
-        "reported_by",
-        "name phone email"
-      );
+      complaint = await Complaint.findById(id)
+        .populate("reported_by", "name phone email")
+        .populate("area_id", "name type");
     } else {
-      complaint = await Complaint.findOne({ complaint_code: id }).populate(
-        "reported_by",
-        "name phone email"
-      );
+      complaint = await Complaint.findOne({ complaint_code: id })
+        .populate("reported_by", "name phone email")
+        .populate("area_id", "name type");
     }
 
     if (!complaint) {
@@ -143,6 +188,32 @@ const getComplaintDetails = async (req, res) => {
         success: false,
         message: "Complaint record not found.",
       });
+    }
+
+    if (
+      req.user.role === "MANAGER" &&
+      String(complaint.manager_id) !== String(req.user._id)
+    ) {
+      return res.status(404).json({
+        success: false,
+        message: "Complaint record not found.",
+      });
+    }
+
+    if (req.user.role === "WORKER") {
+      const worker = await getWorkerForUser(req.user._id);
+      const isAssigned = worker
+        ? await Assignment.exists({
+            complaint_id: complaint._id,
+            worker_id: worker._id,
+          })
+        : false;
+      if (!isAssigned) {
+        return res.status(404).json({
+          success: false,
+          message: "Complaint record not found.",
+        });
+      }
     }
 
     const assignments = await Assignment.find({ complaint_id: complaint._id })
@@ -190,7 +261,12 @@ const getComplaintDetails = async (req, res) => {
         })
         : "",
       note: sh.remarks || `Status updated to ${sh.new_status}`,
-      changedBy: sh.changed_by ? sh.changed_by.name : "System",
+      changedBy:
+        req.user.role === "CITIZEN"
+          ? "Service team"
+          : sh.changed_by
+            ? sh.changed_by.name
+            : "System",
     }));
 
     const formattedRepairHistory = repairHistories.map((rh) => ({
@@ -206,7 +282,6 @@ const getComplaintDetails = async (req, res) => {
       action: rh.repair_description,
       materials: rh.materials_used ? rh.materials_used.join(", ") : "",
       remarks: rh.remarks || "",
-      afterImage: rh.after_image || null,
       repairCost: rh.repair_cost || null,
       verifiedBy: rh.verified_by ? rh.verified_by.name : null,
       verifiedAt: rh.verified_at || null,
@@ -223,11 +298,19 @@ const getComplaintDetails = async (req, res) => {
         issueType: complaint.issue_type,
         priority: complaint.priority,
         status: complaint.status,
-        location: complaint.location,
+        location: complaint.address,
         landmark: complaint.landmark || "",
-        area: complaint.area || "",
-        latitude: complaint.latitude,
-        longitude: complaint.longitude,
+        area: complaint.area_id?.name || complaint.locality || complaint.city || "",
+        locality: complaint.locality || "",
+        city: complaint.city || "",
+        state: complaint.state || "",
+        latitude: complaint.geo_location?.coordinates?.[1],
+        longitude: complaint.geo_location?.coordinates?.[0],
+        navigationUrl: complaint.geo_location?.coordinates
+          ? `https://www.google.com/maps/dir/?api=1&destination=${complaint.geo_location.coordinates[1]},${complaint.geo_location.coordinates[0]}`
+          : null,
+        scheduledStartAt: assignments[0]?.scheduled_start_at || null,
+        scheduledEndAt: assignments[0]?.scheduled_end_at || null,
         reportedDate: complaint.reported_at
           ? new Date(complaint.reported_at).toLocaleDateString("en-GB", {
             day: "2-digit",
@@ -244,13 +327,18 @@ const getComplaintDetails = async (req, res) => {
             })
             : "",
         assignedWorkers: assignedWorkerNames,
-        workStartDate: assignments.length > 0 && assignments[0].started_at ? assignments[0].started_at : "",
-        workEndDate: assignments.length > 0 && assignments[0].completed_at ? assignments[0].completed_at : "",
+        workStartDate: assignments.length > 0 && assignments[0].scheduled_start_at ? assignments[0].scheduled_start_at : "",
+        workEndDate: assignments.length > 0 && assignments[0].scheduled_end_at ? assignments[0].scheduled_end_at : "",
         reporterName: complaint.reported_by ? complaint.reported_by.name : "Citizen",
         reporterPhone: complaint.reported_by ? complaint.reported_by.phone : "",
-        reportedImage: beforeImageDoc ? beforeImageDoc.image_url : complaint.image_url || null,
-        image: beforeImageDoc ? beforeImageDoc.image_url : complaint.image_url || null,
-        completionImage: afterImageDoc ? afterImageDoc.image_url : latestRepair ? latestRepair.after_image : null,
+        images: images.map((image) => ({
+          id: image._id,
+          url: image.image_url,
+          type: image.image_type,
+        })),
+        reportedImage: beforeImageDoc ? beforeImageDoc.image_url : null,
+        image: beforeImageDoc ? beforeImageDoc.image_url : null,
+        completionImage: afterImageDoc ? afterImageDoc.image_url : null,
         workDescription: latestRepair ? latestRepair.repair_description : "",
         materialsUsed: latestRepair && latestRepair.materials_used ? latestRepair.materials_used.join(", ") : "",
         remarks: latestRepair ? latestRepair.remarks : "",
@@ -275,13 +363,31 @@ const getManagerComplaints = async (req, res) => {
   try {
     const { status, priority, search } = req.query;
 
-    const allComplaints = await Complaint.find()
+    const allComplaints = await Complaint.find({ manager_id: req.user._id })
       .populate("reported_by", "name phone email")
+      .populate("area_id", "name type")
       .sort({ reported_at: -1 });
 
-    const allAssignments = await Assignment.find().populate({
+    const complaintIds = allComplaints.map((complaint) => complaint._id);
+    const [allAssignments, allImages] = await Promise.all([
+      Assignment.find({
+        complaint_id: { $in: complaintIds },
+        status: { $in: ["ASSIGNED", "IN_PROGRESS"] },
+      }).populate({
       path: "worker_id",
       populate: { path: "user_id", select: "name" },
+      }),
+      ComplaintImage.find({
+        complaint_id: { $in: complaintIds },
+        image_type: "BEFORE",
+      }).sort({ uploaded_at: 1 }),
+    ]);
+
+    const imageByComplaint = new Map();
+    allImages.forEach((image) => {
+      if (!imageByComplaint.has(String(image.complaint_id))) {
+        imageByComplaint.set(String(image.complaint_id), image.image_url);
+      }
     });
 
     let formattedComplaints = allComplaints.map((c) => {
@@ -316,9 +422,17 @@ const getManagerComplaints = async (req, res) => {
         id: c.complaint_code,
         mongoId: c._id,
         title: c.title,
-        location: c.location,
+        location: c.address,
         landmark: c.landmark || "",
-        area: c.area || "",
+        area: c.area_id?.name || c.locality || c.city || "",
+        locality: c.locality || "",
+        city: c.city || "",
+        state: c.state || "",
+        latitude: c.geo_location?.coordinates?.[1] ?? null,
+        longitude: c.geo_location?.coordinates?.[0] ?? null,
+        navigationUrl: c.geo_location?.coordinates
+          ? `https://www.google.com/maps/dir/?api=1&destination=${c.geo_location.coordinates[1]},${c.geo_location.coordinates[0]}`
+          : null,
         description: c.description,
         reportedBy: c.reported_by ? c.reported_by.name : "Citizen",
         date: formattedDate,
@@ -326,10 +440,13 @@ const getManagerComplaints = async (req, res) => {
         rawPriority: c.priority,
         status: displayStatus,
         rawStatus: c.status,
-        image: c.image_url || null,
+        image: imageByComplaint.get(String(c._id)) || null,
+        assignedWorkerIds: complaintAssignments.map((assignment) =>
+          String(assignment.worker_id?._id || "")
+        ).filter(Boolean),
         assignedWorkers: assignedWorkerNames,
-        workStartDate: complaintAssignments.length > 0 && complaintAssignments[0].started_at ? complaintAssignments[0].started_at : "",
-        workEndDate: complaintAssignments.length > 0 && complaintAssignments[0].completed_at ? complaintAssignments[0].completed_at : "",
+        workStartDate: complaintAssignments.length > 0 && complaintAssignments[0].scheduled_start_at ? complaintAssignments[0].scheduled_start_at : "",
+        workEndDate: complaintAssignments.length > 0 && complaintAssignments[0].scheduled_end_at ? complaintAssignments[0].scheduled_end_at : "",
       };
     });
 
@@ -351,7 +468,7 @@ const getManagerComplaints = async (req, res) => {
         (c) =>
           c.id.toLowerCase().includes(q) ||
           c.title.toLowerCase().includes(q) ||
-          c.location.toLowerCase().includes(q) ||
+          (c.location || "").toLowerCase().includes(q) ||
           c.reportedBy.toLowerCase().includes(q)
       );
     }
@@ -403,6 +520,16 @@ const updateComplaintPriority = async (req, res) => {
       });
     }
 
+    if (
+      req.user.role === "MANAGER" &&
+      String(complaint.manager_id) !== String(req.user._id)
+    ) {
+      return res.status(404).json({
+        success: false,
+        message: "Complaint not found.",
+      });
+    }
+
     complaint.priority = normalizedPriority;
     await complaint.save();
 
@@ -434,9 +561,23 @@ const updateComplaintPriority = async (req, res) => {
 // 5. ASSIGN WORKERS TO COMPLAINT (MANAGER)
 // ==========================================
 const assignComplaintWorkers = async (req, res) => {
+  let session;
   try {
     const { id } = req.params;
-    const { selectedWorkers, startDate, endDate, remarks } = req.body;
+    const {
+      selectedWorkers = req.body.workerId ? [req.body.workerId] : [],
+      startDate,
+      endDate,
+      remarks,
+    } = req.body;
+    const schedule = parseScheduleRange(startDate, endDate);
+
+    if (!schedule) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid startDate and endDate are required in YYYY-MM-DD format.",
+      });
+    }
 
     if (!selectedWorkers || !Array.isArray(selectedWorkers) || selectedWorkers.length === 0) {
       return res.status(400).json({
@@ -445,109 +586,156 @@ const assignComplaintWorkers = async (req, res) => {
       });
     }
 
-    let complaint;
-    if (id.match(/^[0-9a-fA-F]{24}$/)) {
-      complaint = await Complaint.findById(id);
-    } else {
-      complaint = await Complaint.findOne({ complaint_code: id });
-    }
-
-    if (!complaint) {
-      return res.status(404).json({
-        success: false,
-        message: "Complaint not found.",
-      });
-    }
-
-    const workerDocs = [];
-    for (const item of selectedWorkers) {
-      let worker;
-      if (typeof item === "string") {
-        if (item.match(/^[0-9a-fA-F]{24}$/)) {
-          worker = await Worker.findById(item);
-        } else if (item.startsWith("WRK")) {
-          worker = await Worker.findOne({ employee_code: item });
-        } else {
-          const userDoc = await User.findOne({ name: new RegExp(`^${item}$`, "i"), role: "WORKER" });
-          if (userDoc) {
-            worker = await Worker.findOne({ user_id: userDoc._id });
-          }
-        }
-      } else if (typeof item === "object" && item !== null) {
-        if (item.workerId) worker = await Worker.findById(item.workerId);
-        else if (item.employeeCode) worker = await Worker.findOne({ employee_code: item.employeeCode });
-      }
-
-      if (worker) {
-        workerDocs.push(worker);
-      }
-    }
-
-    if (workerDocs.length === 0) {
+    const workerIds = selectedWorkers.map((selection) =>
+      typeof selection === "string" ? selection : selection?.workerId
+    );
+    if (
+      workerIds.some(
+        (workerId) =>
+          typeof workerId !== "string" ||
+          !mongoose.Types.ObjectId.isValid(workerId)
+      ) ||
+      new Set(workerIds).size !== workerIds.length
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Could not resolve selected worker profiles.",
+        message: "Select valid, distinct worker profiles.",
       });
     }
 
-    for (const worker of workerDocs) {
-      const existingAssignment = await Assignment.findOne({
-        complaint_id: complaint._id,
-        worker_id: worker._id,
-      });
+    session = await mongoose.startSession();
+    let result;
+    await session.withTransaction(async () => {
+      const complaintQuery = mongoose.Types.ObjectId.isValid(id)
+        ? { _id: id }
+        : { complaint_code: id };
+      const complaint = await Complaint.findOne(complaintQuery).session(session);
+      if (!complaint) {
+        const error = new Error("Complaint not found.");
+        error.statusCode = 404;
+        throw error;
+      }
 
-      if (!existingAssignment) {
-        await Assignment.create({
+      const isAdmin = req.user.role === "ADMIN";
+      if (!isAdmin && String(complaint.manager_id) !== String(req.user._id)) {
+        const error = new Error("You may only assign complaints routed to you.");
+        error.statusCode = 403;
+        throw error;
+      }
+
+      const workerDocs = await Worker.find({
+        _id: { $in: workerIds },
+      }).populate("user_id", "name");
+      if (workerDocs.length !== workerIds.length) {
+        const error = new Error("One or more selected workers were not found.");
+        error.statusCode = 404;
+        throw error;
+      }
+
+      const inactiveWorker = workerDocs.some(
+        (worker) => worker.availability_status !== "ACTIVE"
+      );
+      if (inactiveWorker) {
+        const error = new Error("Only ACTIVE workers can be assigned.");
+        error.statusCode = 400;
+        throw error;
+      }
+
+      if (
+        !isAdmin &&
+        workerDocs.some(
+          (worker) => String(worker.manager_id) !== String(req.user._id)
+        )
+      ) {
+        const error = new Error("You may only assign your own workers.");
+        error.statusCode = 403;
+        throw error;
+      }
+
+      const overlappingAssignments = await Assignment.find({
+        worker_id: { $in: workerIds },
+        ...getBusyAssignmentsFilter(schedule.start, schedule.end),
+      }).session(session);
+      if (overlappingAssignments.length > 0) {
+        const error = new Error(
+          "A selected worker is already assigned to work during those dates."
+        );
+        error.statusCode = 409;
+        throw error;
+      }
+
+      const oldStatus = complaint.status;
+      const now = new Date();
+      await Assignment.create(
+        workerDocs.map((worker) => ({
           complaint_id: complaint._id,
           worker_id: worker._id,
           assigned_by: req.user._id,
-          assigned_at: new Date(),
-          started_at: startDate ? new Date(startDate) : new Date(),
-          completed_at: endDate ? new Date(endDate) : null,
+          assigned_at: now,
+          scheduled_start_at: schedule.start,
+          scheduled_end_at: schedule.end,
           status: "ASSIGNED",
-          remarks: remarks || `Assigned by Field Manager ${req.user.name}`,
-        });
-      }
+          remarks: remarks || `Assigned by ${req.user.name}`,
+        })),
+        { session }
+      );
 
-      await Notification.create({
-        user_id: worker.user_id,
-        complaint_id: complaint._id,
-        type: "ASSIGNMENT",
-        message: `Field Manager ${req.user.name} assigned you task ${complaint.complaint_code}: ${complaint.title}.`,
-        is_read: false,
-        created_at: new Date(),
-      });
-    }
-
-    const oldStatus = complaint.status;
-    if (complaint.status === "PENDING") {
       complaint.status = "ASSIGNED";
-      await complaint.save();
-    }
+      await complaint.save({ session });
 
-    const workerNamesStr = workerDocs.map((w) => w.employee_code).join(", ");
-    await StatusHistory.create({
-      complaint_id: complaint._id,
-      old_status: oldStatus,
-      new_status: "ASSIGNED",
-      changed_by: req.user._id,
-      remarks: `Assigned to worker(s) [${workerNamesStr}] by Manager ${req.user.name}.`,
-      changed_at: new Date(),
+      await StatusHistory.create(
+        [
+          {
+            complaint_id: complaint._id,
+            old_status: oldStatus,
+            new_status: "ASSIGNED",
+            changed_by: req.user._id,
+            remarks: `Assigned to worker(s) ${workerDocs
+              .map((worker) => worker.employee_code)
+              .join(", ")}.`,
+            changed_at: now,
+          },
+        ],
+        { session }
+      );
+
+      await Notification.create(
+        workerDocs.map((worker) => ({
+          user_id: worker.user_id._id,
+          complaint_id: complaint._id,
+          type: "ASSIGNMENT",
+          message: `${req.user.name} assigned you task ${complaint.complaint_code}: ${complaint.title}.`,
+          is_read: false,
+          created_at: now,
+        })),
+        { session }
+      );
+
+      result = {
+        complaintCode: complaint.complaint_code,
+        workerCodes: workerDocs.map((worker) => worker.employee_code),
+      };
     });
 
     return res.status(200).json({
       success: true,
-      message: `Successfully assigned ${workerDocs.length} worker(s) to complaint ${complaint.complaint_code}.`,
-      assignedWorkers: workerDocs.map((w) => w.employee_code),
+      message: `Successfully assigned ${result.workerCodes.length} worker(s) to complaint ${result.complaintCode}.`,
+      assignedWorkers: result.workerCodes,
       status: "Assigned",
     });
   } catch (error) {
     console.error("Error assigning workers to complaint:", error);
-    return res.status(500).json({
+    const statusCode =
+      error.statusCode || (error.code === 11000 ? 409 : 500);
+    return res.status(statusCode).json({
       success: false,
-      message: "Server error while assigning workers.",
-      error: error.message,
+      message:
+        statusCode === 500
+          ? "Server error while assigning workers."
+          : error.message,
     });
+  } finally {
+    if (session) await session.endSession();
   }
 };
 
@@ -555,86 +743,242 @@ const assignComplaintWorkers = async (req, res) => {
 // 6. SUBMIT NEW COMPLAINT (USER)
 // ==========================================
 const submitComplaint = async (req, res) => {
+  const uploadedImages = [];
   try {
-    const { title, description, issueType, location, landmark, area, latitude, longitude } = req.body;
-
-    if (!title || !location || !issueType) {
-      return res.status(400).json({
-        success: false,
-        message: "Title, location, and issue type are required.",
-      });
-    }
-
-    if (!req.body.image) {
-      return res.status(400).json({
-        success: false,
-        message: "Image is required.",
-      });
-    }
-
-    let nextCodeNumber = 1;
-    const lastComplaint = await Complaint.findOne().sort({ createdAt: -1 });
-    if (lastComplaint && lastComplaint.complaint_code && lastComplaint.complaint_code.startsWith("CMP")) {
-      const lastCode = parseInt(lastComplaint.complaint_code.replace("CMP", ""), 10);
-      if (!isNaN(lastCode)) {
-        nextCodeNumber = lastCode + 1;
-      } else {
-        const totalComplaints = await Complaint.countDocuments();
-        nextCodeNumber = totalComplaints + 1;
-      }
-    }
-    const complaintCode = `CMP${String(nextCodeNumber).padStart(3, "0")}`;
-
-    const newComplaint = await Complaint.create({
-      complaint_code: complaintCode,
+    const {
       title,
       description,
       issue_type: issueType,
-      priority: "MEDIUM", // Default priority
-      status: "PENDING", // Initial status
-      location,
+      address,
       landmark,
-      area,
-      latitude,
-      longitude,
+      latitude: rawLatitude,
+      longitude: rawLongitude,
+      locality: rawLocality,
+      city: rawCity,
+      state: rawState,
+    } = req.body;
+
+    const latitude = Number(rawLatitude);
+    const longitude = Number(rawLongitude);
+    const locality = typeof rawLocality === "string" ? rawLocality.trim() : "";
+    const city = typeof rawCity === "string" ? rawCity.trim() : "";
+    const state = typeof rawState === "string" ? rawState.trim() : "";
+    if (
+      !title?.trim() ||
+      !description?.trim() ||
+      !issueType ||
+      !address?.trim() ||
+      rawLatitude === undefined ||
+      rawLongitude === undefined ||
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude) ||
+      latitude < -90 ||
+      latitude > 90 ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Title, description, issue type, address, and valid coordinates are required.",
+      });
+    }
+
+    if (isTamilNaduState(state) === false) {
+      return res.status(422).json({
+        success: false,
+        message: "Complaints can currently be submitted only in Tamil Nadu.",
+      });
+    }
+    const stateConfirmed = isTamilNaduState(state) === true;
+    const resolved = stateConfirmed
+      ? await findManagerForPoint(longitude, latitude, { locality, city })
+      : null;
+
+    for (const file of req.files || []) {
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "smart-footpath/complaints", resource_type: "image" },
+          (error, uploadResult) => {
+            if (error) reject(error);
+            else resolve(uploadResult);
+          }
+        );
+        stream.end(file.buffer);
+      });
+      uploadedImages.push(result);
+    }
+
+    const complaintCode = `CMP-${Date.now().toString(36).toUpperCase()}-${crypto
+      .randomBytes(3)
+      .toString("hex")
+      .toUpperCase()}`;
+
+    const newComplaint = await Complaint.create({
+      complaint_code: complaintCode,
       reported_by: req.user._id,
-      image_url: req.body.image, // Base64 string directly from frontend
-      image_public_id: null,
-      reported_at: new Date(),
+      title: title.trim(),
+      description: description.trim(),
+      issue_type: issueType,
+      priority: "MEDIUM",
+      status: "PENDING",
+      address: address.trim(),
+      locality: locality || undefined,
+      city: city || undefined,
+      state: stateConfirmed ? "Tamil Nadu" : undefined,
+      landmark: landmark?.trim(),
+      geo_location: {
+        type: "Point",
+        coordinates: [longitude, latitude],
+      },
+      area_id: resolved?.area?._id || null,
+      manager_id: resolved?.manager_id || null,
+      requires_admin_routing: !resolved?.manager_id,
     });
+
+    if (uploadedImages.length > 0) {
+      await ComplaintImage.create(
+        uploadedImages.map((image) => ({
+          complaint_id: newComplaint._id,
+          image_url: image.secure_url,
+          image_public_id: image.public_id,
+          image_type: "BEFORE",
+          uploaded_by: req.user._id,
+        }))
+      );
+    }
 
     await StatusHistory.create({
       complaint_id: newComplaint._id,
       old_status: null,
       new_status: "PENDING",
       changed_by: req.user._id,
-      remarks: "Complaint submitted by citizen.",
+      remarks: resolved?.manager_id
+        ? "Complaint submitted by citizen."
+        : "Complaint queued for administrator routing.",
       changed_at: new Date(),
     });
 
     return res.status(201).json({
       success: true,
-      message: `Complaint submitted successfully. Your ID is ${complaintCode}.`,
+      message: resolved?.manager_id
+        ? `Complaint submitted successfully. Your ID is ${complaintCode}.`
+        : `Complaint submitted and queued for administrator routing. Your ID is ${complaintCode}.`,
       complaintId: complaintCode,
-      complaint: newComplaint,
+      complaint_code: complaintCode,
+      area: resolved?.area ? { name: resolved.area.name } : null,
+      locality: locality || null,
+      city: city || null,
+      state: stateConfirmed ? "Tamil Nadu" : null,
+      requiresAdminRouting: !resolved?.manager_id,
     });
   } catch (error) {
-    console.error("========== CREATE COMPLAINT ERROR ==========");
-    console.error("Name:", error?.name);
-    console.error("Message:", error?.message);
-    console.error("Code:", error?.code);
-    console.error("Stack:", error?.stack);
-    console.error("Full Error:", error);
-    console.error("==============================================");
-
+    await Promise.all(
+      uploadedImages.map((image) =>
+        cloudinary.uploader.destroy(image.public_id).catch((cleanupError) => {
+          console.error("Failed to clean up complaint image:", cleanupError);
+        })
+      )
+    );
+    console.error("Error creating complaint:", error);
+    if (error.name === "ValidationError" || error.name === "CastError") {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
     return res.status(500).json({
       success: false,
-      message: error?.message || "Failed to create complaint",
-      error: {
-        name: error?.name || null,
-        code: error?.code || null,
-        message: error?.message || null,
-      },
+      message: "Failed to create complaint.",
+    });
+  }
+};
+
+const getAdminRoutingComplaints = async (req, res) => {
+  try {
+    const complaints = await Complaint.find({ requires_admin_routing: true })
+      .populate("reported_by", "name email")
+      .populate("area_id", "name type")
+      .sort({ reported_at: 1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      complaints: complaints.map((complaint) => ({
+        id: complaint._id,
+        code: complaint.complaint_code,
+        title: complaint.title,
+        address: complaint.address,
+        locality: complaint.locality || null,
+        city: complaint.city || null,
+        state: complaint.state || null,
+        area: complaint.area_id?.name || complaint.locality || complaint.city || null,
+        latitude: complaint.geo_location?.coordinates?.[1] ?? null,
+        longitude: complaint.geo_location?.coordinates?.[0] ?? null,
+        navigationUrl: complaint.geo_location?.coordinates
+          ? `https://www.google.com/maps/dir/?api=1&destination=${complaint.geo_location.coordinates[1]},${complaint.geo_location.coordinates[0]}`
+          : null,
+        reportedBy: complaint.reported_by?.name || "Citizen",
+        reportedAt: complaint.reported_at,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching complaints requiring admin routing:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to fetch complaints requiring administrator routing.",
+    });
+  }
+};
+
+const routeComplaintToManager = async (req, res) => {
+  const { manager_id: managerId } = req.body;
+  if (!mongoose.Types.ObjectId.isValid(managerId)) {
+    return res.status(400).json({
+      success: false,
+      message: "A valid manager account is required.",
+    });
+  }
+
+  try {
+    const [complaint, manager] = await Promise.all([
+      Complaint.findOne({
+        _id: req.params.id,
+        requires_admin_routing: true,
+      }),
+      User.findOne({
+        _id: managerId,
+        role: "MANAGER",
+        status: "ACTIVE",
+      }).select("_id"),
+    ]);
+
+    if (!complaint) {
+      return res.status(404).json({
+        success: false,
+        message: "Complaint requiring routing was not found.",
+      });
+    }
+    if (!manager) {
+      return res.status(400).json({
+        success: false,
+        message: "Select an active manager account.",
+      });
+    }
+
+    complaint.manager_id = manager._id;
+    complaint.requires_admin_routing = false;
+    await complaint.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Complaint routed to the selected manager.",
+    });
+  } catch (error) {
+    console.error("Error routing complaint to manager:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to route this complaint.",
     });
   }
 };
@@ -653,12 +997,25 @@ const deleteComplaint = async (req, res) => {
       });
     }
 
-    // Delete image from Cloudinary if it exists
-    if (complaint.image_public_id) {
-      const cloudinary = require("../config/cloudinary");
-      await cloudinary.uploader.destroy(complaint.image_public_id);
+    if (
+      String(complaint.manager_id) !== String(req.user._id) &&
+      req.user.role !== "ADMIN"
+    ) {
+      return res.status(404).json({
+        success: false,
+        message: "Complaint not found",
+      });
     }
 
+    const complaintImages = await ComplaintImage.find({
+      complaint_id: complaint._id,
+    });
+    await Promise.all(
+      complaintImages
+        .filter((image) => image.image_public_id)
+        .map((image) => cloudinary.uploader.destroy(image.image_public_id))
+    );
+    await ComplaintImage.deleteMany({ complaint_id: complaint._id });
     await Complaint.findByIdAndDelete(req.params.id);
 
     return res.status(200).json({
@@ -688,20 +1045,36 @@ const getUserComplaints = async (req, res) => {
       filter.status = status.toUpperCase();
     }
 
-    const complaints = await Complaint.find(filter).sort({ reported_at: -1 });
+    const complaints = await Complaint.find(filter)
+      .populate("area_id", "name type")
+      .sort({ reported_at: -1 });
+    const complaintIds = complaints.map((complaint) => complaint._id);
+    const images = await ComplaintImage.find({
+      complaint_id: { $in: complaintIds },
+      image_type: "BEFORE",
+    }).sort({ uploaded_at: 1 });
+    const imageByComplaint = new Map();
+    images.forEach((image) => {
+      if (!imageByComplaint.has(String(image.complaint_id))) {
+        imageByComplaint.set(String(image.complaint_id), image.image_url);
+      }
+    });
 
     const formattedComplaints = complaints.map(c => ({
       id: c.complaint_code,
       mongoId: c._id,
       title: c.title,
-      location: c.location,
-      area: c.area || "",
+      location: c.address,
+      area: c.area_id?.name || c.locality || c.city || "",
+      locality: c.locality || "",
+      city: c.city || "",
+      state: c.state || "",
       date: c.reported_at ? new Date(c.reported_at).toLocaleDateString("en-GB", {
         day: "2-digit", month: "short", year: "numeric"
       }) : "Recent",
       priority: c.priority,
       status: c.status,
-      image: c.image_url || null,
+      image: imageByComplaint.get(String(c._id)) || null,
     }));
 
     return res.status(200).json({
@@ -726,6 +1099,8 @@ module.exports = {
   updateComplaintPriority,
   assignComplaintWorkers,
   submitComplaint,
+  getAdminRoutingComplaints,
+  routeComplaintToManager,
   getUserComplaints,
   deleteComplaint,
 };

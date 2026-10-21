@@ -1,4 +1,4 @@
-const { Assignment, Notification, StatusHistory, Complaint } = require("../schemas");
+const { Assignment, Notification, Complaint, Area } = require("../schemas");
 const { getWorkerForUser } = require("../utils/workerHelper");
 
 // ==========================================
@@ -15,10 +15,16 @@ const getWorkerDashboard = async (req, res) => {
     }
 
     // Get all assignments for this worker
-    const assignments = await Assignment.find({ worker_id: worker._id })
+    const assignments = await Assignment.find({
+      worker_id: worker._id,
+      status: { $ne: "CANCELLED" },
+    })
       .populate({
         path: "complaint_id",
-        populate: { path: "reported_by", select: "name phone" },
+        populate: [
+          { path: "reported_by", select: "name phone" },
+          { path: "area_id", select: "name type" },
+        ],
       })
       .sort({ assigned_at: -1 });
 
@@ -36,9 +42,19 @@ const getWorkerDashboard = async (req, res) => {
           priority: c.priority,
           status: c.status,
           assignmentStatus: a.status,
-          location: c.location,
+          location: c.address,
           landmark: c.landmark || "",
-          area: c.area || "",
+          area: c.area_id?.name || c.locality || c.city || "",
+          locality: c.locality || "",
+          city: c.city || "",
+          state: c.state || "",
+          latitude: c.geo_location?.coordinates?.[1] ?? null,
+          longitude: c.geo_location?.coordinates?.[0] ?? null,
+          navigationUrl: c.geo_location?.coordinates
+            ? `https://www.google.com/maps/dir/?api=1&destination=${c.geo_location.coordinates[1]},${c.geo_location.coordinates[0]}`
+            : null,
+          scheduledStartAt: a.scheduled_start_at,
+          scheduledEndAt: a.scheduled_end_at,
           reportedDate: c.reported_at
             ? new Date(c.reported_at).toLocaleDateString("en-GB", {
                 day: "2-digit",
@@ -56,9 +72,11 @@ const getWorkerDashboard = async (req, res) => {
           reportedImage: c.image_url || null,
           reporterName: c.reported_by ? c.reported_by.name : "Citizen",
           progress:
-            c.status === "RESOLVED" || c.status === "CLOSED"
+            c.status === "RESOLVED" ||
+            c.status === "CLOSED" ||
+            a.status === "COMPLETED"
               ? 100
-              : c.status === "IN_PROGRESS"
+              : c.status === "IN_PROGRESS" || a.status === "IN_PROGRESS"
               ? 80
               : 10,
         };
@@ -67,7 +85,8 @@ const getWorkerDashboard = async (req, res) => {
     // Counts
     const totalAssigned = complaintsList.length;
     const inProgressCount = complaintsList.filter(
-      (c) => c.status === "IN_PROGRESS"
+      (c) =>
+        c.assignmentStatus === "IN_PROGRESS" || c.status === "IN_PROGRESS"
     ).length;
     const completedCount = complaintsList.filter(
       (c) =>
@@ -75,21 +94,27 @@ const getWorkerDashboard = async (req, res) => {
         c.status === "CLOSED" ||
         c.assignmentStatus === "COMPLETED"
     ).length;
-    const highPriorityCount = complaintsList.filter(
+    const activeComplaints = complaintsList.filter(
+      (c) =>
+        c.assignmentStatus !== "COMPLETED" &&
+        c.status !== "RESOLVED" &&
+        c.status !== "CLOSED"
+    );
+    const highPriorityTasks = activeComplaints.filter(
       (c) => c.priority === "HIGH" || c.priority === "CRITICAL"
-    ).length;
+    );
+    const highPriorityCount = highPriorityTasks.length;
 
     // Active spotlight task
     const activeTask =
-      complaintsList.find((c) => c.status === "IN_PROGRESS") ||
-      complaintsList.find((c) => c.status === "ASSIGNED") ||
-      complaintsList[0] ||
+      activeComplaints.find(
+        (c) =>
+          c.assignmentStatus === "IN_PROGRESS" || c.status === "IN_PROGRESS"
+      ) ||
+      activeComplaints.find(
+        (c) => c.assignmentStatus === "ASSIGNED" || c.status === "ASSIGNED"
+      ) ||
       null;
-
-    // High priority tasks
-    const highPriorityTasks = complaintsList.filter(
-      (c) => c.priority === "HIGH" || c.priority === "CRITICAL"
-    );
 
     // Unread notifications count
     const unreadNotificationsCount = await Notification.countDocuments({
@@ -97,24 +122,39 @@ const getWorkerDashboard = async (req, res) => {
       is_read: false,
     });
 
-    // Weekly performance calculation (Mon-Sat)
-    const weeklyData = [
-      { day: "Mon", count: 4, label: "4 Tasks" },
-      { day: "Tue", count: 6, label: "6 Tasks" },
-      { day: "Wed", count: 5, label: "5 Tasks" },
-      { day: "Thu", count: 7, label: "7 Tasks" },
-      {
-        day: "Fri",
-        count: Math.max(8, completedCount + inProgressCount),
-        label: `${Math.max(8, completedCount + inProgressCount)} Tasks`,
-      },
-      { day: "Sat", count: 3, label: "3 Tasks" },
-    ];
+    const today = new Date();
+    const weekStart = new Date(today);
+    weekStart.setHours(0, 0, 0, 0);
+    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+    const weeklyCounts = Array(7).fill(0);
+    assignments.forEach((assignment) => {
+      if (assignment.status !== "COMPLETED") return;
+      const completedAt = assignment.completed_at;
+      if (!completedAt) return;
+      const dayOffset = Math.floor(
+        (new Date(completedAt).setHours(0, 0, 0, 0) - weekStart.getTime()) /
+          (24 * 60 * 60 * 1000)
+      );
+      if (dayOffset >= 0 && dayOffset < weeklyCounts.length) {
+        weeklyCounts[dayOffset] += 1;
+      }
+    });
+    const weeklyData = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
+      (day, index) => ({
+        day,
+        count: weeklyCounts[index],
+        label: `${weeklyCounts[index]} completed`,
+      })
+    );
 
     // Status breakdown for donut
     const resolvedCount = completedCount;
     const assignedPendingCount = complaintsList.filter(
-      (c) => c.status === "ASSIGNED" || c.status === "PENDING"
+      (c) =>
+        c.assignmentStatus === "ASSIGNED" &&
+        c.status !== "IN_PROGRESS" &&
+        c.status !== "RESOLVED" &&
+        c.status !== "CLOSED"
     ).length;
     const totalForDonut = Math.max(1, totalAssigned);
 
@@ -139,37 +179,72 @@ const getWorkerDashboard = async (req, res) => {
       },
     ];
 
-    // Recent activity list
-    const recentStatusHistories = await StatusHistory.find()
-      .populate("complaint_id", "complaint_code title")
-      .populate("changed_by", "name")
-      .sort({ changed_at: -1 })
-      .limit(5);
+    const recentActivity = assignments
+      .filter((assignment) => assignment.complaint_id)
+      .map((assignment) => {
+        const completed =
+          assignment.status === "COMPLETED" ||
+          ["RESOLVED", "CLOSED"].includes(assignment.complaint_id.status);
+        const inProgress =
+          assignment.status === "IN_PROGRESS" ||
+          assignment.complaint_id.status === "IN_PROGRESS";
+        const timestamp = completed
+          ? assignment.completed_at || assignment.updatedAt
+          : inProgress
+          ? assignment.started_at || assignment.updatedAt
+          : assignment.assigned_at;
+        return {
+          id: assignment._id,
+          complaintCode: assignment.complaint_id.complaint_code,
+          status: completed ? "COMPLETED" : inProgress ? "IN_PROGRESS" : "ASSIGNED",
+          iconType: completed ? "resolved" : inProgress ? "progress" : "assigned",
+          text: completed
+            ? "Repair completed"
+            : inProgress
+            ? "Repair in progress"
+            : "Task assigned",
+          timestamp,
+          time: timestamp
+            ? new Date(timestamp).toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "Recently",
+        };
+      })
+      .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+      .slice(0, 5);
 
-    const recentActivity = recentStatusHistories.map((sh) => {
-      let iconType = "assigned";
-      if (sh.new_status === "RESOLVED" || sh.new_status === "CLOSED")
-        iconType = "resolved";
-      else if (sh.new_status === "IN_PROGRESS") iconType = "progress";
-
-      const timeAgo = sh.changed_at
-        ? new Date(sh.changed_at).toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "short",
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-        : "Recently";
-
-      return {
-        id: sh._id,
-        complaintCode: sh.complaint_id ? sh.complaint_id.complaint_code : "CMP",
-        status: sh.new_status,
-        iconType,
-        text: sh.remarks || `Status changed to ${sh.new_status}`,
-        time: timeAgo,
-      };
-    });
+    const upcomingSchedule = assignments
+      .filter(
+        (assignment) =>
+          assignment.status === "ASSIGNED" &&
+          assignment.complaint_id &&
+          assignment.scheduled_start_at &&
+          new Date(assignment.scheduled_start_at) >= today
+      )
+      .sort(
+        (a, b) =>
+          new Date(a.scheduled_start_at) - new Date(b.scheduled_start_at)
+      )
+      .slice(0, 5)
+      .map((assignment) => ({
+        day: new Date(assignment.scheduled_start_at).toLocaleDateString(
+          "en-GB",
+          { weekday: "short", day: "2-digit", month: "short" }
+        ),
+        title: assignment.complaint_id.title,
+        info: `Priority: ${assignment.complaint_id.priority || "Not set"}${
+          assignment.scheduled_end_at
+            ? ` · Due ${new Date(assignment.scheduled_end_at).toLocaleDateString(
+                "en-GB",
+                { day: "2-digit", month: "short" }
+              )}`
+            : ""
+        }`,
+      }));
 
     return res.status(200).json({
       success: true,
@@ -178,7 +253,7 @@ const getWorkerDashboard = async (req, res) => {
           id: worker.employee_code,
           name: worker.user_id.name,
           email: worker.user_id.email,
-          zone: worker.zone || "Zone 2 - Gandhipuram Central",
+          team: worker.manager_id?.name || "Assigned Team",
           rating: worker.rating || 4.9,
           onTimeRate: worker.on_time_rate || 96,
         },
@@ -194,18 +269,7 @@ const getWorkerDashboard = async (req, res) => {
         weeklyData,
         statusData,
         recentActivity,
-        upcomingSchedule: [
-          {
-            day: "Tomorrow",
-            title: "Saibaba Colony Sidewalk Repair",
-            info: "Priority: Medium • 2 Workers Assigned",
-          },
-          {
-            day: "Friday",
-            title: "Peelamedu Storm Drainage Paving",
-            info: "Priority: High • Concrete Curing Check",
-          },
-        ],
+        upcomingSchedule,
       },
     });
   } catch (error) {
@@ -223,24 +287,33 @@ const getWorkerDashboard = async (req, res) => {
 // ==========================================
 const getManagerDashboard = async (req, res) => {
   try {
-    // Total counts across all complaints in MongoDB
+    const managerFilter = { manager_id: req.user._id };
     const [totalComplaints, pendingCount, inProgressCount, resolvedCount] =
       await Promise.all([
-        Complaint.countDocuments(),
+        Complaint.countDocuments(managerFilter),
         Complaint.countDocuments({
+          ...managerFilter,
           status: { $in: ["PENDING", "ASSIGNED"] },
         }),
-        Complaint.countDocuments({ status: "IN_PROGRESS" }),
+        Complaint.countDocuments({ ...managerFilter, status: "IN_PROGRESS" }),
         Complaint.countDocuments({
+          ...managerFilter,
           status: { $in: ["RESOLVED", "CLOSED"] },
         }),
       ]);
 
-    // Fetch the most recent complaints for manager overview table
-    const recentComplaints = await Complaint.find()
-      .populate("reported_by", "name phone email")
-      .sort({ reported_at: -1 })
-      .limit(10);
+    const [recentComplaints, managerArea] = await Promise.all([
+      Complaint.find(managerFilter)
+        .populate("reported_by", "name phone email")
+        .populate("area_id", "name type")
+        .sort({ reported_at: -1 })
+        .limit(10),
+      Area.findOne({ manager_id: req.user._id, active: true })
+        .sort({ type: 1 })
+        .select("name type"),
+    ]);
+
+    const latestComplaintCity = recentComplaints.find((complaint) => complaint.city)?.city;
 
     // Format complaint rows matching Manager frontend table
     const formattedComplaints = recentComplaints.map((c) => {
@@ -265,9 +338,10 @@ const getManagerDashboard = async (req, res) => {
         id: c.complaint_code,
         mongoId: c._id,
         title: c.title,
-        location: c.location,
+        location: c.address,
         landmark: c.landmark || "",
-        area: c.area || "",
+        area: c.area_id?.name || c.locality || c.city || "",
+        city: c.city || "",
         date: formattedDate,
         priority: displayPriority,
         rawPriority: c.priority,
@@ -282,11 +356,13 @@ const getManagerDashboard = async (req, res) => {
       success: true,
       manager: {
         id: req.user._id,
-        name: req.user.name || "Mohan Kumar",
+        name: req.user.name,
         email: req.user.email,
         role: "MANAGER",
-        city: "Coimbatore",
-        zone: "Central Municipal Area",
+        city: managerArea?.type === "CITY"
+          ? managerArea.name
+          : latestComplaintCity || managerArea?.name || "",
+        zone: managerArea?.type === "CITY" ? "" : managerArea?.name || "",
       },
       stats: {
         totalComplaints,

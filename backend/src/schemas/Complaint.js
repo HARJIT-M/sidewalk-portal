@@ -48,32 +48,70 @@ const complaintSchema = new mongoose.Schema(
       enum: ["PENDING", "ASSIGNED", "IN_PROGRESS", "RESOLVED", "CLOSED", "REJECTED"],
       default: "PENDING",
     },
-    location: {
+    address: {
       type: String,
-      required: [true, "Location is required"],
+      required: [true, "Address is required"],
+      trim: true,
+    },
+    locality: {
+      type: String,
+      trim: true,
+    },
+    city: {
+      type: String,
+      trim: true,
+    },
+    state: {
+      type: String,
       trim: true,
     },
     landmark: {
       type: String,
       trim: true,
     },
-    area: {
-      type: String,
-      trim: true,
+    geo_location: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        required: true,
+      },
+      coordinates: {
+        type: [Number],
+        required: true,
+        validate: {
+          validator: (coordinates) =>
+            coordinates.length === 2 &&
+            Number.isFinite(coordinates[0]) &&
+            coordinates[0] >= -180 &&
+            coordinates[0] <= 180 &&
+            Number.isFinite(coordinates[1]) &&
+            coordinates[1] >= -90 &&
+            coordinates[1] <= 90,
+          message: "Coordinates must be [longitude, latitude] within valid ranges.",
+        },
+      },
     },
-    image_url: {
-      type: String,
-      trim: true,
+    area_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Area",
+      default: null,
     },
-    image_public_id: {
-      type: String,
-      trim: true,
+    manager_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true,
     },
-    latitude: {
-      type: Number,
+    escalated: {
+      type: Boolean,
+      default: false,
     },
-    longitude: {
-      type: Number,
+    escalated_at: {
+      type: Date,
+    },
+    requires_admin_routing: {
+      type: Boolean,
+      default: false,
     },
     reported_at: {
       type: Date,
@@ -87,5 +125,8 @@ const complaintSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+complaintSchema.index({ geo_location: "2dsphere" });
+complaintSchema.index({ manager_id: 1, status: 1 });
 
 module.exports = mongoose.model("Complaint", complaintSchema);

@@ -4,6 +4,7 @@ const {
   getDashboardStats,
   getAllUsers,
   updateUserStatus,
+  getUserDeletionDependencySummary,
   deleteUser,
   createUser
 } = require("../controllers/adminController");
@@ -17,6 +18,7 @@ router.use(authorize("ADMIN"));
 
 router.get("/dashboard", getDashboardStats);
 router.get("/users", getAllUsers);
+router.get("/users/:id/dependencies", getUserDeletionDependencySummary);
 router.post("/add-user", createUser);
 router.put("/users/:id/status", updateUserStatus);
 router.delete("/users/:id", deleteUser);
