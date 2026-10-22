@@ -1,4 +1,4 @@
-/* landingpage.css — Paadhai: navy / orange / cream theme */
+/* landingpage.css — align with the application’s indigo / slate palette */
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
 
 * {
@@ -8,20 +8,26 @@
 }
 
 .landing-page {
-  --ink: #101a33;
-  --ink-soft: #1d2b4f;
-  --text: #2b3350;
-  --muted: #6b7390;
-  --orange: #ff6b1a;
-  --orange-deep: #e5530a;
-  --amber: #ffb703;
-  --cream: #fff8f0;
-  --sand: #f7ecdd;
-  --line: #efe3d3;
+  --ink: #1e1b2e;
+  --ink-soft: #2f2b45;
+  --text: #3d4053;
+  --muted: #6b7280;
+  --primary: #4f46e5;
+  --primary-deep: #4338ca;
+  --secondary: #7c3aed;
+  --surface: #f4f5f9;
+  --sand: #eef2ff;
+  --line: #e5e7eb;
+
+  /* Backwards-compatible aliases used throughout the landing page */
+  --orange: var(--primary);
+  --orange-deep: var(--primary-deep);
+  --amber: var(--secondary);
+  --cream: var(--surface);
 
   font-family: "DM Sans", "Segoe UI", Arial, sans-serif;
   color: var(--ink);
-  background: var(--cream);
+  background: var(--surface);
   overflow-x: hidden;
 }
 
@@ -99,8 +105,8 @@
 }
 
 @keyframes dotPulse {
-  0%   { box-shadow: 0 0 0 0 rgba(255, 107, 26, 0.55); }
-  100% { box-shadow: 0 0 0 12px rgba(255, 107, 26, 0); }
+  0%   { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.55); }
+  100% { box-shadow: 0 0 0 12px rgba(79, 70, 229, 0); }
 }
 
 @keyframes underlineDraw {
@@ -113,8 +119,8 @@
 }
 
 @keyframes glowPulse {
-  0%, 100% { box-shadow: 0 10px 26px rgba(255, 107, 26, 0.35); }
-  50%      { box-shadow: 0 10px 38px rgba(255, 107, 26, 0.6); }
+  0%, 100% { box-shadow: 0 10px 26px rgba(79, 70, 229, 0.35); }
+  50%      { box-shadow: 0 10px 38px rgba(79, 70, 229, 0.6); }
 }
 
 
@@ -285,7 +291,7 @@
 .nav-cta {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, var(--amber), var(--orange));
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
   color: white;
   text-decoration: none;
   font-size: 13px;
@@ -325,7 +331,7 @@
   align-items: center;
   padding: 0 30px 130px;
   overflow: hidden;
-  background: var(--ink);
+  background: linear-gradient(135deg, #1e1b2e 0%, #312e81 46%, #4f46e5 100%);
 }
 
 .hero-media {
@@ -347,9 +353,9 @@
   inset: 0;
   background: linear-gradient(
     105deg,
-    rgba(11, 18, 38, 0.95) 0%,
-    rgba(16, 26, 51, 0.88) 50%,
-    rgba(255, 107, 26, 0.3) 100%
+    rgba(17, 24, 39, 0.92) 0%,
+    rgba(49, 46, 129, 0.88) 52%,
+    rgba(79, 70, 229, 0.32) 100%
   );
 }
 
@@ -366,7 +372,7 @@
   height: 320px;
   top: 8%;
   right: 10%;
-  background: rgba(255, 107, 26, 0.35);
+  background: rgba(79, 70, 229, 0.38);
   animation: blobDrift 14s ease-in-out infinite;
 }
 
@@ -375,7 +381,7 @@
   height: 260px;
   bottom: 18%;
   left: 38%;
-  background: rgba(255, 183, 3, 0.2);
+  background: rgba(124, 58, 237, 0.22);
   animation: blobDrift 18s ease-in-out infinite reverse;
 }
 
@@ -511,7 +517,7 @@
 }
 
 .btn-primary.light::after {
-  background: rgba(255, 107, 26, 0.18);
+  background: rgba(79, 70, 229, 0.12);
 }
 
 .btn-ghost {
@@ -875,7 +881,7 @@
 }
 
 .scene-step.active b {
-  box-shadow: 0 0 0 4px rgba(255, 107, 26, 0.25);
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.25);
 }
 
 .scene-foot i {
@@ -931,7 +937,7 @@
 
 .promise:hover {
   transform: translateY(-8px);
-  box-shadow: 0 26px 50px rgba(255, 107, 26, 0.22);
+  box-shadow: 0 26px 50px rgba(79, 70, 229, 0.18);
 }
 
 .promise:hover::after {
@@ -1184,7 +1190,7 @@
 .role-panel:hover {
   transform: translateY(-10px);
   border-color: var(--orange);
-  box-shadow: 0 26px 46px rgba(255, 107, 26, 0.16);
+  box-shadow: 0 26px 46px rgba(79, 70, 229, 0.14);
 }
 
 .role-top {
@@ -1203,7 +1209,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 10px 22px rgba(255, 107, 26, 0.3);
+  box-shadow: 0 10px 22px rgba(79, 70, 229, 0.22);
   transition: transform 0.5s ease;
 }
 
@@ -1507,7 +1513,7 @@
   overflow: hidden;
   max-width: 1180px;
   margin: 90px auto 0;
-  background: linear-gradient(120deg, #101a33, #1d2b4f, #e5530a, #ff6b1a, #101a33);
+  background: linear-gradient(120deg, #1e1b2e, #312e81, #4f46e5, #7c3aed, #1e1b2e);
   background-size: 300% 300%;
   animation: gradientShift 14s ease infinite;
   border-radius: 28px;
