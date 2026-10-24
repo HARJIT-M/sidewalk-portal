@@ -1,4 +1,4 @@
-const { Assignment, Notification, Complaint, Area } = require("../schemas");
+const { Assignment, Notification, Complaint, ComplaintImage, Area } = require("../schemas");
 const { getWorkerForUser } = require("../utils/workerHelper");
 
 // ==========================================
@@ -27,6 +27,20 @@ const getWorkerDashboard = async (req, res) => {
         ],
       })
       .sort({ assigned_at: -1 });
+
+    const assignedComplaintIds = assignments
+      .filter((a) => a.complaint_id)
+      .map((a) => a.complaint_id._id);
+    const beforeImages = await ComplaintImage.find({
+      complaint_id: { $in: assignedComplaintIds },
+      image_type: "BEFORE",
+    }).sort({ uploaded_at: 1 });
+    const imageByComplaint = new Map();
+    beforeImages.forEach((img) => {
+      if (!imageByComplaint.has(String(img.complaint_id))) {
+        imageByComplaint.set(String(img.complaint_id), img.image_url);
+      }
+    });
 
     const complaintsList = assignments
       .filter((a) => a.complaint_id)
@@ -69,7 +83,7 @@ const getWorkerDashboard = async (req, res) => {
                 year: "numeric",
               })
             : "",
-          reportedImage: c.image_url || null,
+          reportedImage: imageByComplaint.get(String(c._id)) || null,
           reporterName: c.reported_by ? c.reported_by.name : "Citizen",
           progress:
             c.status === "RESOLVED" ||
@@ -314,6 +328,17 @@ const getManagerDashboard = async (req, res) => {
     ]);
 
     const latestComplaintCity = recentComplaints.find((complaint) => complaint.city)?.city;
+    const recentComplaintIds = recentComplaints.map((c) => c._id);
+    const recentImages = await ComplaintImage.find({
+      complaint_id: { $in: recentComplaintIds },
+      image_type: "BEFORE",
+    }).sort({ uploaded_at: 1 });
+    const managerImageMap = new Map();
+    recentImages.forEach((img) => {
+      if (!managerImageMap.has(String(img.complaint_id))) {
+        managerImageMap.set(String(img.complaint_id), img.image_url);
+      }
+    });
 
     // Format complaint rows matching Manager frontend table
     const formattedComplaints = recentComplaints.map((c) => {
@@ -348,7 +373,7 @@ const getManagerDashboard = async (req, res) => {
         status: displayStatus,
         rawStatus: c.status,
         reportedBy: c.reported_by ? c.reported_by.name : "Citizen",
-        image: c.image_url || null,
+        image: managerImageMap.get(String(c._id)) || null,
       };
     });
 
@@ -415,7 +440,7 @@ const getUserDashboard = async (req, res) => {
         mongoId: c._id,
         action: actionText,
         issue: c.title,
-        location: c.location,
+        location: c.address || c.location || "",
         priority: c.priority,
         status: c.status,
         date: c.reported_at ? new Date(c.reported_at).toLocaleDateString("en-GB", {

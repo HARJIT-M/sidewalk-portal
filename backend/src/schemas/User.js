@@ -18,6 +18,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    address: {
+      type: String,
+      trim: true,
+    },
     area_ids: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Area" }],
       default: [],

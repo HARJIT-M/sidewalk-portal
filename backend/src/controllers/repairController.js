@@ -7,7 +7,7 @@ const { getWorkerForUser } = require("../utils/workerHelper");
 const startRepair = async (req, res) => {
   try {
     const { complaintId } = req.params;
-    const { description } = req.body;
+    const { description } = req.body || {};
 
     let complaint;
     if (complaintId.match(/^[0-9a-fA-F]{24}$/)) {
@@ -24,55 +24,69 @@ const startRepair = async (req, res) => {
     }
 
     const worker = await getWorkerForUser(req.user._id);
-
-    let assignment;
-    if (worker) {
-      assignment = await Assignment.findOne({
-        complaint_id: complaint._id,
-        worker_id: worker._id,
+    if (!worker) {
+      return res.status(404).json({
+        success: false,
+        message: "Worker profile not found.",
       });
     }
 
+    const assignment = await Assignment.findOne({
+      complaint_id: complaint._id,
+      worker_id: worker._id,
+      status: { $in: ["ASSIGNED", "IN_PROGRESS"] },
+    });
     if (!assignment) {
-      assignment = await Assignment.findOne({ complaint_id: complaint._id });
+      return res.status(403).json({
+        success: false,
+        message: "You are not assigned to this active repair.",
+      });
     }
 
-    if (assignment) {
+    if (assignment.status !== "IN_PROGRESS") {
       assignment.status = "IN_PROGRESS";
-      assignment.started_at = new Date();
+      assignment.started_at = assignment.started_at || new Date();
       await assignment.save();
     }
 
     const oldStatus = complaint.status;
-    complaint.status = "IN_PROGRESS";
-    await complaint.save();
+    if (complaint.status !== "IN_PROGRESS") {
+      complaint.status = "IN_PROGRESS";
+      await complaint.save();
+    }
 
     let repairHistory = await RepairHistory.findOne({
       complaint_id: complaint._id,
+      worker_id: worker._id,
     });
 
     if (!repairHistory) {
       repairHistory = await RepairHistory.create({
         complaint_id: complaint._id,
-        worker_id: worker ? worker._id : assignment?.worker_id || req.user._id,
-        started_at: new Date(),
+        worker_id: worker._id,
+        assignment_id: assignment._id,
+        started_at: assignment.started_at || new Date(),
         repair_description: description || "Repair started on-site.",
         materials_used: [],
       });
     } else {
       repairHistory.started_at = repairHistory.started_at || new Date();
       if (description) repairHistory.repair_description = description;
+      repairHistory.worker_id = worker._id;
+      repairHistory.assignment_id = assignment._id;
       await repairHistory.save();
     }
 
-    await StatusHistory.create({
-      complaint_id: complaint._id,
-      changed_by: req.user._id,
-      old_status: oldStatus,
-      new_status: "IN_PROGRESS",
-      remarks: "Worker started on-site repair work.",
-      changed_at: new Date(),
-    });
+    if (oldStatus !== "IN_PROGRESS") {
+      await StatusHistory.create({
+        complaint_id: complaint._id,
+        changed_by: req.user._id,
+        old_status: oldStatus,
+        new_status: "IN_PROGRESS",
+        remarks: "Worker started on-site repair work.",
+        changed_at: new Date(),
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -187,6 +201,15 @@ const completeRepair = async (req, res) => {
       });
     }
 
+    // If worker submits a progress update that is not yet completed, route to progress update
+    const incomingStatus = (req.body.status || "").toUpperCase();
+    if (incomingStatus === "IN PROGRESS" || incomingStatus === "IN_PROGRESS") {
+      req.body.notes = workDescription || repairDescription || remarks;
+      req.body.progress = 65;
+      req.body.afterImage = afterImage || completionImage;
+      return updateRepairProgress(req, res);
+    }
+
     const worker = await getWorkerForUser(req.user._id);
     const oldStatus = complaint.status;
 
@@ -280,6 +303,13 @@ const verifyRepairWork = async (req, res) => {
       });
     }
 
+    if (req.user.role === "MANAGER" && String(complaint.manager_id) !== String(req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to verify complaints outside your jurisdiction.",
+      });
+    }
+
     complaint.status = "CLOSED";
     await complaint.save();
 
@@ -325,9 +355,13 @@ const getRepairDetails = async (req, res) => {
 
     let complaint;
     if (complaintId.match(/^[0-9a-fA-F]{24}$/)) {
-      complaint = await Complaint.findById(complaintId).populate("reported_by", "name phone email");
+      complaint = await Complaint.findById(complaintId)
+        .populate("reported_by", "name phone email")
+        .populate("area_id", "name type");
     } else {
-      complaint = await Complaint.findOne({ complaint_code: complaintId }).populate("reported_by", "name phone email");
+      complaint = await Complaint.findOne({ complaint_code: complaintId })
+        .populate("reported_by", "name phone email")
+        .populate("area_id", "name type");
     }
 
     if (!complaint) {
@@ -375,9 +409,9 @@ const getRepairDetails = async (req, res) => {
           issueType: complaint.issue_type,
           priority: complaint.priority,
           status: complaint.status,
-          location: complaint.location,
-          landmark: complaint.landmark,
-          area: complaint.area,
+          location: complaint.address || complaint.location || "",
+          landmark: complaint.landmark || "",
+          area: complaint.area_id?.name || complaint.locality || complaint.city || "",
           reportedAt: complaint.reported_at,
           reportedBy: complaint.reported_by?.name,
         },
@@ -404,8 +438,14 @@ const getAllRepairs = async (req, res) => {
   try {
     const { status, search } = req.query;
 
-    const complaints = await Complaint.find()
+    const complaintFilter = {};
+    if (req.user.role === "MANAGER") {
+      complaintFilter.manager_id = req.user._id;
+    }
+
+    const complaints = await Complaint.find(complaintFilter)
       .populate("reported_by", "name phone")
+      .populate("area_id", "name type")
       .sort({ reported_at: -1 });
 
     const [allAssignments, allRepairs] = await Promise.all([
@@ -469,6 +509,15 @@ const getAllRepairs = async (req, res) => {
             })
           : "";
 
+      const expectedDateFormatted =
+        complaintAssignments.length > 0 && complaintAssignments[0].scheduled_end_at
+          ? new Date(complaintAssignments[0].scheduled_end_at).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })
+          : "";
+
       const historyTimeline = complaintRepairs.map((rh) => ({
         date: rh.started_at
           ? new Date(rh.started_at).toLocaleDateString("en-GB", {
@@ -489,16 +538,16 @@ const getAllRepairs = async (req, res) => {
         id: c.complaint_code,
         mongoId: c._id,
         title: c.title,
-        location: c.location,
+        location: c.address || c.location || "",
         landmark: c.landmark || "",
-        area: c.area || "",
+        area: c.area_id?.name || c.locality || c.city || "",
         priority: displayPriority,
         status: displayStatus,
         progress,
         assignedWorkers: assignedWorkerNames,
         assignedDate: assignedDateFormatted,
         startedDate: startedDateFormatted,
-        expectedDate: "24 Aug 2026",
+        expectedDate: expectedDateFormatted,
         lastUpdate: latestRepair
           ? latestRepair.repair_description
           : complaintAssignments.length > 0
@@ -531,10 +580,10 @@ const getAllRepairs = async (req, res) => {
       const q = search.toLowerCase();
       trackWorks = trackWorks.filter(
         (w) =>
-          w.id.toLowerCase().includes(q) ||
-          w.title.toLowerCase().includes(q) ||
-          w.location.toLowerCase().includes(q) ||
-          w.assignedWorkers.some((worker) => worker.toLowerCase().includes(q))
+          (w.id && w.id.toLowerCase().includes(q)) ||
+          (w.title && w.title.toLowerCase().includes(q)) ||
+          (w.location && w.location.toLowerCase().includes(q)) ||
+          (w.assignedWorkers && w.assignedWorkers.some((worker) => worker && worker.toLowerCase().includes(q)))
       );
     }
 

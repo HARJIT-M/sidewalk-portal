@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   getWorkerComplaintDetails,
   startComplaintWork,
   submitWorkUpdate,
-  getWorkerProfile,
 } from "../../services/workerApi";
 import "./WorkerComplaintDetails.css";
 
@@ -13,7 +12,6 @@ const WorkerComplaintDetails = () => {
   const navigate = useNavigate();
 
   const [complaint, setComplaint] = useState(null);
-  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [successAlert, setSuccessAlert] = useState("");
@@ -26,64 +24,66 @@ const WorkerComplaintDetails = () => {
   const [remarks, setRemarks] = useState("");
   const [completionImage, setCompletionImage] = useState(null);
 
-  const loadDetails = async () => {
+  const loadDetails = useCallback(async () => {
     try {
       setLoading(true);
       setErrorAlert("");
-      const [res, profRes] = await Promise.allSettled([
-        getWorkerComplaintDetails(id),
-        getWorkerProfile(),
-      ]);
-
-      if (res.status === "fulfilled" && res.value.success) {
-        const found = res.value.complaint;
-        setComplaint(found);
-        setWorkDescription(found.workDescription || "");
-        setMaterialsUsed(found.materialsUsed || "");
-        setRemarks(found.remarks || "");
-        setCompletionImage(found.completionImage || null);
-        if (found.status === "RESOLVED" || found.status === "COMPLETED" || found.status === "CLOSED") {
-          setWorkStatus("Completed");
-        } else if (found.status === "IN_PROGRESS") {
-          setWorkStatus("In Progress");
-        } else {
-          setWorkStatus("Pending");
-        }
-      } else {
-        setErrorAlert("Complaint details not found.");
+      const res = await getWorkerComplaintDetails(id);
+      if (!res?.success || !res.complaint) {
+        throw new Error(res?.message || "Complaint details not found.");
       }
-
-      if (profRes.status === "fulfilled" && profRes.value.success) {
-        setProfile(profRes.value.profile);
+      const found = res.complaint;
+      setComplaint(found);
+      setWorkDescription(found.workDescription || "");
+      setMaterialsUsed(found.materialsUsed || "");
+      setRemarks(found.remarks || "");
+      setCompletionImage(found.completionImage || null);
+      if (found.status === "RESOLVED" || found.status === "COMPLETED" || found.status === "CLOSED") {
+        setWorkStatus("Completed");
+      } else if (found.status === "IN_PROGRESS") {
+        setWorkStatus("In Progress");
+      } else {
+        setWorkStatus("Pending");
       }
     } catch (err) {
       console.error("Error loading complaint details:", err);
-      setErrorAlert("Failed to load complaint details from server.");
+      setErrorAlert(
+        err.response?.data?.message ||
+          err.message ||
+          "Failed to load complaint details from server."
+      );
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
-    loadDetails();
-  }, [id]);
+    const timeoutId = window.setTimeout(loadDetails, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [loadDetails]);
 
   // Quick Action: Start Work
   const handleStartWork = async () => {
     try {
       setSubmitting(true);
       setErrorAlert("");
-      console.log("Id from handleStartWork :",id);
-      const res = await startComplaintWork(id);
-      if (res.success) {
-        setSuccessAlert("Work status updated to In Progress in MongoDB!");
-        setWorkStatus("In Progress");
-        await loadDetails();
-        setTimeout(() => setSuccessAlert(""), 4000);
+      const res = await startComplaintWork(id, {
+        description: "Repair started on-site.",
+      });
+      if (!res?.success) {
+        throw new Error(res?.message || "Failed to start repair work.");
       }
+      setSuccessAlert(res.message || "Repair work started successfully.");
+      setWorkStatus("In Progress");
+      await loadDetails();
+      setTimeout(() => setSuccessAlert(""), 4000);
     } catch (err) {
       console.error("Failed to start work:", err);
-      setErrorAlert(err.response?.data?.message || "Failed to update work status.");
+      setErrorAlert(
+        err.response?.data?.message ||
+          err.message ||
+          "Failed to update work status."
+      );
     } finally {
       setSubmitting(false);
     }

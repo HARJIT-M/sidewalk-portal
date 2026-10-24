@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Wrench,
   Users,
+  UserRound,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -37,11 +38,18 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
       path: "/workers",
       icon: Users,
     },
+    {
+      name: "My Profile",
+      path: "/manager/profile",
+      icon: UserRound,
+    },
   ];
 
   // ================= LOGOUT =================
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to log out?")) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
       navigate("/login");
     }
   };

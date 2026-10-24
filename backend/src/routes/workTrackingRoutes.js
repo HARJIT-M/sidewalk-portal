@@ -16,9 +16,9 @@ router.use(protect);
 // ==========================================
 // 1. WORK EXECUTION ROUTES
 // ==========================================
-router.post("/:complaintId/start", startRepair);
-router.post("/:complaintId/update-work", completeRepair);
-router.post("/:complaintId/update", updateRepairProgress);
+router.post("/:complaintId/start", authorize("WORKER"), startRepair);
+router.post("/:complaintId/update-work", authorize("WORKER"), completeRepair);
+router.post("/:complaintId/update", authorize("WORKER"), updateRepairProgress);
 
 // ==========================================
 // 2. MANAGER WORK TRACKING & VERIFICATION

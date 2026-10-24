@@ -12,7 +12,7 @@ import {
   RefreshCw,
   Clock,
 } from "lucide-react";
-import { getAllWorkTracking } from "../../../services/managerApi";
+import { getAllWorkTracking, verifyRepairWork } from "../../../services/managerApi";
 import "./new_track.css";
 
 const WorkTracking = () => {
@@ -22,6 +22,7 @@ const WorkTracking = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [statusFilter, setStatusFilter] = useState("All");
   const [search, setSearch] = useState("");
+  const [verifying, setVerifying] = useState(false);
 
   const loadWorkTracking = async () => {
     try {
@@ -40,6 +41,22 @@ const WorkTracking = () => {
       setErrorMsg(err.message || "Failed to load work tracking records.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleVerify = async (complaintId) => {
+    if (!window.confirm("Verify and sign off on this completed repair work?")) return;
+    try {
+      setVerifying(true);
+      const res = await verifyRepairWork(complaintId, { verificationNotes: "Verified and signed off by Field Manager." });
+      if (res && res.success) {
+        alert("Repair verified and complaint closed successfully!");
+        await loadWorkTracking();
+      }
+    } catch (err) {
+      alert(err.message || "Failed to verify repair work.");
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -313,6 +330,47 @@ const WorkTracking = () => {
                   ></div>
                 </div>
               </div>
+
+              {/* Verification Callout if Work is Done */}
+              {(selectedWork.progress === 100 || selectedWork.status === "Completed") && (
+                <div style={{
+                  background: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  borderRadius: "10px",
+                  padding: "14px 16px",
+                  marginBottom: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "12px",
+                }}>
+                  <div>
+                    <h4 style={{ margin: "0 0 4px 0", color: "#166534", fontSize: "14px", fontWeight: "600" }}>
+                      Work Done & Awaiting Verification
+                    </h4>
+                    <p style={{ margin: 0, color: "#15803d", fontSize: "12px" }}>
+                      Maintenance crew marked on-site repair as completed. Sign off to close.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleVerify(selectedWork.mongoId || selectedWork.id)}
+                    disabled={verifying}
+                    style={{
+                      background: "#16a34a",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "8px",
+                      padding: "8px 16px",
+                      fontWeight: "600",
+                      fontSize: "13px",
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {verifying ? "Verifying..." : "Verify & Close"}
+                  </button>
+                </div>
+              )}
 
               {/* Meta Grid */}
               <div className="detail-info-grid">

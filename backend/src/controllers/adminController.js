@@ -68,10 +68,11 @@ const getDashboardStats = async (req, res) => {
     const hotspotAreas = await Complaint.aggregate([
       {
         $group: {
-          _id: "$location",
+          _id: { $ifNull: ["$locality", { $ifNull: ["$city", "$address"] }] },
           complaints: { $sum: 1 },
         },
       },
+      { $match: { _id: { $ne: null } } },
       {
         $project: {
           area: "$_id",
@@ -91,9 +92,57 @@ const getDashboardStats = async (req, res) => {
       { $limit: 5 },
     ]);
 
-    // For recent activity, you might want to fetch latest users and complaints
-    // This is a simplified representation
-    const recentActivity = []; // populate with actual latest data if needed
+    // Fetch latest complaints and user signups for real recent activity
+    const [latestComplaints, latestUsers] = await Promise.all([
+      Complaint.find()
+        .sort({ reported_at: -1, createdAt: -1 })
+        .limit(5)
+        .select("complaint_code title status reported_at createdAt")
+        .lean(),
+      User.find()
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .select("name role status createdAt")
+        .lean(),
+    ]);
+
+    const recentActivity = [
+      ...latestComplaints.map((c) => ({
+        title: `Complaint ${c.complaint_code}: ${c.title}`,
+        meta: `Status: ${c.status}`,
+        time: c.reported_at || c.createdAt
+          ? new Date(c.reported_at || c.createdAt).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "Recently",
+        timestamp: c.reported_at || c.createdAt,
+        tone:
+          c.status === "RESOLVED" || c.status === "CLOSED"
+            ? "green"
+            : c.status === "IN_PROGRESS"
+            ? "blue"
+            : "amber",
+      })),
+      ...latestUsers.map((u) => ({
+        title: `New user: ${u.name}`,
+        meta: `Role: ${u.role}`,
+        time: u.createdAt
+          ? new Date(u.createdAt).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "Recently",
+        timestamp: u.createdAt,
+        tone: "indigo",
+      })),
+    ]
+      .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+      .slice(0, 8);
 
     res.json({
       success: true,

@@ -32,6 +32,8 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
   // ================= LOGOUT =================
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to log out?")) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
       navigate("/login");
     }
   };
@@ -58,12 +60,12 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
       <div className="sidebar-brand">
 
         <div className="brand-icon">
-          F
+          A
         </div>
 
         <div className="brand-text">
           <h2>Footpath</h2>
-          <span>Manager Portal</span>
+          <span>Admin Portal</span>
         </div>
 
       </div>
@@ -73,7 +75,7 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
       <nav className="sidebar-nav">
 
         <p className="nav-title">
-          MANAGER MENU
+          ADMIN MENU
         </p>
 
         {menuItems.map((item) => {

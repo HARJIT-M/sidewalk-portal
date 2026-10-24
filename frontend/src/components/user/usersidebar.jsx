@@ -40,6 +40,8 @@ const UserSidebar = ({ collapsed, setCollapsed }) => {
 
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to log out?")) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
       navigate("/login");
     }
   };

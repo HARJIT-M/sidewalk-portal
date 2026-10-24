@@ -1042,7 +1042,14 @@ const getUserComplaints = async (req, res) => {
     let filter = { reported_by: req.user._id };
 
     if (status && status !== "All") {
-      filter.status = status.toUpperCase();
+      const s = status.toUpperCase().replace(/\s+/g, "_");
+      if (s === "COMPLETED" || s === "RESOLVED") {
+        filter.status = { $in: ["RESOLVED", "CLOSED"] };
+      } else if (s === "PENDING" || s === "NOT_ASSIGNED") {
+        filter.status = { $in: ["PENDING", "ASSIGNED"] };
+      } else {
+        filter.status = s;
+      }
     }
 
     const complaints = await Complaint.find(filter)

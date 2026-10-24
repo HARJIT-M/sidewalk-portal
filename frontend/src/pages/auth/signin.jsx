@@ -79,7 +79,7 @@ const Signup = () => {
     } catch (err) {
       console.error("Signup failed:", err);
       showError(
-        err?.response?.data?.message ||
+        err.message ||
           "Could not create your account. Please try again."
       );
     } finally {

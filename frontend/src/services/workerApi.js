@@ -71,9 +71,11 @@ export const getWorkerComplaintDetails = async (id) => {
 // ==========================================
 // 4. WORK TRACKING APIS
 // ==========================================
-export const startComplaintWork = async (id) => {
-  console.log("Id from startComplaint :",id);
-  const response = await workerApi.post(`/api/work-tracking/${id}/start`);
+export const startComplaintWork = async (id, payload = {}) => {
+  const response = await workerApi.post(
+    `/api/work-tracking/${id}/start`,
+    payload
+  );
   return response.data;
 };
 

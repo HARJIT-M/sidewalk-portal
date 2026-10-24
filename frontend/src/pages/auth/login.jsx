@@ -59,7 +59,7 @@ const Login = () => {
       }
     } catch (err) {
       console.error("Login attempt failed:", err);
-      showError("Sign in failed. Please check your email and password.");
+      showError(err.message || "Sign in failed. Please check your email and password.");
     } finally {
       setLoading(false);
     }

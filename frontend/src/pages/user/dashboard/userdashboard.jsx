@@ -159,7 +159,7 @@ const UserDashboard = () => {
 
           <button
             className="view-all-btn"
-            onClick={() => navigate("/my-complaints")}
+            onClick={() => navigate("/user/view-complaint")}
           >
             View All
           </button>

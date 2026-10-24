@@ -60,10 +60,11 @@ const ViewComplaints = () => {
   // FILTER COMPLAINTS
   // ============================
   const filteredComplaints = complaints.filter((complaint) => {
+    const q = search.toLowerCase();
     const matchesSearch =
-      complaint.id.toLowerCase().includes(search.toLowerCase()) ||
-      complaint.title.toLowerCase().includes(search.toLowerCase()) ||
-      complaint.location.toLowerCase().includes(search.toLowerCase());
+      (complaint.id && complaint.id.toLowerCase().includes(q)) ||
+      (complaint.title && complaint.title.toLowerCase().includes(q)) ||
+      (complaint.location && complaint.location.toLowerCase().includes(q));
 
     const displayStatus = formatStatus(complaint.status);
     const matchesStatus = statusFilter === "All" || displayStatus === statusFilter;

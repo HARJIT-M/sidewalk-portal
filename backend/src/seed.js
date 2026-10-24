@@ -42,7 +42,16 @@ const seedDatabase = async () => {
     const hashedPassword = await bcrypt.hash("password123", 10);
 
     // 2. Create Users
-    console.log("Creating Users (Citizens, Manager, Workers)...");
+    console.log("Creating Users (Admin, Citizens, Manager, Workers)...");
+    const adminUser = await User.create({
+      name: "System Administrator",
+      email: "admin@gmail.com",
+      phone: "+91 98765 43000",
+      password: hashedPassword,
+      role: "ADMIN",
+      status: "ACTIVE",
+    });
+
     const managerUser = await User.create({
       name: "Mohan Kumar",
       email: "mohan@gmail.com",

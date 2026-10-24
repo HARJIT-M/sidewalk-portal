@@ -1,5 +1,15 @@
 import { useState, useEffect } from "react";
 import {
+  CalendarDays,
+  ClipboardList,
+  Flag,
+  MapPin,
+  Navigation,
+  UserRound,
+  UsersRound,
+  X,
+} from "lucide-react";
+import {
   getManagerComplaints,
   getAvailableWorkers,
   updateComplaintPriority,
@@ -520,185 +530,231 @@ const Complaints = () => {
       {/* COMPLAINT DETAILS POPUP */}
       {/* ================================================= */}
       {showDetails && selectedComplaint && (
-        <div className="modal-overlay" onClick={() => setShowDetails(false)}>
-          <div className="details-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <span className="modal-id">{selectedComplaint.id}</span>
-                <h2>{selectedComplaint.title}</h2>
-              </div>
-
-              <button
-                className="close-btn"
-                onClick={() => setShowDetails(false)}
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="details-content">
-              {selectedComplaint.image && (
-                <div className="complaint-image-container">
-                  <img
-                    src={selectedComplaint.image}
-                    alt={selectedComplaint.title}
-                    className="complaint-image"
-                  />
-
-                  <div className="image-badges">
-                    <span
-                      className={`priority-badge ${priorityClass(
-                        selectedComplaint.priority
-                      )}`}
-                    >
-                      {selectedComplaint.priority === "Not Set"
-                        ? "Priority Not Set"
-                        : `${selectedComplaint.priority} Priority`}
-                    </span>
-
-                    <span
-                      className={`status-badge ${statusClass(
-                        selectedComplaint.status
-                      )}`}
-                    >
-                      {selectedComplaint.status}
-                    </span>
-                  </div>
+        <div
+          className="modal-overlay manager-details-overlay"
+          onClick={() => setShowDetails(false)}
+        >
+          <section
+            className="details-modal manager-details-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="manager-details-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="manager-details-hero">
+              {selectedComplaint.image ? (
+                <img
+                  className="manager-details-hero-image"
+                  src={selectedComplaint.image}
+                  alt={`Reported ${selectedComplaint.title}`}
+                />
+              ) : (
+                <div className="manager-details-hero-empty">
+                  <ClipboardList size={36} />
+                  <span>Complaint report</span>
                 </div>
               )}
-
-              {/* PRIORITY EDITOR IN MODAL */}
-              <div className="priority-editor">
-                <span>Set Priority</span>
-                <div className="priority-options">
-                  {PRIORITY_LEVELS.filter((p) => p !== "Not Set").map((p) => (
-                    <button
-                      key={p}
-                      className={`priority-pill ${priorityClass(p)} ${
-                        selectedComplaint.priority === p ? "active" : ""
-                      }`}
-                      onClick={() =>
-                        handlePriorityChange(selectedComplaint.id, p)
-                      }
-                    >
-                      {p}
-                    </button>
-                  ))}
+              <div className="manager-details-hero-shade" />
+              <div className="manager-details-hero-content">
+                <div className="manager-details-badges">
+                  <span className="manager-details-id">
+                    {selectedComplaint.id}
+                  </span>
+                  <span
+                    className={`status-badge ${statusClass(
+                      selectedComplaint.status
+                    )}`}
+                  >
+                    {selectedComplaint.status}
+                  </span>
                 </div>
+                <h2 id="manager-details-title">{selectedComplaint.title}</h2>
+                <p>
+                  <MapPin size={15} />
+                  {selectedComplaint.location || "Location not provided"}
+                  {[selectedComplaint.locality, selectedComplaint.city]
+                    .filter(Boolean)
+                    .join(", ") &&
+                    ` · ${[selectedComplaint.locality, selectedComplaint.city]
+                      .filter(Boolean)
+                      .join(", ")}`}
+                </p>
               </div>
+              <button
+                className="manager-details-close"
+                type="button"
+                aria-label="Close complaint details"
+                onClick={() => setShowDetails(false)}
+              >
+                <X size={19} />
+              </button>
+            </header>
 
-              <div className="complaint-information">
-                <div className="info-row">
-                  <div className="info-icon">📍</div>
-                  <div>
-                    <span>Location</span>
-                    <strong>{selectedComplaint.location}</strong>
-                    {(selectedComplaint.locality || selectedComplaint.city) && (
-                      <small>
-                        {[selectedComplaint.locality, selectedComplaint.city]
-                          .filter(Boolean)
-                          .join(", ")}
-                      </small>
-                    )}
-                    {selectedComplaint.navigationUrl && (
-                      <a
-                        href={selectedComplaint.navigationUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Open exact pin in Maps
-                      </a>
-                    )}
+            <div className="manager-details-body">
+              <main className="manager-details-main">
+                <section className="manager-details-section">
+                  <div className="manager-details-section-title">
+                    <ClipboardList size={17} />
+                    <h3>Report details</h3>
                   </div>
-                </div>
-
-                <div className="info-row">
-                  <div className="info-icon">🧑</div>
-                  <div>
-                    <span>Reported By</span>
-                    <strong>{selectedComplaint.reportedBy || "Citizen"}</strong>
-                  </div>
-                </div>
-
-                <div className="info-row">
-                  <div className="info-icon">📅</div>
-                  <div>
-                    <span>Reported Date</span>
-                    <strong>{selectedComplaint.date || selectedComplaint.reportedDate}</strong>
-                  </div>
-                </div>
-
-                {selectedComplaint.workStartDate && (
-                  <div className="info-row">
-                    <div className="info-icon">🗓️</div>
+                  <p className="manager-details-description">
+                    {selectedComplaint.description ||
+                      "No additional description was provided."}
+                  </p>
+                  <div className="manager-details-facts">
                     <div>
-                      <span>Work Timeline</span>
+                      <span><UserRound size={14} /> Reported by</span>
+                      <strong>{selectedComplaint.reportedBy || "Citizen"}</strong>
+                    </div>
+                    <div>
+                      <span><CalendarDays size={14} /> Reported on</span>
                       <strong>
-                        {formatDate(selectedComplaint.workStartDate)} →{" "}
-                        {formatDate(selectedComplaint.workEndDate)}
+                        {selectedComplaint.date ||
+                          selectedComplaint.reportedDate ||
+                          "Date unavailable"}
                       </strong>
                     </div>
+                    {selectedComplaint.landmark && (
+                      <div>
+                        <span><MapPin size={14} /> Landmark</span>
+                        <strong>{selectedComplaint.landmark}</strong>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                  {selectedComplaint.navigationUrl && (
+                    <a
+                      className="manager-details-map-link"
+                      href={selectedComplaint.navigationUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <Navigation size={15} />
+                      Open exact location in Maps
+                    </a>
+                  )}
+                </section>
 
-              {(() => {
-                const overdue = getOverdueInfo(selectedComplaint);
-                return overdue ? (
-                  <div className={`overdue-banner ${overdue.type}`}>
-                    {overdue.type === "overdue" && "⚠️ "}
-                    {overdue.label} to complete this work
+                <section className="manager-details-section">
+                  <div className="manager-details-section-title">
+                    <UsersRound size={17} />
+                    <h3>Assigned maintenance team</h3>
                   </div>
-                ) : null;
-              })()}
+                  {selectedComplaint.assignedWorkers?.length ? (
+                    <div className="manager-details-team">
+                      {selectedComplaint.assignedWorkers.map((worker) => (
+                        <div className="manager-details-worker" key={worker}>
+                          <span>{worker.charAt(0).toUpperCase()}</span>
+                          <strong>{worker}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="manager-details-unassigned">
+                      No workers assigned to this complaint yet.
+                    </p>
+                  )}
+                </section>
+              </main>
 
-              <div className="description-section">
-                <h3>Description</h3>
-                <p>{selectedComplaint.description || "No additional description provided."}</p>
-              </div>
+              <aside className="manager-details-sidebar">
+                <section className="manager-details-panel">
+                  <div className="manager-details-section-title">
+                    <Flag size={17} />
+                    <h3>Priority</h3>
+                  </div>
+                  <span
+                    className={`manager-details-priority ${priorityClass(
+                      selectedComplaint.priority
+                    )}`}
+                  >
+                    {selectedComplaint.priority || "Not Set"}
+                  </span>
+                  <div className="manager-details-priority-options">
+                    {PRIORITY_LEVELS.filter((priority) => priority !== "Not Set").map(
+                      (priority) => (
+                        <button
+                          type="button"
+                          key={priority}
+                          className={`priority-pill ${priorityClass(priority)} ${
+                            selectedComplaint.priority === priority
+                              ? "active"
+                              : ""
+                          }`}
+                          aria-pressed={selectedComplaint.priority === priority}
+                          onClick={() =>
+                            handlePriorityChange(selectedComplaint.id, priority)
+                          }
+                        >
+                          {priority}
+                        </button>
+                      )
+                    )}
+                  </div>
+                </section>
 
-              <div className="assigned-section">
-                <h3>Assigned Maintenance Crew</h3>
-
-                {!selectedComplaint.assignedWorkers || selectedComplaint.assignedWorkers.length === 0 ? (
-                  <p className="no-workers">No workers assigned yet.</p>
-                ) : (
-                  <div className="assigned-workers">
-                    {selectedComplaint.assignedWorkers.map((worker) => (
-                      <span key={worker}>
-                        <span className="assigned-avatar">
-                          {worker.charAt(0)}
-                        </span>
-                        {worker}
+                <section className="manager-details-panel">
+                  <div className="manager-details-section-title">
+                    <CalendarDays size={17} />
+                    <h3>Work schedule</h3>
+                  </div>
+                  {selectedComplaint.workStartDate ? (
+                    <div className="manager-details-schedule">
+                      <strong>{formatDate(selectedComplaint.workStartDate)}</strong>
+                      <span>to</span>
+                      <strong>{formatDate(selectedComplaint.workEndDate)}</strong>
+                    </div>
+                  ) : (
+                    <p className="manager-details-unassigned">
+                      Work has not been scheduled.
+                    </p>
+                  )}
+                  {(() => {
+                    const overdue = getOverdueInfo(selectedComplaint);
+                    return overdue ? (
+                      <span
+                        className={`overdue-badge ${overdue.type} manager-details-overdue`}
+                      >
+                        {overdue.label}
                       </span>
-                    ))}
-                  </div>
+                    ) : null;
+                  })()}
+                </section>
+              </aside>
+            </div>
+
+            <footer className="manager-details-footer">
+              <span>
+                {selectedComplaint.assignedWorkers?.length
+                  ? `${selectedComplaint.assignedWorkers.length} worker${
+                      selectedComplaint.assignedWorkers.length === 1 ? "" : "s"
+                    } assigned`
+                  : "Awaiting assignment"}
+              </span>
+              <div>
+                <button
+                  className="cancel-btn"
+                  type="button"
+                  onClick={() => setShowDetails(false)}
+                >
+                  Close
+                </button>
+                {(selectedComplaint.status === "Not Assigned" ||
+                  selectedComplaint.status === "Pending") && (
+                  <button
+                    className="assign-main-btn"
+                    type="button"
+                    disabled={selectedComplaint.priority === "Not Set"}
+                    onClick={() => {
+                      setShowDetails(false);
+                      handleOpenAssign(selectedComplaint);
+                    }}
+                  >
+                    Assign workers
+                  </button>
                 )}
               </div>
-            </div>
-
-            <div className="modal-footer">
-              <button
-                className="cancel-btn"
-                onClick={() => setShowDetails(false)}
-              >
-                Close
-              </button>
-
-              {(selectedComplaint.status === "Not Assigned" || selectedComplaint.status === "Pending") && (
-                <button
-                  className="assign-main-btn"
-                  disabled={selectedComplaint.priority === "Not Set"}
-                  onClick={() => {
-                    setShowDetails(false);
-                    handleOpenAssign(selectedComplaint);
-                  }}
-                >
-                  Assign Workers
-                </button>
-              )}
-            </div>
-          </div>
+            </footer>
+          </section>
         </div>
       )}
 

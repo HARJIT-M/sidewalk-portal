@@ -17,9 +17,9 @@ router.use(protect);
 // ==========================================
 // 1. WORKER REPAIR ACTIONS (WHAT HAPPENED?)
 // ==========================================
-router.post("/:complaintId/start", startRepair);
-router.put("/:complaintId/progress", updateRepairProgress);
-router.post("/:complaintId/complete", completeRepair);
+router.post("/:complaintId/start", authorize("WORKER"), startRepair);
+router.put("/:complaintId/progress", authorize("WORKER"), updateRepairProgress);
+router.post("/:complaintId/complete", authorize("WORKER"), completeRepair);
 
 // ==========================================
 // 2. MANAGER REPAIR VERIFICATION

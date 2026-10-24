@@ -136,6 +136,10 @@ const login = async (req, res) => {
     }
 
     // --- DEMO USER ROLE OVERRIDES ---
+    if (user.email === "admin@gmail.com" && user.role !== "ADMIN") {
+      user.role = "ADMIN";
+      await user.save();
+    }
     if (user.email === "mohan@gmail.com" && user.role !== "MANAGER") {
       user.role = "MANAGER";
       await user.save();

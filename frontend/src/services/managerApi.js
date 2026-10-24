@@ -40,6 +40,35 @@ export const getManagerProfile = async () => {
   }
 };
 
+export const getManagerLocationOptions = async () => {
+  try {
+    const response = await managerApi.get(
+      "/api/manager/profile/location-options"
+    );
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error?.response?.data?.message ||
+        "Failed to load available service areas.",
+      { cause: error }
+    );
+  }
+};
+
+export const updateManagerLocation = async (locationId) => {
+  try {
+    const response = await managerApi.put("/api/manager/profile/location", {
+      locationId,
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error?.response?.data?.message || "Failed to update service area.",
+      { cause: error }
+    );
+  }
+};
+
 // ==========================================
 // 2. COMPLAINTS MANAGEMENT
 // ==========================================

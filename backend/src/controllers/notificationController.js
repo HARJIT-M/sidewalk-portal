@@ -6,17 +6,9 @@ const { Notification } = require("../schemas");
 const getWorkerNotifications = async (req, res) => {
   try {
     // 1. Query notifications specifically assigned to this user
-    let notifs = await Notification.find({ user_id: req.user._id })
+    const notifs = await Notification.find({ user_id: req.user._id })
       .populate("complaint_id", "complaint_code title")
       .sort({ created_at: -1, createdAt: -1 });
-
-    // 2. If user is a MANAGER or test account with no specific notifications,
-    // fallback to general/worker notifications so list is never empty
-    if (!notifs || notifs.length === 0) {
-      notifs = await Notification.find()
-        .populate("complaint_id", "complaint_code title")
-        .sort({ created_at: -1, createdAt: -1 });
-    }
 
     const formattedNotifs = notifs.map((n) => {
       let timeAgo = "Recently";
@@ -75,7 +67,10 @@ const getWorkerNotifications = async (req, res) => {
 const markNotificationRead = async (req, res) => {
   try {
     const { id } = req.params;
-    await Notification.findByIdAndUpdate(id, { is_read: true });
+    await Notification.findOneAndUpdate(
+      { _id: id, user_id: req.user._id },
+      { is_read: true }
+    );
 
     return res.status(200).json({
       success: true,
@@ -96,8 +91,7 @@ const markNotificationRead = async (req, res) => {
 // ==========================================
 const markAllNotificationsRead = async (req, res) => {
   try {
-    const filter = req.user?.role === "MANAGER" ? {} : { user_id: req.user._id };
-    await Notification.updateMany(filter, { is_read: true });
+    await Notification.updateMany({ user_id: req.user._id }, { is_read: true });
 
     return res.status(200).json({
       success: true,
@@ -119,7 +113,7 @@ const markAllNotificationsRead = async (req, res) => {
 const deleteNotification = async (req, res) => {
   try {
     const { id } = req.params;
-    await Notification.findByIdAndDelete(id);
+    await Notification.findOneAndDelete({ _id: id, user_id: req.user._id });
 
     return res.status(200).json({
       success: true,
