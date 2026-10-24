@@ -9,6 +9,9 @@
     "dev": "nodemon server.js",
     "seed": "node src/seed.js"
   },
+  "allowScripts": {
+    "core-js": true
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
