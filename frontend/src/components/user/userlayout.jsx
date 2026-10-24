@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import UserSidebar from "./usersidebar";
-import "./UserLayout.css";
+import "./userlayout.css";
 
 const UserLayout = () => {
   const [collapsed, setCollapsed] = useState(() => {
