@@ -1,13 +1,20 @@
 import { useState, useEffect } from "react";
 import {
-  CalendarDays,
-  ClipboardList,
-  Flag,
+  Search,
+  RefreshCw,
   MapPin,
-  Navigation,
-  UserRound,
-  UsersRound,
+  User,
+  Calendar,
+  CalendarRange,
   X,
+  AlertCircle,
+  CheckCircle2,
+  ExternalLink,
+  Check,
+  Inbox,
+  ClipboardList,
+  Users,
+  Clock,
 } from "lucide-react";
 import {
   getManagerComplaints,
@@ -109,6 +116,19 @@ const Complaints = () => {
       isCurrentRequest = false;
     };
   }, [showAssignPopup, startDate, endDate]);
+
+  // close popups with the Escape key
+  useEffect(() => {
+    if (!showDetails && !showAssignPopup) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        setShowDetails(false);
+        setShowAssignPopup(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showDetails, showAssignPopup]);
 
   const filteredComplaints = complaints.filter((complaint) => {
     const q = search.toLowerCase();
@@ -271,9 +291,11 @@ const Complaints = () => {
     }
   };
 
-  const statusClass = (status) => (status ? status.toLowerCase().replace(" ", "-") : "pending");
+  const statusClass = (status) =>
+    status ? status.toLowerCase().replace(/\s+/g, "-") : "pending";
 
-  const priorityClass = (priority) => (priority ? priority.toLowerCase().replace(" ", "-") : "medium");
+  const priorityClass = (priority) =>
+    priority ? priority.toLowerCase().replace(/\s+/g, "-") : "medium";
 
   const formatDate = (isoDate) => {
     if (!isoDate) return "";
@@ -309,59 +331,69 @@ const Complaints = () => {
   };
 
   return (
-    <div className="complaints-page">
+    <div className="mc-page">
+
       {/* ================= HEADER ================= */}
-      <div className="page-header">
-        <div>
+      <section className="mc-hero">
+        <div className="mc-hero-rings" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div className="mc-hero-slabs" aria-hidden="true">
+          <i></i><i></i><i></i><i></i>
+        </div>
+
+        <div className="mc-hero-text">
+          <span className="mc-hero-tag">
+            <ClipboardList size={14} strokeWidth={2.4} /> Manager Console
+          </span>
           <h1>Complaints</h1>
           <p>Supervise, prioritize and assign reported footpath issues</p>
         </div>
 
-        <div className="complaint-count">
+        <div className="mc-count">
           <strong>{filteredComplaints.length}</strong>
           <span>Complaints</span>
         </div>
-      </div>
+      </section>
 
       {successMsg && (
-        <div style={{
-          backgroundColor: "#f0fdf4",
-          color: "#166534",
-          padding: "12px 16px",
-          borderRadius: "8px",
-          marginBottom: "16px",
-          border: "1px solid #bbf7d0"
-        }}>
-          ✓ {successMsg}
+        <div className="mc-alert success" role="status">
+          <CheckCircle2 size={18} strokeWidth={2.2} />
+          {successMsg}
         </div>
       )}
 
       {errorMsg && (
-        <div style={{
-          backgroundColor: "#fef2f2",
-          color: "#b91c1c",
-          padding: "12px 16px",
-          borderRadius: "8px",
-          marginBottom: "16px",
-          border: "1px solid #fecaca"
-        }}>
-          ⚠️ {errorMsg}
+        <div className="mc-alert error" role="alert">
+          <AlertCircle size={18} strokeWidth={2.2} />
+          {errorMsg}
         </div>
       )}
 
       {/* ================= FILTERS ================= */}
-      <div className="filters-container">
-        <div className="search-box">
-          <span>🔍</span>
+      <div className="mc-filters">
+        <div className="mc-search">
+          <Search size={18} strokeWidth={2} />
           <input
             type="text"
             placeholder="Search complaint, location, reporter..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          {search && (
+            <button
+              type="button"
+              className="mc-search-clear"
+              onClick={() => setSearch("")}
+              aria-label="Clear search"
+            >
+              <X size={15} strokeWidth={2.5} />
+            </button>
+          )}
         </div>
 
         <select
+          className="mc-select"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
@@ -374,6 +406,7 @@ const Complaints = () => {
         </select>
 
         <select
+          className="mc-select"
           value={priorityFilter}
           onChange={(e) => setPriorityFilter(e.target.value)}
         >
@@ -385,33 +418,32 @@ const Complaints = () => {
           ))}
         </select>
 
-        <button
-          onClick={loadData}
-          style={{
-            padding: "10px 18px",
-            background: "#4f46e5",
-            color: "white",
-            border: "none",
-            borderRadius: "8px",
-            cursor: "pointer",
-            fontWeight: "600",
-            fontSize: "13px"
-          }}
-        >
-          {loading ? "Refreshing..." : "↻ Refresh"}
+        <button className="mc-refresh" onClick={loadData} disabled={loading}>
+          <RefreshCw
+            size={14}
+            strokeWidth={2.5}
+            className={loading ? "mc-spin" : ""}
+          />
+          {loading ? "Refreshing..." : "Refresh"}
         </button>
       </div>
 
       {/* ================= COMPLAINT CARDS ================= */}
       {loading ? (
-        <div className="manager-complaints-state">Loading city complaints…</div>
+        <div className="mc-state">
+          <div className="mc-loader" aria-hidden="true">
+            <i></i><i></i><i></i><i></i>
+          </div>
+          <p>Loading city complaints...</p>
+        </div>
       ) : filteredComplaints.length === 0 ? (
-        <div className="manager-complaints-state">
-          No complaints match the selected filters.
+        <div className="mc-state">
+          <Inbox size={36} strokeWidth={1.8} />
+          <p>No complaints match the selected filters.</p>
         </div>
       ) : (
-        <div className="manager-complaint-grid">
-          {filteredComplaints.map((complaint) => {
+        <div className="mc-grid">
+          {filteredComplaints.map((complaint, i) => {
             const overdue = getOverdueInfo(complaint);
             const canAssign =
               complaint.status === "Not Assigned" ||
@@ -419,43 +451,56 @@ const Complaints = () => {
 
             return (
               <article
-                className="manager-complaint-card"
+                className={`mc-card mc-card-${statusClass(complaint.status)}`}
                 key={complaint.id || complaint.mongoId}
+                style={{ animationDelay: `${Math.min(i, 8) * 0.06}s` }}
               >
                 {complaint.image && (
                   <img
-                    className="manager-complaint-image"
+                    className="mc-card-image"
                     src={complaint.image}
                     alt={`Reported issue: ${complaint.title}`}
                   />
                 )}
-                <div className="manager-complaint-content">
-                  <div className="manager-complaint-topline">
-                    <span className="complaint-id">{complaint.id}</span>
-                    <span className={`status-badge ${statusClass(complaint.status)}`}>
+
+                <div className="mc-card-body">
+                  <div className="mc-card-top">
+                    <span className="mc-id">{complaint.id}</span>
+                    <span className={`mc-status ${statusClass(complaint.status)}`}>
+                      <span className="mc-dot"></span>
                       {complaint.status}
                     </span>
                   </div>
 
                   <h2>{complaint.title}</h2>
-                  <p className="manager-complaint-location">
-                    📍 {complaint.location}
-                    {(complaint.locality || complaint.city) &&
-                      ` · ${[complaint.locality, complaint.city]
-                        .filter(Boolean)
-                        .join(", ")}`}
+
+                  <p className="mc-card-location">
+                    <MapPin size={14} strokeWidth={2} />
+                    <span>
+                      {complaint.location}
+                      {(complaint.locality || complaint.city) &&
+                        ` · ${[complaint.locality, complaint.city]
+                          .filter(Boolean)
+                          .join(", ")}`}
+                    </span>
                   </p>
 
-                  <div className="manager-complaint-meta">
-                    <span>Reported by {complaint.reportedBy || "Citizen"}</span>
-                    <span>{complaint.date}</span>
+                  <div className="mc-card-meta">
+                    <span>
+                      <User size={13} strokeWidth={2} />
+                      {complaint.reportedBy || "Citizen"}
+                    </span>
+                    <span>
+                      <Calendar size={13} strokeWidth={2} />
+                      {complaint.date}
+                    </span>
                   </div>
 
-                  <div className="manager-complaint-controls">
+                  <div className="mc-card-controls">
                     <label>
                       Priority
                       <select
-                        className={`priority-select ${priorityClass(complaint.priority)}`}
+                        className={`mc-priority-select ${priorityClass(complaint.priority)}`}
                         value={complaint.priority || "Not Set"}
                         onChange={(event) =>
                           handlePriorityChange(complaint.id, event.target.value)
@@ -468,7 +513,12 @@ const Complaints = () => {
                         ))}
                       </select>
                     </label>
-                    <div className="manager-complaint-schedule">
+
+                    <div className="mc-schedule">
+                      <span className="mc-schedule-label">
+                        <CalendarRange size={12} strokeWidth={2.2} />
+                        Schedule
+                      </span>
                       <strong>
                         {complaint.workStartDate
                           ? `${formatDate(complaint.workStartDate)} → ${formatDate(
@@ -477,36 +527,40 @@ const Complaints = () => {
                           : "Not scheduled"}
                       </strong>
                       {overdue && (
-                        <span className={`overdue-badge ${overdue.type}`}>
+                        <span className={`mc-overdue ${overdue.type}`}>
+                          <Clock size={11} strokeWidth={2.5} />
                           {overdue.label}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <div className="manager-complaint-team">
-                    <strong>Assigned team</strong>
+                  <div className="mc-team">
+                    <span className="mc-team-label">
+                      <Users size={13} strokeWidth={2.2} />
+                      Assigned team
+                    </span>
                     {complaint.assignedWorkers?.length ? (
-                      <div className="team-names">
+                      <div className="mc-team-names">
                         {complaint.assignedWorkers.map((worker) => (
                           <span key={worker}>{worker}</span>
                         ))}
                       </div>
                     ) : (
-                      <span className="not-assigned">Not assigned</span>
+                      <span className="mc-not-assigned">Not assigned</span>
                     )}
                   </div>
 
-                  <div className="manager-complaint-actions">
+                  <div className="mc-actions">
                     <button
-                      className="details-btn"
+                      className="mc-btn-soft"
                       onClick={() => handleViewDetails(complaint)}
                     >
                       View complaint
                     </button>
                     {canAssign && (
                       <button
-                        className="assign-btn"
+                        className="mc-btn-main"
                         disabled={complaint.priority === "Not Set"}
                         title={
                           complaint.priority === "Not Set"
@@ -530,231 +584,199 @@ const Complaints = () => {
       {/* COMPLAINT DETAILS POPUP */}
       {/* ================================================= */}
       {showDetails && selectedComplaint && (
-        <div
-          className="modal-overlay manager-details-overlay"
-          onClick={() => setShowDetails(false)}
-        >
-          <section
-            className="details-modal manager-details-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="manager-details-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <header className="manager-details-hero">
-              {selectedComplaint.image ? (
-                <img
-                  className="manager-details-hero-image"
-                  src={selectedComplaint.image}
-                  alt={`Reported ${selectedComplaint.title}`}
-                />
-              ) : (
-                <div className="manager-details-hero-empty">
-                  <ClipboardList size={36} />
-                  <span>Complaint report</span>
-                </div>
-              )}
-              <div className="manager-details-hero-shade" />
-              <div className="manager-details-hero-content">
-                <div className="manager-details-badges">
-                  <span className="manager-details-id">
-                    {selectedComplaint.id}
-                  </span>
-                  <span
-                    className={`status-badge ${statusClass(
-                      selectedComplaint.status
-                    )}`}
-                  >
-                    {selectedComplaint.status}
-                  </span>
-                </div>
-                <h2 id="manager-details-title">{selectedComplaint.title}</h2>
-                <p>
-                  <MapPin size={15} />
-                  {selectedComplaint.location || "Location not provided"}
-                  {[selectedComplaint.locality, selectedComplaint.city]
-                    .filter(Boolean)
-                    .join(", ") &&
-                    ` · ${[selectedComplaint.locality, selectedComplaint.city]
-                      .filter(Boolean)
-                      .join(", ")}`}
-                </p>
+        <div className="mc-overlay" onClick={() => setShowDetails(false)}>
+          <div className="mc-modal mc-modal-wide" onClick={(e) => e.stopPropagation()}>
+            <div className="mc-modal-head">
+              <div>
+                <span className="mc-modal-id">{selectedComplaint.id}</span>
+                <h2>{selectedComplaint.title}</h2>
               </div>
+
               <button
-                className="manager-details-close"
-                type="button"
-                aria-label="Close complaint details"
+                className="mc-close"
                 onClick={() => setShowDetails(false)}
+                aria-label="Close"
               >
-                <X size={19} />
+                <X size={18} strokeWidth={2.5} />
               </button>
-            </header>
-
-            <div className="manager-details-body">
-              <main className="manager-details-main">
-                <section className="manager-details-section">
-                  <div className="manager-details-section-title">
-                    <ClipboardList size={17} />
-                    <h3>Report details</h3>
-                  </div>
-                  <p className="manager-details-description">
-                    {selectedComplaint.description ||
-                      "No additional description was provided."}
-                  </p>
-                  <div className="manager-details-facts">
-                    <div>
-                      <span><UserRound size={14} /> Reported by</span>
-                      <strong>{selectedComplaint.reportedBy || "Citizen"}</strong>
-                    </div>
-                    <div>
-                      <span><CalendarDays size={14} /> Reported on</span>
-                      <strong>
-                        {selectedComplaint.date ||
-                          selectedComplaint.reportedDate ||
-                          "Date unavailable"}
-                      </strong>
-                    </div>
-                    {selectedComplaint.landmark && (
-                      <div>
-                        <span><MapPin size={14} /> Landmark</span>
-                        <strong>{selectedComplaint.landmark}</strong>
-                      </div>
-                    )}
-                  </div>
-                  {selectedComplaint.navigationUrl && (
-                    <a
-                      className="manager-details-map-link"
-                      href={selectedComplaint.navigationUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <Navigation size={15} />
-                      Open exact location in Maps
-                    </a>
-                  )}
-                </section>
-
-                <section className="manager-details-section">
-                  <div className="manager-details-section-title">
-                    <UsersRound size={17} />
-                    <h3>Assigned maintenance team</h3>
-                  </div>
-                  {selectedComplaint.assignedWorkers?.length ? (
-                    <div className="manager-details-team">
-                      {selectedComplaint.assignedWorkers.map((worker) => (
-                        <div className="manager-details-worker" key={worker}>
-                          <span>{worker.charAt(0).toUpperCase()}</span>
-                          <strong>{worker}</strong>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="manager-details-unassigned">
-                      No workers assigned to this complaint yet.
-                    </p>
-                  )}
-                </section>
-              </main>
-
-              <aside className="manager-details-sidebar">
-                <section className="manager-details-panel">
-                  <div className="manager-details-section-title">
-                    <Flag size={17} />
-                    <h3>Priority</h3>
-                  </div>
-                  <span
-                    className={`manager-details-priority ${priorityClass(
-                      selectedComplaint.priority
-                    )}`}
-                  >
-                    {selectedComplaint.priority || "Not Set"}
-                  </span>
-                  <div className="manager-details-priority-options">
-                    {PRIORITY_LEVELS.filter((priority) => priority !== "Not Set").map(
-                      (priority) => (
-                        <button
-                          type="button"
-                          key={priority}
-                          className={`priority-pill ${priorityClass(priority)} ${
-                            selectedComplaint.priority === priority
-                              ? "active"
-                              : ""
-                          }`}
-                          aria-pressed={selectedComplaint.priority === priority}
-                          onClick={() =>
-                            handlePriorityChange(selectedComplaint.id, priority)
-                          }
-                        >
-                          {priority}
-                        </button>
-                      )
-                    )}
-                  </div>
-                </section>
-
-                <section className="manager-details-panel">
-                  <div className="manager-details-section-title">
-                    <CalendarDays size={17} />
-                    <h3>Work schedule</h3>
-                  </div>
-                  {selectedComplaint.workStartDate ? (
-                    <div className="manager-details-schedule">
-                      <strong>{formatDate(selectedComplaint.workStartDate)}</strong>
-                      <span>to</span>
-                      <strong>{formatDate(selectedComplaint.workEndDate)}</strong>
-                    </div>
-                  ) : (
-                    <p className="manager-details-unassigned">
-                      Work has not been scheduled.
-                    </p>
-                  )}
-                  {(() => {
-                    const overdue = getOverdueInfo(selectedComplaint);
-                    return overdue ? (
-                      <span
-                        className={`overdue-badge ${overdue.type} manager-details-overdue`}
-                      >
-                        {overdue.label}
-                      </span>
-                    ) : null;
-                  })()}
-                </section>
-              </aside>
             </div>
 
-            <footer className="manager-details-footer">
-              <span>
-                {selectedComplaint.assignedWorkers?.length
-                  ? `${selectedComplaint.assignedWorkers.length} worker${
-                      selectedComplaint.assignedWorkers.length === 1 ? "" : "s"
-                    } assigned`
-                  : "Awaiting assignment"}
-              </span>
-              <div>
-                <button
-                  className="cancel-btn"
-                  type="button"
-                  onClick={() => setShowDetails(false)}
-                >
-                  Close
-                </button>
-                {(selectedComplaint.status === "Not Assigned" ||
-                  selectedComplaint.status === "Pending") && (
-                  <button
-                    className="assign-main-btn"
-                    type="button"
-                    disabled={selectedComplaint.priority === "Not Set"}
-                    onClick={() => {
-                      setShowDetails(false);
-                      handleOpenAssign(selectedComplaint);
-                    }}
-                  >
-                    Assign workers
-                  </button>
+            <div className="mc-modal-body">
+              {selectedComplaint.image && (
+                <div className="mc-image-wrap">
+                  <img
+                    src={selectedComplaint.image}
+                    alt={selectedComplaint.title}
+                  />
+
+                  <div className="mc-image-badges">
+                    <span
+                      className={`mc-priority ${priorityClass(
+                        selectedComplaint.priority
+                      )}`}
+                    >
+                      {selectedComplaint.priority === "Not Set"
+                        ? "Priority Not Set"
+                        : `${selectedComplaint.priority} Priority`}
+                    </span>
+
+                    <span
+                      className={`mc-status ${statusClass(
+                        selectedComplaint.status
+                      )}`}
+                    >
+                      <span className="mc-dot"></span>
+                      {selectedComplaint.status}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* PRIORITY EDITOR IN MODAL */}
+              <div className="mc-priority-editor">
+                <span>Set Priority</span>
+                <div className="mc-priority-options">
+                  {PRIORITY_LEVELS.filter((p) => p !== "Not Set").map((p) => (
+                    <button
+                      key={p}
+                      className={`mc-pill ${priorityClass(p)} ${
+                        selectedComplaint.priority === p ? "active" : ""
+                      }`}
+                      onClick={() =>
+                        handlePriorityChange(selectedComplaint.id, p)
+                      }
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mc-info-grid">
+                <div className="mc-info">
+                  <div className="mc-info-icon">
+                    <MapPin size={18} strokeWidth={2.2} />
+                  </div>
+                  <div>
+                    <label>Location</label>
+                    <strong>{selectedComplaint.location}</strong>
+                    {(selectedComplaint.locality || selectedComplaint.city) && (
+                      <small>
+                        {[selectedComplaint.locality, selectedComplaint.city]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </small>
+                    )}
+                    {selectedComplaint.navigationUrl && (
+                      <a
+                        href={selectedComplaint.navigationUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open exact pin in Maps
+                        <ExternalLink size={12} strokeWidth={2.4} />
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mc-info">
+                  <div className="mc-info-icon">
+                    <User size={18} strokeWidth={2.2} />
+                  </div>
+                  <div>
+                    <label>Reported By</label>
+                    <strong>{selectedComplaint.reportedBy || "Citizen"}</strong>
+                  </div>
+                </div>
+
+                <div className="mc-info">
+                  <div className="mc-info-icon">
+                    <Calendar size={18} strokeWidth={2.2} />
+                  </div>
+                  <div>
+                    <label>Reported Date</label>
+                    <strong>{selectedComplaint.date || selectedComplaint.reportedDate}</strong>
+                  </div>
+                </div>
+
+                {selectedComplaint.workStartDate && (
+                  <div className="mc-info">
+                    <div className="mc-info-icon">
+                      <CalendarRange size={18} strokeWidth={2.2} />
+                    </div>
+                    <div>
+                      <label>Work Timeline</label>
+                      <strong>
+                        {formatDate(selectedComplaint.workStartDate)} →{" "}
+                        {formatDate(selectedComplaint.workEndDate)}
+                      </strong>
+                    </div>
+                  </div>
                 )}
               </div>
-            </footer>
-          </section>
+
+              {(() => {
+                const overdue = getOverdueInfo(selectedComplaint);
+                return overdue ? (
+                  <div className={`mc-banner ${overdue.type}`}>
+                    {overdue.type === "overdue" ? (
+                      <AlertCircle size={16} strokeWidth={2.4} />
+                    ) : (
+                      <Clock size={16} strokeWidth={2.4} />
+                    )}
+                    {overdue.label} to complete this work
+                  </div>
+                ) : null;
+              })()}
+
+              <div className="mc-description">
+                <h3>Description</h3>
+                <p>{selectedComplaint.description || "No additional description provided."}</p>
+              </div>
+
+              <div className="mc-crew">
+                <h3>Assigned Maintenance Crew</h3>
+
+                {!selectedComplaint.assignedWorkers || selectedComplaint.assignedWorkers.length === 0 ? (
+                  <p className="mc-no-workers">No workers assigned yet.</p>
+                ) : (
+                  <div className="mc-crew-list">
+                    {selectedComplaint.assignedWorkers.map((worker) => (
+                      <span key={worker}>
+                        <span className="mc-crew-avatar">
+                          {worker.charAt(0)}
+                        </span>
+                        {worker}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mc-modal-footer">
+              <button
+                className="mc-cancel"
+                onClick={() => setShowDetails(false)}
+              >
+                Close
+              </button>
+
+              {(selectedComplaint.status === "Not Assigned" || selectedComplaint.status === "Pending") && (
+                <button
+                  className="mc-save"
+                  disabled={selectedComplaint.priority === "Not Set"}
+                  onClick={() => {
+                    setShowDetails(false);
+                    handleOpenAssign(selectedComplaint);
+                  }}
+                >
+                  Assign Workers
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -763,30 +785,34 @@ const Complaints = () => {
       {/* ================================================= */}
       {showAssignPopup && selectedComplaint && (
         <div
-          className="modal-overlay"
+          className="mc-overlay"
           onClick={() => setShowAssignPopup(false)}
         >
-          <div className="assign-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
+          <div className="mc-modal mc-modal-narrow" onClick={(e) => e.stopPropagation()}>
+            <div className="mc-modal-head">
               <div>
-                <span className="modal-id">{selectedComplaint.id}</span>
+                <span className="mc-modal-id">{selectedComplaint.id}</span>
                 <h2>Assign Maintenance Team</h2>
               </div>
 
               <button
-                className="close-btn"
+                className="mc-close"
                 onClick={() => setShowAssignPopup(false)}
+                aria-label="Close"
               >
-                ×
+                <X size={18} strokeWidth={2.5} />
               </button>
             </div>
 
-            <div className="assign-content">
-              <div className="assignment-info">
+            <div className="mc-modal-body">
+              <div className="mc-assign-info">
                 <h3>{selectedComplaint.title}</h3>
-                <p>📍 {selectedComplaint.location}</p>
+                <p>
+                  <MapPin size={14} strokeWidth={2} />
+                  {selectedComplaint.location}
+                </p>
                 <span
-                  className={`priority-badge ${priorityClass(
+                  className={`mc-priority ${priorityClass(
                     selectedComplaint.priority
                   )}`}
                 >
@@ -795,8 +821,8 @@ const Complaints = () => {
               </div>
 
               {/* WORK SCHEDULE */}
-              <div className="date-range-section">
-                <div className="date-field">
+              <div className="mc-dates">
+                <div className="mc-date-field">
                   <label>Work Start Date</label>
                   <input
                     type="date"
@@ -805,7 +831,7 @@ const Complaints = () => {
                   />
                 </div>
 
-                <div className="date-field">
+                <div className="mc-date-field">
                   <label>Work End Date</label>
                   <input
                     type="date"
@@ -816,15 +842,15 @@ const Complaints = () => {
                 </div>
               </div>
 
-              <div className="selected-count">
-                <div className="selected-count-text">
+              <div className="mc-selected">
+                <div className="mc-selected-text">
                   <span>Selected Workers</span>
                   <strong>{selectedWorkers.length} / 3</strong>
                 </div>
 
-                <div className="progress-track">
+                <div className="mc-progress">
                   <div
-                    className="progress-fill"
+                    className="mc-progress-fill"
                     style={{
                       width: `${(selectedWorkers.length / 3) * 100}%`,
                     }}
@@ -832,17 +858,17 @@ const Complaints = () => {
                 </div>
               </div>
 
-              <div className="workers-list">
+              <div className="mc-workers">
                 {loadingWorkers ? (
-                  <p style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>
+                  <p className="mc-workers-note">
                     Checking team availability for these dates...
                   </p>
                 ) : !startDate || !endDate ? (
-                  <p style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>
+                  <p className="mc-workers-note">
                     Select a valid work date range to check availability.
                   </p>
                 ) : availableWorkers.length === 0 ? (
-                  <p style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>
+                  <p className="mc-workers-note">
                     No available workers in your team for the selected dates.
                   </p>
                 ) : (
@@ -852,24 +878,22 @@ const Complaints = () => {
                     return (
                       <div
                         key={worker.id}
-                        className={`worker-option ${
-                          isSelected ? "selected" : ""
-                        }`}
+                        className={`mc-worker ${isSelected ? "selected" : ""}`}
                         onClick={() => toggleWorker(worker.id)}
                       >
-                        <div className="worker-avatar-small">
+                        <div className="mc-worker-avatar">
                           {worker.name.charAt(0)}
                         </div>
 
-                        <div className="worker-details">
+                        <div className="mc-worker-details">
                           <strong>{worker.name} ({worker.employeeCode || "WRK"})</strong>
                           <span>
                             {worker.team} • {worker.role} • {worker.phone}
                           </span>
                         </div>
 
-                        <div className="worker-checkbox">
-                          {isSelected ? "✓" : ""}
+                        <div className="mc-worker-check">
+                          {isSelected && <Check size={14} strokeWidth={3.2} />}
                         </div>
                       </div>
                     );
@@ -878,16 +902,16 @@ const Complaints = () => {
               </div>
             </div>
 
-            <div className="modal-footer">
+            <div className="mc-modal-footer">
               <button
-                className="cancel-btn"
+                className="mc-cancel"
                 onClick={() => setShowAssignPopup(false)}
               >
                 Cancel
               </button>
 
               <button
-                className="assign-main-btn"
+                className="mc-save"
                 onClick={handleAssignWorkers}
                 disabled={selectedWorkers.length < 1 || assigning}
               >

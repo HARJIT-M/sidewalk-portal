@@ -1,6 +1,19 @@
 // new_dashboard.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  ClipboardList,
+  Hourglass,
+  Wrench,
+  CheckCircle2,
+  RefreshCw,
+  MapPin,
+  Calendar,
+  ArrowRight,
+  Inbox,
+  AlertCircle,
+  Building2,
+} from "lucide-react";
 import { getManagerDashboard } from "../../../services/managerApi";
 import "./new_dashboard.css";
 
@@ -49,169 +62,228 @@ const Dashboard = () => {
     return name.trim().charAt(0).toUpperCase();
   };
 
+  const cls = (value) => String(value).toLowerCase().replace(/\s+/g, "-");
+
+  const statCards = [
+    { label: "Total Complaints", value: stats.totalComplaints, icon: ClipboardList, tone: "total" },
+    { label: "Pending Review", value: stats.pendingComplaints, icon: Hourglass, tone: "pending" },
+    { label: "In Progress", value: stats.inProgressComplaints, icon: Wrench, tone: "progress" },
+    { label: "Resolved", value: stats.resolvedComplaints, icon: CheckCircle2, tone: "done" },
+  ];
+
   return (
-    <div className="worker-dashboard">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div>
+    <div className="md-page">
+
+      {/* =========================
+          HERO
+      ========================= */}
+
+      <section className="md-hero">
+        <div className="md-hero-rings" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div className="md-hero-slabs" aria-hidden="true">
+          <i></i><i></i><i></i><i></i>
+        </div>
+
+        <div className="md-hero-text">
+          <span className="md-hero-tag">
+            <Building2 size={14} strokeWidth={2.4} /> Manager Console
+          </span>
           <h1>Manager Dashboard</h1>
           <p>Supervise and dispatch municipal footpath repairs in real-time</p>
         </div>
 
-        <div className="worker-info">
-          <div className="worker-avatar">{getInitial(manager.name)}</div>
+        <div className="md-manager">
+          <div className="md-avatar">{getInitial(manager.name)}</div>
           <div>
-            <h3>{manager.name}</h3>
+            <h3>{manager.name || "Manager"}</h3>
             <span>{manager.city || manager.zone || "Municipal Corp"}</span>
           </div>
         </div>
-      </div>
+      </section>
 
       {error && (
-        <div style={{
-          backgroundColor: "#fef2f2",
-          color: "#b91c1c",
-          padding: "12px 16px",
-          borderRadius: "8px",
-          marginBottom: "20px",
-          border: "1px solid #fecaca"
-        }}>
+        <div className="md-error" role="alert">
+          <AlertCircle size={18} strokeWidth={2.2} />
           {error}
         </div>
       )}
 
-      {/* Statistics Cards */}
-      <div className="stats-container">
-        <div className="stat-card">
-          <div className="stat-icon total">📋</div>
-          <div>
-            <p>Total Complaints</p>
-            <h2>{loading ? "..." : stats.totalComplaints}</h2>
-          </div>
-        </div>
+      {/* =========================
+          STATISTICS
+      ========================= */}
 
-        <div className="stat-card">
-          <div className="stat-icon pending">⏳</div>
-          <div>
-            <p>Pending Review</p>
-            <h2>{loading ? "..." : stats.pendingComplaints}</h2>
+      <section className="md-stats">
+        {statCards.map(({ label, value, icon: Icon, tone }, i) => (
+          <div
+            className={`md-stat md-stat-${tone}`}
+            key={label}
+            style={{ animationDelay: `${0.1 + i * 0.08}s` }}
+          >
+            <div className="md-stat-icon">
+              <Icon size={22} strokeWidth={2.2} />
+            </div>
+            <div className="md-stat-text">
+              <strong>{loading ? "..." : value}</strong>
+              <span>{label}</span>
+            </div>
           </div>
-        </div>
+        ))}
+      </section>
 
-        <div className="stat-card">
-          <div className="stat-icon progress">🔧</div>
-          <div>
-            <p>In Progress</p>
-            <h2>{loading ? "..." : stats.inProgressComplaints}</h2>
-          </div>
-        </div>
+      {/* =========================
+          COMPLAINTS
+      ========================= */}
 
-        <div className="stat-card">
-          <div className="stat-icon resolved">✓</div>
-          <div>
-            <p>Resolved</p>
-            <h2>{loading ? "..." : stats.resolvedComplaints}</h2>
-          </div>
-        </div>
-      </div>
-
-      {/* Complaints Section */}
-      <div className="complaints-section">
-        <div className="section-header">
+      <section className="md-recent">
+        <div className="md-section-head">
           <div>
             <h2>Recent Complaints Overview</h2>
             <p>Live feed of citizen reported issues and repair progress</p>
           </div>
 
           <button
-            className="refresh-btn"
+            className="md-refresh"
             onClick={fetchDashboardData}
             disabled={loading}
           >
-            {loading ? "↻ Updating..." : "↻ Refresh"}
+            <RefreshCw
+              size={14}
+              strokeWidth={2.5}
+              className={loading ? "md-spin" : ""}
+            />
+            {loading ? "Updating..." : "Refresh"}
           </button>
         </div>
 
-        {/* Table */}
-        <div className="table-container">
-          <table className="complaints-table">
-            <thead>
-              <tr>
-                <th>Complaint ID</th>
-                <th>Issue</th>
-                <th>Location</th>
-                <th>Reported Date</th>
-                <th>Priority</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
+        {loading ? (
+          <div className="md-loading">
+            <div className="md-loader" aria-hidden="true">
+              <i></i><i></i><i></i><i></i>
+            </div>
+            <p>Loading complaints from database...</p>
+          </div>
+        ) : complaints.length === 0 ? (
+          <div className="md-empty">
+            <Inbox size={36} strokeWidth={1.8} />
+            <p>No complaints registered in the system yet.</p>
+          </div>
+        ) : (
+          <>
+            {/* ---- DESKTOP / TABLET TABLE ---- */}
+            <div className="md-table-wrap">
+              <table className="md-table">
+                <thead>
+                  <tr>
+                    <th>Complaint ID</th>
+                    <th>Issue</th>
+                    <th>Location</th>
+                    <th>Reported Date</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
 
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan="7" style={{ textAlign: "center", padding: "30px", color: "#6b7280" }}>
-                    Loading complaints from database...
-                  </td>
-                </tr>
-              ) : complaints.length === 0 ? (
-                <tr>
-                  <td colSpan="7" style={{ textAlign: "center", padding: "30px", color: "#6b7280" }}>
-                    No complaints registered in the system yet.
-                  </td>
-                </tr>
-              ) : (
-                complaints.map((complaint) => (
-                  <tr key={complaint.id || complaint.mongoId}>
-                    <td>
-                      <span className="complaint-id">{complaint.id}</span>
-                    </td>
+                <tbody>
+                  {complaints.map((complaint) => {
+                    const priority = complaint.priority || "Medium";
+                    const status = complaint.status || "Pending";
+                    return (
+                      <tr key={complaint.id || complaint.mongoId}>
+                        <td>
+                          <span className="md-id">{complaint.id}</span>
+                        </td>
 
-                    <td>
-                      <span className="issue-title">{complaint.title}</span>
-                    </td>
+                        <td className="md-issue">{complaint.title}</td>
 
-                    <td>
-                      <span className="location">
-                        📍 {complaint.location}
+                        <td>
+                          <span className="md-loc">
+                            <MapPin size={13} strokeWidth={2} />
+                            {complaint.location}
+                          </span>
+                        </td>
+
+                        <td>{complaint.date}</td>
+
+                        <td>
+                          <span className={`md-priority ${cls(priority)}`}>
+                            {priority}
+                          </span>
+                        </td>
+
+                        <td>
+                          <span className={`md-status ${cls(status)}`}>
+                            <span className="md-dot"></span>
+                            {status}
+                          </span>
+                        </td>
+
+                        <td>
+                          <button
+                            className="md-manage"
+                            onClick={() => navigate("/complaints")}
+                          >
+                            Manage
+                            <ArrowRight size={14} strokeWidth={2.4} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ---- MOBILE CARD LIST ---- */}
+            <div className="md-cards">
+              {complaints.map((complaint) => {
+                const priority = complaint.priority || "Medium";
+                const status = complaint.status || "Pending";
+                return (
+                  <div className="md-card" key={complaint.id || complaint.mongoId}>
+                    <div className="md-card-top">
+                      <span className="md-id">{complaint.id}</span>
+                      <span className={`md-status ${cls(status)}`}>
+                        <span className="md-dot"></span>
+                        {status}
                       </span>
-                    </td>
+                    </div>
 
-                    <td>{complaint.date}</td>
+                    <h3>{complaint.title}</h3>
 
-                    <td>
-                      <span
-                        className={`priority ${(complaint.priority || "medium").toLowerCase()}`}
-                      >
-                        {complaint.priority || "Medium"}
+                    <div className="md-card-meta">
+                      <span>
+                        <MapPin size={13} strokeWidth={2} />
+                        {complaint.location}
                       </span>
-                    </td>
-
-                    <td>
-                      <span
-                        className={`status ${(complaint.status || "pending")
-                          .toLowerCase()
-                          .replace(" ", "-")}`}
-                      >
-                        {complaint.status || "Pending"}
+                      <span>
+                        <Calendar size={13} strokeWidth={2} />
+                        {complaint.date}
                       </span>
-                    </td>
+                    </div>
 
-                    <td>
+                    <div className="md-card-bottom">
+                      <span className={`md-priority ${cls(priority)}`}>
+                        {priority}
+                      </span>
                       <button
-                        className="view-btn"
+                        className="md-manage"
                         onClick={() => navigate("/complaints")}
                       >
                         Manage
+                        <ArrowRight size={14} strokeWidth={2.4} />
                       </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </section>
+
     </div>
   );
 };

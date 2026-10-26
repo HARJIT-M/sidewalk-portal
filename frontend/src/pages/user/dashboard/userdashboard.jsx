@@ -8,9 +8,21 @@ import {
   Plus,
   MapPin,
   Calendar,
+  ArrowRight,
+  Inbox,
 } from "lucide-react";
 import userApi from "../../../services/userApi";
 import "./userdashboard.css";
+
+// first name of the logged in user (saved by the login page)
+const getFirstName = () => {
+  try {
+    const user = JSON.parse(localStorage.getItem("user"));
+    return user?.name ? user.name.trim().split(" ")[0] : "";
+  } catch {
+    return "";
+  }
+};
 
 const UserDashboard = () => {
   const navigate = useNavigate();
@@ -35,14 +47,26 @@ const UserDashboard = () => {
   }, []);
 
   if (loading) {
-    return <div className="user-dashboard">Loading dashboard...</div>;
+    return (
+      <div className="ud-page ud-loading">
+        <div className="ud-loader" aria-hidden="true">
+          <i></i><i></i><i></i><i></i>
+        </div>
+        <p>Loading your dashboard...</p>
+      </div>
+    );
   }
 
   // Statistics
-  const stats = dashboardData?.stats || { totalReported: 0, pending: 0, inProgress: 0, resolved: 0 };
+  const stats = dashboardData?.stats || {
+    totalReported: 0,
+    pending: 0,
+    inProgress: 0,
+    resolved: 0,
+  };
   const complaints = dashboardData?.recentActivity || [];
 
-  const badgeClass = (value) => value.toLowerCase().replace(" ", "-");
+  const badgeClass = (value) => value.toLowerCase().replace(/\s+/g, "-");
 
   const formatStatus = (status) => {
     if (!status) return "Pending";
@@ -61,206 +85,216 @@ const UserDashboard = () => {
     return "Not Set";
   };
 
+  const firstName = getFirstName();
+
+  const statCards = [
+    { label: "Total Complaints", value: stats.totalReported, icon: ClipboardList, tone: "total" },
+    { label: "Not Assigned", value: stats.pending, icon: CircleDot, tone: "pending" },
+    { label: "In Progress", value: stats.inProgress, icon: RefreshCw, tone: "progress" },
+    { label: "Completed", value: stats.resolved, icon: CheckCircle2, tone: "done" },
+  ];
+
   return (
-    <div className="user-dashboard">
+    <div className="ud-page">
+
       {/* =========================
-          HEADER
+          HERO
       ========================= */}
 
-      <div className="user-dashboard-header">
-        <div>
-          <h1>Welcome Back!</h1>
+      <section className="ud-hero">
+        <div className="ud-hero-rings" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div className="ud-hero-slabs" aria-hidden="true">
+          <i></i><i></i><i></i><i></i>
+        </div>
+
+        <div className="ud-hero-text">
+          <span className="ud-hero-tag">
+            <MapPin size={14} strokeWidth={2.4} /> Paadhai
+          </span>
+          <h1>
+            Welcome back{firstName ? `, ${firstName}` : ""}!
+          </h1>
           <p>Track your reported footpath and sidewalk issues.</p>
         </div>
 
-        
-      </div>
+        <button
+          className="ud-hero-btn"
+          onClick={() => navigate("/user/add-complaint")}
+        >
+          <Plus size={18} strokeWidth={2.6} />
+          Report an Issue
+        </button>
+      </section>
 
       {/* =========================
           STATISTICS
       ========================= */}
 
-      <div className="user-stat-grid">
-        <div className="user-stat-card">
-          <div className="user-stat-icon total-icon">
-            <ClipboardList size={22} strokeWidth={2} />
+      <section className="ud-stats">
+        {statCards.map(({ label, value, icon: Icon, tone }, i) => (
+          <div
+            className={`ud-stat ud-stat-${tone}`}
+            key={label}
+            style={{ animationDelay: `${0.1 + i * 0.08}s` }}
+          >
+            <div className="ud-stat-icon">
+              <Icon size={22} strokeWidth={2.2} />
+            </div>
+            <div className="ud-stat-text">
+              <strong>{value}</strong>
+              <span>{label}</span>
+            </div>
           </div>
-          <div>
-            <span>Total Complaints</span>
-            <strong>{stats.totalReported}</strong>
-          </div>
-        </div>
-
-        <div className="user-stat-card">
-          <div className="user-stat-icon pending-icon">
-            <CircleDot size={22} strokeWidth={2} />
-          </div>
-          <div>
-            <span>Not Assigned</span>
-            <strong>{stats.pending}</strong>
-          </div>
-        </div>
-
-        <div className="user-stat-card">
-          <div className="user-stat-icon progress-icon">
-            <RefreshCw size={22} strokeWidth={2} />
-          </div>
-          <div>
-            <span>In Progress</span>
-            <strong>{stats.inProgress}</strong>
-          </div>
-        </div>
-
-        <div className="user-stat-card">
-          <div className="user-stat-icon completed-icon">
-            <CheckCircle2 size={22} strokeWidth={2} />
-          </div>
-          <div>
-            <span>Completed</span>
-            <strong>{stats.resolved}</strong>
-          </div>
-        </div>
-      </div>
+        ))}
+      </section>
 
       {/* =========================
           QUICK ACTION
       ========================= */}
 
-      <div className="quick-report-card">
-        <div className="quick-report-content">
-          <div className="quick-report-icon">
-            <Plus size={22} strokeWidth={2.5} />
-          </div>
+      <section className="ud-quick">
+        <div className="ud-quick-pin" aria-hidden="true">
+          <MapPin size={26} strokeWidth={2.2} />
+        </div>
 
-          <div>
-            <h2>Report a Footpath Issue</h2>
-            <p>
-              Found a damaged footpath, pothole, crack or other pedestrian
-              infrastructure issue?
-            </p>
-          </div>
+        <div className="ud-quick-text">
+          <h2>Spotted a damaged footpath?</h2>
+          <p>
+            Report potholes, cracks or any other pedestrian infrastructure
+            issue in seconds.
+          </p>
         </div>
 
         <button onClick={() => navigate("/user/add-complaint")}>
           Report Now
+          <ArrowRight size={17} strokeWidth={2.4} />
         </button>
-      </div>
+      </section>
 
       {/* =========================
           RECENT COMPLAINTS
       ========================= */}
 
-      <div className="recent-complaints">
-        <div className="section-header">
+      <section className="ud-recent">
+        <div className="ud-section-head">
           <div>
             <h2>Recent Complaints</h2>
             <p>Your recently reported issues</p>
           </div>
 
           <button
-            className="view-all-btn"
+            className="ud-viewall"
             onClick={() => navigate("/user/view-complaint")}
           >
             View All
+            <ArrowRight size={15} strokeWidth={2.4} />
           </button>
         </div>
 
-        {/* ---- DESKTOP / TABLET TABLE ---- */}
-        <div className="complaints-table-container">
-          <table className="user-complaints-table">
-            <thead>
-              <tr>
-                <th>Complaint ID</th>
-                <th>Issue</th>
-                <th>Location</th>
-                <th>Date</th>
-                <th>Priority</th>
-                <th>Status</th>
-              </tr>
-            </thead>
+        {complaints.length === 0 ? (
+          <div className="ud-empty">
+            <Inbox size={34} strokeWidth={1.8} />
+            <p>No complaints yet. Your reported issues will show up here.</p>
+          </div>
+        ) : (
+          <>
+            {/* ---- DESKTOP / TABLET TABLE ---- */}
+            <div className="ud-table-wrap">
+              <table className="ud-table">
+                <thead>
+                  <tr>
+                    <th>Complaint ID</th>
+                    <th>Issue</th>
+                    <th>Location</th>
+                    <th>Date</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
 
-            <tbody>
+                <tbody>
+                  {complaints.map((complaint) => {
+                    const displayStatus = formatStatus(complaint.status);
+                    const displayPriority = formatPriority(complaint.priority);
+                    return (
+                      <tr key={complaint.id}>
+                        <td>
+                          <span className="ud-id">{complaint.id}</span>
+                        </td>
+
+                        <td className="ud-issue">{complaint.issue}</td>
+
+                        <td>
+                          <span className="ud-loc">
+                            <MapPin size={13} strokeWidth={2} />
+                            {complaint.location}
+                          </span>
+                        </td>
+
+                        <td>{complaint.date}</td>
+
+                        <td>
+                          <span className={`ud-priority ${badgeClass(displayPriority)}`}>
+                            {displayPriority}
+                          </span>
+                        </td>
+
+                        <td>
+                          <span className={`ud-status ${badgeClass(displayStatus)}`}>
+                            <span className="ud-dot"></span>
+                            {displayStatus}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ---- MOBILE CARD LIST ---- */}
+            <div className="ud-cards">
               {complaints.map((complaint) => {
                 const displayStatus = formatStatus(complaint.status);
                 const displayPriority = formatPriority(complaint.priority);
                 return (
-                <tr key={complaint.id}>
-                  <td>
-                    <strong>{complaint.id}</strong>
-                  </td>
+                  <div className="ud-card" key={complaint.id}>
+                    <div className="ud-card-top">
+                      <span className="ud-id">{complaint.id}</span>
+                      <span className={`ud-status ${badgeClass(displayStatus)}`}>
+                        <span className="ud-dot"></span>
+                        {displayStatus}
+                      </span>
+                    </div>
 
-                  <td>{complaint.issue}</td>
+                    <h3>{complaint.issue}</h3>
 
-                  <td>
-                    <MapPin size={13} strokeWidth={2} className="inline-icon" />{" "}
-                    {complaint.location}
-                  </td>
+                    <div className="ud-card-meta">
+                      <span>
+                        <MapPin size={13} strokeWidth={2} />
+                        {complaint.location}
+                      </span>
+                      <span>
+                        <Calendar size={13} strokeWidth={2} />
+                        {complaint.date}
+                      </span>
+                    </div>
 
-                  <td>{complaint.date}</td>
-
-                  <td>
-                    <span
-                      className={`priority-badge ${badgeClass(displayPriority)}`}
-                    >
-                      {displayPriority}
-                    </span>
-                  </td>
-
-                  <td>
-                    <span
-                      className={`status-badge ${badgeClass(displayStatus)}`}
-                    >
-                      <span className="status-dot"></span>
-                      {displayStatus}
-                    </span>
-                  </td>
-                </tr>
-              )})}
-            </tbody>
-          </table>
-        </div>
-
-        {/* ---- MOBILE CARD LIST ---- */}
-        <div className="complaints-card-list">
-          {complaints.map((complaint) => {
-            const displayStatus = formatStatus(complaint.status);
-            const displayPriority = formatPriority(complaint.priority);
-            return (
-            <div className="complaint-mobile-card" key={complaint.id}>
-              <div className="complaint-mobile-top">
-                <span className="complaint-mobile-id">{complaint.id}</span>
-                <span
-                  className={`status-badge ${badgeClass(displayStatus)}`}
-                >
-                  <span className="status-dot"></span>
-                  {displayStatus}
-                </span>
-              </div>
-
-              <h3 className="complaint-mobile-title">{complaint.issue}</h3>
-
-              <div className="complaint-mobile-meta">
-                <span>
-                  <MapPin size={13} strokeWidth={2} className="inline-icon" />{" "}
-                  {complaint.location}
-                </span>
-                <span>
-                  <Calendar size={13} strokeWidth={2} className="inline-icon" />{" "}
-                  {complaint.date}
-                </span>
-              </div>
-
-              <div className="complaint-mobile-bottom">
-                <span
-                  className={`priority-badge ${badgeClass(displayPriority)}`}
-                >
-                  {displayPriority}
-                </span>
-              </div>
+                    <div className="ud-card-bottom">
+                      <span className={`ud-priority ${badgeClass(displayPriority)}`}>
+                        {displayPriority}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          )})}
-        </div>
-      </div>
+          </>
+        )}
+      </section>
+
     </div>
   );
 };

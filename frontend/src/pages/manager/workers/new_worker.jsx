@@ -1,5 +1,24 @@
 import React, { useState, useEffect } from "react";
 import {
+  Users,
+  UserCheck,
+  UserX,
+  UserPlus,
+  Search,
+  RefreshCw,
+  Phone,
+  Mail,
+  X,
+  Inbox,
+  AlertCircle,
+  CheckCircle2,
+  ArrowLeftRight,
+  Trash2,
+  Calendar,
+  TriangleAlert,
+  HardHat,
+} from "lucide-react";
+import {
   getAllWorkers,
   addWorker,
   updateWorkerStatus,
@@ -50,6 +69,19 @@ const Workers = () => {
   useEffect(() => {
     loadWorkers();
   }, []);
+
+  // close popups with the Escape key
+  useEffect(() => {
+    if (!showAddPopup && !showRemovePopup) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        setShowAddPopup(false);
+        if (!removingWorker) setShowRemovePopup(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showAddPopup, showRemovePopup, removingWorker]);
 
   // ==============================
   // COUNTS
@@ -173,99 +205,106 @@ const Workers = () => {
     setShowRemovePopup(true);
   };
 
+  const isWorkerActive = (worker) =>
+    worker.status === "Active" || worker.availabilityStatus === "ACTIVE";
+
+  const statCards = [
+    { label: "Total Workers", value: totalWorkers, icon: Users, tone: "total" },
+    { label: "Active & Ready", value: activeWorkers, icon: UserCheck, tone: "active" },
+    { label: "Inactive / On Leave", value: inactiveWorkers, icon: UserX, tone: "inactive" },
+  ];
+
   return (
-    <div className="workers-page">
+    <div className="mw-page">
       {/* =================================
           HEADER
       ================================= */}
-      <div className="workers-header">
-        <div>
+      <section className="mw-hero">
+        <div className="mw-hero-rings" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div className="mw-hero-slabs" aria-hidden="true">
+          <i></i><i></i><i></i><i></i>
+        </div>
+
+        <div className="mw-hero-text">
+          <span className="mw-hero-tag">
+            <HardHat size={14} strokeWidth={2.4} /> Manager Console
+          </span>
           <h1>Worker Management</h1>
           <p>Supervise maintenance crew, workloads, and real-time availability</p>
         </div>
 
-
-      </div>
+        <button
+          className="mw-hero-btn"
+          onClick={() => setShowAddPopup(true)}
+        >
+          <UserPlus size={18} strokeWidth={2.4} />
+          Add Worker
+        </button>
+      </section>
 
       {successMsg && (
-        <div style={{
-          backgroundColor: "#f0fdf4",
-          color: "#166534",
-          padding: "12px 16px",
-          borderRadius: "8px",
-          marginBottom: "16px",
-          border: "1px solid #bbf7d0"
-        }}>
-          ✓ {successMsg}
+        <div className="mw-alert success" role="status">
+          <CheckCircle2 size={18} strokeWidth={2.2} />
+          {successMsg}
         </div>
       )}
 
       {errorMsg && (
-        <div style={{
-          backgroundColor: "#fef2f2",
-          color: "#b91c1c",
-          padding: "12px 16px",
-          borderRadius: "8px",
-          marginBottom: "16px",
-          border: "1px solid #fecaca"
-        }}>
-          ⚠️ {errorMsg}
+        <div className="mw-alert error" role="alert">
+          <AlertCircle size={18} strokeWidth={2.2} />
+          {errorMsg}
         </div>
       )}
 
       {/* =================================
           STATISTICS
       ================================= */}
-      <div className="worker-stats">
-        <div className="worker-stat-card">
-          <div className="worker-stat-icon total">👥</div>
-          <div>
-            <span>Total Workers</span>
-            <strong>{loading ? "..." : totalWorkers}</strong>
-          </div>
-        </div>
-
-        <div className="worker-stat-card">
-          <div className="worker-stat-icon active">🟢</div>
-          <div>
-            <span>Active & Ready</span>
-            <strong>{loading ? "..." : activeWorkers}</strong>
-          </div>
-        </div>
-
-        <div className="worker-stat-card">
-          <div className="worker-stat-icon inactive">🔴</div>
-          <div>
-            <span>Inactive / On Leave</span>
-            <strong>{loading ? "..." : inactiveWorkers}</strong>
-          </div>
-        </div>
-
-        <div>
-          <button
-            className="add-worker-btn"
-            onClick={() => setShowAddPopup(true)}
+      <section className="mw-stats">
+        {statCards.map(({ label, value, icon: Icon, tone }, i) => (
+          <div
+            className={`mw-stat mw-stat-${tone}`}
+            key={label}
+            style={{ animationDelay: `${0.1 + i * 0.08}s` }}
           >
-            + Add Worker
-          </button>
-        </div>
-      </div>
+            <div className="mw-stat-icon">
+              <Icon size={22} strokeWidth={2.2} />
+            </div>
+            <div className="mw-stat-text">
+              <strong>{loading ? "..." : value}</strong>
+              <span>{label}</span>
+            </div>
+          </div>
+        ))}
+      </section>
 
       {/* =================================
           CONTROLS / FILTERS
       ================================= */}
-      <div className="worker-filters">
-        <div className="worker-search">
-          <span style={{ color: "#a9a5bd" }}>🔍</span>
+      <div className="mw-filters">
+        <div className="mw-search">
+          <Search size={18} strokeWidth={2} />
           <input
             type="text"
             placeholder="Search by worker ID, name, email or phone..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          {search && (
+            <button
+              type="button"
+              className="mw-search-clear"
+              onClick={() => setSearch("")}
+              aria-label="Clear search"
+            >
+              <X size={15} strokeWidth={2.5} />
+            </button>
+          )}
         </div>
 
         <select
+          className="mw-select"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
@@ -274,146 +313,225 @@ const Workers = () => {
           <option value="Inactive">Inactive</option>
         </select>
 
-        <button
-          onClick={loadWorkers}
-          style={{
-            padding: "10px 18px",
-            background: "#4f46e5",
-            color: "white",
-            border: "none",
-            borderRadius: "8px",
-            cursor: "pointer",
-            fontWeight: "600",
-            fontSize: "13px"
-          }}
-        >
-          {loading ? "Refreshing..." : "↻ Refresh"}
+        <button className="mw-refresh" onClick={loadWorkers} disabled={loading}>
+          <RefreshCw
+            size={14}
+            strokeWidth={2.5}
+            className={loading ? "mw-spin" : ""}
+          />
+          {loading ? "Refreshing..." : "Refresh"}
         </button>
       </div>
 
       {/* =================================
-          WORKER TABLE
+          WORKERS LIST
       ================================= */}
-      <div className="workers-container">
-        <div className="workers-table-wrapper">
-          <table className="workers-table">
-            <thead>
-              <tr>
-                <th>Worker</th>
-                <th>Contact</th>
-                <th>Team / Role</th>
-                <th>Status</th>
-                <th>Tasks</th>
-                <th>Joined Date</th>
-                <th>Action</th>
-              </tr>
-            </thead>
+      <section className="mw-list">
+        {loading ? (
+          <div className="mw-state">
+            <div className="mw-loader" aria-hidden="true">
+              <i></i><i></i><i></i><i></i>
+            </div>
+            <p>Loading workers from database...</p>
+          </div>
+        ) : filteredWorkers.length === 0 ? (
+          <div className="mw-state">
+            <Inbox size={36} strokeWidth={1.8} />
+            <h3>No Workers Found</h3>
+            <p>No workers match your filter criteria.</p>
+          </div>
+        ) : (
+          <>
+            {/* ---- DESKTOP / TABLET TABLE ---- */}
+            <div className="mw-table-wrap">
+              <table className="mw-table">
+                <thead>
+                  <tr>
+                    <th>Worker</th>
+                    <th>Contact</th>
+                    <th>Team / Role</th>
+                    <th>Status</th>
+                    <th>Tasks</th>
+                    <th>Joined Date</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
 
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan="7" style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
-                    Loading workers from database...
-                  </td>
-                </tr>
-              ) : filteredWorkers.length === 0 ? (
-                <tr>
-                  <td colSpan="7" className="no-workers">
-                    <div className="no-worker-icon">👥</div>
-                    <h3>No Workers Found</h3>
-                    <p>No workers match your filter criteria.</p>
-                  </td>
-                </tr>
-              ) : (
-                filteredWorkers.map((worker) => {
-                  const isActive = worker.status === "Active" || worker.availabilityStatus === "ACTIVE";
-                  return (
-                    <tr key={worker.id || worker.mongoId}>
-                      <td>
-                        <div className="worker-profile">
-                          <div className="worker-avatar">
-                            {worker.name ? worker.name.charAt(0).toUpperCase() : "W"}
+                <tbody>
+                  {filteredWorkers.map((worker) => {
+                    const isActive = isWorkerActive(worker);
+                    return (
+                      <tr key={worker.id || worker.mongoId}>
+                        <td>
+                          <div className="mw-profile">
+                            <div className="mw-avatar">
+                              {worker.name ? worker.name.charAt(0).toUpperCase() : "W"}
+                            </div>
+                            <div>
+                              <strong>{worker.name}</strong>
+                              <span>{worker.id}</span>
+                            </div>
                           </div>
-                          <div>
-                            <strong>{worker.name}</strong>
-                            <span>{worker.id}</span>
+                        </td>
+
+                        <td>
+                          <div className="mw-contact">
+                            <span>
+                              <Phone size={13} strokeWidth={2} />
+                              {worker.phone || "—"}
+                            </span>
+                            <span>
+                              <Mail size={13} strokeWidth={2} />
+                              {worker.email || "—"}
+                            </span>
                           </div>
+                        </td>
+
+                        <td>
+                          <div className="mw-role">
+                            {worker.team || "Assigned Team"}
+                            <small>{worker.role}</small>
+                          </div>
+                        </td>
+
+                        <td>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus(worker)}
+                            title="Click to toggle status"
+                            className={`mw-status ${isActive ? "active" : "inactive"}`}
+                          >
+                            <span className="mw-dot"></span>
+                            {isActive ? "Active" : "Inactive"}
+                            <ArrowLeftRight size={12} strokeWidth={2.4} />
+                          </button>
+                        </td>
+
+                        <td>
+                          <span
+                            className={`mw-count ${
+                              (worker.assignedWorks || 0) > 0 ? "has-work" : "no-work"
+                            }`}
+                          >
+                            {worker.assignedWorks || 0}
+                          </span>
+                        </td>
+
+                        <td>{worker.joinedDate || "—"}</td>
+
+                        <td>
+                          <button
+                            className="mw-remove"
+                            onClick={() => openRemovePopup(worker)}
+                          >
+                            <Trash2 size={13} strokeWidth={2.3} />
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ---- MOBILE CARD LIST ---- */}
+            <div className="mw-cards">
+              {filteredWorkers.map((worker) => {
+                const isActive = isWorkerActive(worker);
+                return (
+                  <div className="mw-card" key={worker.id || worker.mongoId}>
+                    <div className="mw-card-top">
+                      <div className="mw-profile">
+                        <div className="mw-avatar">
+                          {worker.name ? worker.name.charAt(0).toUpperCase() : "W"}
                         </div>
-                      </td>
-
-                      <td>
-                        <div className="contact-details">
-                          <span>📞 {worker.phone || "—"}</span>
-                          <span>✉️ {worker.email || "—"}</span>
+                        <div>
+                          <strong>{worker.name}</strong>
+                          <span>{worker.id}</span>
                         </div>
-                      </td>
+                      </div>
 
-                      <td>
-                        <div className="role-text">
-                          {worker.team || "Assigned Team"}
-                          <small>{worker.role}</small>
-                        </div>
-                      </td>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleStatus(worker)}
+                        className={`mw-status ${isActive ? "active" : "inactive"}`}
+                      >
+                        <span className="mw-dot"></span>
+                        {isActive ? "Active" : "Inactive"}
+                        <ArrowLeftRight size={12} strokeWidth={2.4} />
+                      </button>
+                    </div>
 
-                      <td>
-                        <span
-                          onClick={() => handleToggleStatus(worker)}
-                          style={{ cursor: "pointer" }}
-                          title="Click to toggle status"
-                          className={`worker-status ${isActive ? "active" : "inactive"}`}
-                        >
-                          <div className="status-dot"></div>
-                          {isActive ? "Active" : "Inactive"} ⇄
-                        </span>
-                      </td>
+                    <div className="mw-contact">
+                      <span>
+                        <Phone size={13} strokeWidth={2} />
+                        {worker.phone || "—"}
+                      </span>
+                      <span>
+                        <Mail size={13} strokeWidth={2} />
+                        {worker.email || "—"}
+                      </span>
+                      <span>
+                        <Calendar size={13} strokeWidth={2} />
+                        {worker.joinedDate || "—"}
+                      </span>
+                    </div>
 
-                      <td>
-                        <span className={`assigned-count ${(worker.assignedWorks || 0) > 0 ? "has-work" : "no-work"}`}>
-                          {worker.assignedWorks || 0}
-                        </span>
-                      </td>
+                    <div className="mw-card-bottom">
+                      <div className="mw-role">
+                        {worker.team || "Assigned Team"}
+                        <small>{worker.role}</small>
+                      </div>
 
-                      <td>{worker.joinedDate || "—"}</td>
+                      <span
+                        className={`mw-count ${
+                          (worker.assignedWorks || 0) > 0 ? "has-work" : "no-work"
+                        }`}
+                        title="Assigned tasks"
+                      >
+                        {worker.assignedWorks || 0}
+                      </span>
 
-                      <td>
-                        <button
-                          className="remove-btn"
-                          onClick={() => openRemovePopup(worker)}
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                      <button
+                        className="mw-remove"
+                        onClick={() => openRemovePopup(worker)}
+                      >
+                        <Trash2 size={13} strokeWidth={2.3} />
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </section>
 
       {/* =================================
           ADD WORKER POPUP
       ================================= */}
       {showAddPopup && (
-        <div className="worker-modal-overlay" onClick={() => setShowAddPopup(false)}>
-          <div className="worker-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="worker-modal-header">
+        <div className="mw-overlay" onClick={() => setShowAddPopup(false)}>
+          <div className="mw-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="mw-modal-head">
               <div>
-                <span className="modal-label">NEW WORKER</span>
+                <span className="mw-modal-label">NEW WORKER</span>
                 <h2>Add New Field Worker</h2>
               </div>
               <button
-                className="modal-close"
+                className="mw-close"
                 onClick={() => setShowAddPopup(false)}
+                aria-label="Close"
               >
-                ×
+                <X size={18} strokeWidth={2.5} />
               </button>
             </div>
 
-            <form onSubmit={handleAddWorker} className="worker-form">
-              <div className="form-row">
-                <div className="form-group">
+            <form onSubmit={handleAddWorker} className="mw-form">
+              <div className="mw-form-row">
+                <div className="mw-group">
                   <label>Full Name *</label>
                   <input
                     type="text"
@@ -425,7 +543,7 @@ const Workers = () => {
                   />
                 </div>
 
-                <div className="form-group">
+                <div className="mw-group">
                   <label>Phone Number *</label>
                   <input
                     type="text"
@@ -438,7 +556,7 @@ const Workers = () => {
                 </div>
               </div>
 
-              <div className="form-group">
+              <div className="mw-group">
                 <label>Email Address *</label>
                 <input
                   type="email"
@@ -450,10 +568,10 @@ const Workers = () => {
                 />
               </div>
 
-              <div className="worker-modal-footer">
+              <div className="mw-modal-footer">
                 <button
                   type="button"
-                  className="modal-cancel-btn"
+                  className="mw-cancel"
                   onClick={() => setShowAddPopup(false)}
                 >
                   Cancel
@@ -461,7 +579,7 @@ const Workers = () => {
 
                 <button
                   type="submit"
-                  className="modal-add-btn"
+                  className="mw-save"
                   disabled={submitting}
                 >
                   {submitting ? "Adding..." : "Add Worker"}
@@ -476,9 +594,11 @@ const Workers = () => {
           REMOVE WORKER POPUP
       ================================= */}
       {showRemovePopup && selectedWorker && (
-        <div className="worker-modal-overlay" onClick={() => setShowRemovePopup(false)}>
-          <div className="remove-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="remove-icon">!</div>
+        <div className="mw-overlay" onClick={() => setShowRemovePopup(false)}>
+          <div className="mw-remove-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="mw-remove-icon">
+              <TriangleAlert size={26} strokeWidth={2.3} />
+            </div>
             <h2>Remove Field Worker</h2>
 
             <p>
@@ -487,7 +607,7 @@ const Workers = () => {
             </p>
 
             {selectedWorker.activeAssignments?.length > 0 ? (
-              <div className="remove-warning">
+              <div className="mw-warning">
                 <strong>This worker is actively assigned to work:</strong>
                 <ul>
                   {selectedWorker.activeAssignments.map((assignment) => (
@@ -499,14 +619,14 @@ const Workers = () => {
                 Reassign or complete these tasks before removing the worker.
               </div>
             ) : (
-              <div className="remove-warning">
+              <div className="mw-warning mw-warning-ok">
                 This worker has no active assignments and can be removed from the roster.
               </div>
             )}
 
-            <div className="remove-actions">
+            <div className="mw-remove-actions">
               <button
-                className="cancel-remove-btn"
+                className="mw-cancel"
                 onClick={() => setShowRemovePopup(false)}
                 disabled={removingWorker}
               >
@@ -514,7 +634,7 @@ const Workers = () => {
               </button>
 
               <button
-                className="confirm-remove-btn"
+                className="mw-danger"
                 onClick={handleRemoveWorker}
                 disabled={
                   removingWorker || Boolean(selectedWorker.activeAssignments?.length)

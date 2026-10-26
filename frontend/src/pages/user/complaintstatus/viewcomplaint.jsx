@@ -7,28 +7,48 @@ import {
   RefreshCw,
   Search,
   MapPin,
+  Calendar,
+  ArrowRight,
+  Inbox,
   X,
 } from "lucide-react";
 import userApi from "../../../services/userApi";
 import "./viewcomplaint.css";
 
-const ViewComplaints = () => {
+// logged in user (saved by the login page)
+const getUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem("user")) || {};
+  } catch {
+    return {};
+  }
+};
 
+const STEPS = ["Submitted", "Assigned", "In Progress", "Completed"];
+
+const ViewComplaints = () => {
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
 
   useEffect(() => {
     fetchComplaints();
-  }, [statusFilter]);
+  }, []);
+
+  // close the details popup with the Escape key
+  useEffect(() => {
+    if (!selectedComplaint) return;
+    const onKey = (e) => e.key === "Escape" && setSelectedComplaint(null);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedComplaint]);
 
   const fetchComplaints = async () => {
     setLoading(true);
     try {
-      const data = await userApi.getUserComplaints(statusFilter);
+      const data = await userApi.getUserComplaints("All");
       if (data.success) {
         setComplaints(data.complaints);
       }
@@ -56,500 +76,379 @@ const ViewComplaints = () => {
     return "Not Set";
   };
 
+  const cls = (value) => value.toLowerCase().replace(/\s+/g, "-");
+
+  // how far along the repair is: 1 = submitted ... 4 = completed
+  const stageOf = (status) => {
+    const s = formatStatus(status);
+    if (s === "Completed") return 4;
+    if (s === "In Progress") return 3;
+    if (s === "Assigned") return 2;
+    return 1;
+  };
+
   // ============================
-  // FILTER COMPLAINTS
+  // SEARCH
   // ============================
-  const filteredComplaints = complaints.filter((complaint) => {
-    const q = search.toLowerCase();
-    const matchesSearch =
-      (complaint.id && complaint.id.toLowerCase().includes(q)) ||
-      (complaint.title && complaint.title.toLowerCase().includes(q)) ||
-      (complaint.location && complaint.location.toLowerCase().includes(q));
+  const query = search.toLowerCase();
 
-    const displayStatus = formatStatus(complaint.status);
-    const matchesStatus = statusFilter === "All" || displayStatus === statusFilter;
-
-    return matchesSearch && matchesStatus;
-  });
-
-  const notAssignedComplaints = complaints.filter(
-    (complaint) => formatStatus(complaint.status) === "Pending" || formatStatus(complaint.status) === "Assigned"
-  ).length;
-
-  const inProgressComplaints = complaints.filter(
-    (complaint) => formatStatus(complaint.status) === "In Progress"
-  ).length;
-
-  const completedComplaints = complaints.filter(
-    (complaint) => formatStatus(complaint.status) === "Completed"
-  ).length;
+  const filteredComplaints = complaints.filter(
+    (complaint) =>
+      (complaint.id || "").toLowerCase().includes(query) ||
+      (complaint.title || "").toLowerCase().includes(query) ||
+      (complaint.location || "").toLowerCase().includes(query)
+  );
 
   const stats = {
     total: complaints.length,
-    pending: notAssignedComplaints,
-    progress: inProgressComplaints,
+    pending: complaints.filter((c) => stageOf(c.status) <= 2).length,
+    progress: complaints.filter((c) => stageOf(c.status) === 3).length,
+    completed: complaints.filter((c) => stageOf(c.status) === 4).length,
   };
 
-  return (
-    <div className="my-complaints-page">
+  const user = getUser();
+  const initial = (user.name || "M").trim().charAt(0).toUpperCase();
 
-    {/* ============================
+  const statCards = [
+    { label: "Total Reported", value: stats.total, icon: ClipboardList, tone: "total" },
+    { label: "Not Assigned", value: stats.pending, icon: CircleDot, tone: "pending" },
+    { label: "In Progress", value: stats.progress, icon: Wrench, tone: "progress" },
+    { label: "Completed", value: stats.completed, icon: CheckCircle2, tone: "done" },
+  ];
+
+  return (
+    <div className="vc-page">
+
+      {/* ============================
           HEADER
       ============================ */}
 
-    <div className="complaints-header">
+      <div className="vc-header">
+        <div className="vc-header-rings" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div className="vc-header-slabs" aria-hidden="true">
+          <i></i><i></i><i></i><i></i>
+        </div>
 
-      <div>
-        <h1>My Complaints</h1>
-        <p>Track and view the complaints you have submitted.</p>
-      </div>
+        <div className="vc-header-text">
+          <h1>My Complaints</h1>
+          <p>Track and view the complaints you have submitted.</p>
+        </div>
 
-      <div className="user-info">
-        <div className="user-avatar">M</div>
-        <div>
-          <h3>My Complaints</h3>
-          <span>Coimbatore</span>
+        <div className="vc-user">
+          <div className="vc-avatar">{initial}</div>
+          <div>
+            <h3>{user.name || "My Account"}</h3>
+            {user.email && <span>{user.email}</span>}
+          </div>
         </div>
       </div>
 
-    </div>
 
-
-    {/* ============================
+      {/* ============================
           STATISTICS
       ============================ */}
 
-    <div className="stats-container">
-      <div className="stat-card">
-        <div className="stat-icon total">
-          <ClipboardList size={22} strokeWidth={2} />
-        </div>
-        <div>
-          <p>Total Reported</p>
-          <h2>{stats.total}</h2>
-        </div>
+      <div className="vc-stats">
+        {statCards.map(({ label, value, icon: Icon, tone }, i) => (
+          <div
+            className={`vc-stat vc-stat-${tone}`}
+            key={label}
+            style={{ animationDelay: `${0.1 + i * 0.08}s` }}
+          >
+            <div className="vc-stat-icon">
+              <Icon size={22} strokeWidth={2.2} />
+            </div>
+            <div>
+              <strong>{value}</strong>
+              <span>{label}</span>
+            </div>
+          </div>
+        ))}
       </div>
 
-      <div className="stat-card">
-        <div className="stat-icon pending">
-          <CircleDot size={22} strokeWidth={2} />
-        </div>
-        <div>
-          <p>Not Assigned</p>
-          <h2>{stats.pending}</h2>
-        </div>
-      </div>
 
-      <div className="stat-card">
-        <div className="stat-icon progress">
-          <Wrench size={22} strokeWidth={2} />
-        </div>
-        <div>
-          <p>In Progress</p>
-          <h2>{stats.progress}</h2>
-        </div>
-      </div>
-
-      <div className="stat-card">
-        <div className="stat-icon resolved">
-          <CheckCircle2 size={22} strokeWidth={2} />
-        </div>
-        <div>
-          <p>Completed</p>
-          <h2>{completedComplaints}</h2>
-        </div>
-      </div>
-    </div>
-
-
-    {/* ============================
-          COMPLAINT LIST
+      {/* ============================
+          COMPLAINT CARDS
       ============================ */}
 
-    <div className="complaints-section">
+      <div className="vc-section">
 
-      <div className="section-header">
+        <div className="vc-section-head">
+          <div>
+            <h2>All Complaints</h2>
+            <p>Search the complaints you have submitted</p>
+          </div>
 
-        <div>
-          <h2>All Complaints</h2>
-          <p>Search and filter complaints you have submitted</p>
+          <button
+            className="vc-refresh"
+            onClick={fetchComplaints}
+            disabled={loading}
+          >
+            <RefreshCw
+              size={14}
+              strokeWidth={2.5}
+              className={loading ? "vc-spin" : ""}
+            />
+            Refresh
+          </button>
         </div>
 
-        <button className="refresh-btn">
-          <RefreshCw size={14} strokeWidth={2.5} /> Refresh
-        </button>
-
-      </div>
-
-
-      {/* SEARCH / FILTER */}
-
-      <div className="filter-section">
-
-        <div className="search-box">
-
-          <Search size={17} strokeWidth={2} />
-
+        {/* SEARCH */}
+        <div className="vc-search">
+          <Search size={18} strokeWidth={2} />
           <input
             type="text"
             placeholder="Search by complaint ID, title or location..."
             value={search}
-            onChange={(e) =>
-              setSearch(e.target.value)
-            }
+            onChange={(e) => setSearch(e.target.value)}
           />
-
+          {search && (
+            <button
+              type="button"
+              className="vc-search-clear"
+              onClick={() => setSearch("")}
+              aria-label="Clear search"
+            >
+              <X size={15} strokeWidth={2.5} />
+            </button>
+          )}
         </div>
 
+        {loading ? (
+          <div className="vc-loading">
+            <div className="vc-loader" aria-hidden="true">
+              <i></i><i></i><i></i><i></i>
+            </div>
+            <p>Loading your complaints...</p>
+          </div>
+        ) : filteredComplaints.length === 0 ? (
+          <div className="vc-empty">
+            <Inbox size={36} strokeWidth={1.8} />
+            <p>No complaints found.</p>
+          </div>
+        ) : (
+          <div className="vc-grid">
+            {filteredComplaints.map((complaint, i) => {
+              const displayStatus = formatStatus(complaint.status);
+              const displayPriority = formatPriority(complaint.priority);
+              const stage = stageOf(complaint.status);
 
-        <select
-          value={statusFilter}
-          onChange={(e) =>
-            setStatusFilter(e.target.value)
-          }
-        >
-
-          <option value="All">All Status</option>
-          <option value="Not Assigned">Not Assigned</option>
-          <option value="In Progress">In Progress</option>
-          <option value="Completed">Completed</option>
-
-        </select>
-
-      </div>
-
-
-      {/* TABLE */}
-
-      <div className="table-container">
-
-        <table className="complaints-table">
-
-          <thead>
-            <tr>
-              <th>Complaint</th>
-              <th>Reported Date</th>
-              <th>Location</th>
-              <th>Priority</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-
-          <tbody>
-
-            {filteredComplaints.length > 0 ? (
-
-              filteredComplaints.map((complaint) => (
-
-                <tr key={complaint.id}>
-
-                  <td>
-                    <span className="complaint-id">
-                      {complaint.id}
+              return (
+                <article
+                  className={`vc-card vc-card-${cls(displayStatus)}`}
+                  key={complaint.id}
+                  style={{ animationDelay: `${Math.min(i, 8) * 0.06}s` }}
+                >
+                  <div className="vc-card-top">
+                    <span className="vc-id">{complaint.id}</span>
+                    <span className={`vc-status ${cls(displayStatus)}`}>
+                      <span className="vc-dot"></span>
+                      {displayStatus}
                     </span>
-                    <br />
-                    <span className="issue-title">
-                      {complaint.title}
-                    </span>
-                  </td>
+                  </div>
 
-                  <td>{complaint.date}</td>
+                  <h3 className="vc-card-title">{complaint.title}</h3>
 
-                  <td>
-                    <span className="location">
-                      <MapPin size={13} strokeWidth={2} className="inline-icon" />{" "}
+                  <div className="vc-meta">
+                    <span>
+                      <MapPin size={14} strokeWidth={2} />
                       {complaint.location}
                     </span>
-                  </td>
-
-                  <td>
-                    <span
-                      className={`priority ${formatPriority(complaint.priority).toLowerCase()}`}
-                    >
-                      {formatPriority(complaint.priority)}
+                    <span>
+                      <Calendar size={14} strokeWidth={2} />
+                      {complaint.date}
                     </span>
-                  </td>
+                  </div>
 
-                  <td>
-                    <span
-                      className={`status ${formatStatus(complaint.status)
-                        .toLowerCase()
-                        .replace(" ", "-")}`}
-                    >
-                      {formatStatus(complaint.status)}
+                  {/* repair progress tracker */}
+                  <div className="vc-track" aria-label={`Stage ${stage} of 4`}>
+                    {STEPS.map((step, idx) => (
+                      <div
+                        key={step}
+                        className={`vc-track-step ${idx + 1 <= stage ? "on" : ""} ${idx + 1 === stage ? "now" : ""}`}
+                      >
+                        <i></i>
+                        <span>{step}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="vc-card-bottom">
+                    <span className={`vc-priority ${cls(displayPriority)}`}>
+                      {displayPriority}
                     </span>
-                  </td>
 
-                  <td>
                     <button
-                      className="view-btn"
-                      onClick={() =>
-                        setSelectedComplaint(complaint)
-                      }
+                      className="vc-view"
+                      onClick={() => setSelectedComplaint(complaint)}
                     >
-                      View
+                      View Details
+                      <ArrowRight size={15} strokeWidth={2.4} />
                     </button>
-                  </td>
-
-                </tr>
-
-              ))
-
-            ) : (
-
-              <tr>
-                <td colSpan="6" className="no-results">
-                  No complaints found.
-                </td>
-              </tr>
-
-            )}
-
-          </tbody>
-
-        </table>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
 
       </div>
 
-    </div>
 
-
-    {/* ============================
+      {/* ============================
           COMPLAINT DETAILS MODAL
       ============================ */}
 
-    {selectedComplaint && (
+      {selectedComplaint && (() => {
+        const displayStatus = formatStatus(selectedComplaint.status);
+        const displayPriority = formatPriority(selectedComplaint.priority);
+        const stage = stageOf(selectedComplaint.status);
 
-      <div
-        className="modal-overlay"
-        onClick={() =>
-          setSelectedComplaint(null)
-        }
-      >
-
-        <div
-          className="details-modal"
-          onClick={(e) =>
-            e.stopPropagation()
-          }
-        >
-
-          {/* Modal Header */}
-
-          <div className="modal-header">
-
-            <div>
-
-              <span className="modal-id">
-                {selectedComplaint.id}
-              </span>
-
-              <h2>
-                {selectedComplaint.title}
-              </h2>
-
-            </div>
-
-            <button
-              className="close-button"
-              onClick={() =>
-                setSelectedComplaint(null)
-              }
+        return (
+          <div
+            className="vc-overlay"
+            onClick={() => setSelectedComplaint(null)}
+          >
+            <div
+              className="vc-modal"
+              onClick={(e) => e.stopPropagation()}
             >
-              <X size={18} strokeWidth={2.5} />
-            </button>
 
-          </div>
-
-
-          {/* Status */}
-
-          <div className="modal-status">
-
-            <span
-              className={`status ${formatStatus(selectedComplaint.status)
-                .toLowerCase()
-                .replace(" ", "-")}`}
-            >
-              {formatStatus(selectedComplaint.status)}
-            </span>
-
-            <span
-              className={`priority ${formatPriority(selectedComplaint.priority)
-                .toLowerCase()}`}
-            >
-              {formatPriority(selectedComplaint.priority)} Priority
-            </span>
-
-          </div>
-
-
-          {/* Details */}
-
-          <div className="details-grid">
-
-            <div className="detail-item">
-              <label>Complaint ID</label>
-              <span>{selectedComplaint.id}</span>
-            </div>
-
-            <div className="detail-item">
-              <label>Reported Date</label>
-              <span>{selectedComplaint.date}</span>
-            </div>
-
-            <div className="detail-item">
-              <label>Issue Type</label>
-              <span>{selectedComplaint.issueType}</span>
-            </div>
-
-            <div className="detail-item">
-              <label>Location</label>
-              <span>{selectedComplaint.location}</span>
-            </div>
-
-            <div className="detail-item">
-              <label>Latitude</label>
-              <span>{selectedComplaint.latitude}</span>
-            </div>
-
-            <div className="detail-item">
-              <label>Longitude</label>
-              <span>{selectedComplaint.longitude}</span>
-            </div>
-
-          </div>
-
-
-          {/* Description */}
-
-          <div className="description-section">
-            <label>Description</label>
-            <p>{selectedComplaint.description}</p>
-          </div>
-
-
-          {/* Timeline */}
-
-          <div className="timeline-section">
-
-            <h3>Complaint Status</h3>
-
-            <div className="timeline">
-
-              <div className="timeline-item completed">
-
-                <div className="timeline-dot">
-                  <CheckCircle2 size={13} strokeWidth={2.5} />
+              {/* Modal Header */}
+              <div className="vc-modal-head">
+                <div>
+                  <span className="vc-modal-id">{selectedComplaint.id}</span>
+                  <h2>{selectedComplaint.title}</h2>
                 </div>
 
-                <div>
-                  <strong>Complaint Submitted</strong>
+                <button
+                  className="vc-close"
+                  onClick={() => setSelectedComplaint(null)}
+                  aria-label="Close"
+                >
+                  <X size={18} strokeWidth={2.5} />
+                </button>
+              </div>
+
+              {/* Status */}
+              <div className="vc-modal-status">
+                <span className={`vc-status ${cls(displayStatus)}`}>
+                  <span className="vc-dot"></span>
+                  {displayStatus}
+                </span>
+
+                <span className={`vc-priority ${cls(displayPriority)}`}>
+                  {displayPriority} Priority
+                </span>
+              </div>
+
+              {/* Details */}
+              <div className="vc-details">
+                <div className="vc-detail">
+                  <label>Complaint ID</label>
+                  <span>{selectedComplaint.id}</span>
+                </div>
+
+                <div className="vc-detail">
+                  <label>Reported Date</label>
                   <span>{selectedComplaint.date}</span>
                 </div>
 
+                <div className="vc-detail">
+                  <label>Issue Type</label>
+                  <span>{selectedComplaint.issueType}</span>
+                </div>
+
+                <div className="vc-detail">
+                  <label>Location</label>
+                  <span>{selectedComplaint.location}</span>
+                </div>
+
+                <div className="vc-detail">
+                  <label>Latitude</label>
+                  <span>{selectedComplaint.latitude}</span>
+                </div>
+
+                <div className="vc-detail">
+                  <label>Longitude</label>
+                  <span>{selectedComplaint.longitude}</span>
+                </div>
               </div>
 
+              {/* Description */}
+              <div className="vc-description">
+                <label>Description</label>
+                <p>{selectedComplaint.description}</p>
+              </div>
 
-              <div
-                className={`timeline-item ${formatStatus(selectedComplaint.status) !== "Pending"
-                  ? "completed"
-                  : ""
-                  }`}
+              {/* Timeline */}
+              <div className="vc-timeline-wrap">
+                <h3>Complaint Status</h3>
+
+                <div className="vc-timeline">
+
+                  <div className="vc-tl-item done">
+                    <div className="vc-tl-dot">
+                      <CheckCircle2 size={13} strokeWidth={2.5} />
+                    </div>
+                    <div>
+                      <strong>Complaint Submitted</strong>
+                      <span>{selectedComplaint.date}</span>
+                    </div>
+                  </div>
+
+                  <div className={`vc-tl-item ${stage >= 2 ? "done" : ""}`}>
+                    <div className="vc-tl-dot">2</div>
+                    <div>
+                      <strong>Work Assigned</strong>
+                      <span>
+                        {stage >= 2 ? "Workers assigned" : "Waiting for assignment"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className={`vc-tl-item ${stage >= 3 ? "done" : ""}`}>
+                    <div className="vc-tl-dot">3</div>
+                    <div>
+                      <strong>Work In Progress</strong>
+                      <span>
+                        {stage >= 3 ? "Repair work started" : "Not started"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className={`vc-tl-item ${stage >= 4 ? "done" : ""}`}>
+                    <div className="vc-tl-dot">
+                      <CheckCircle2 size={13} strokeWidth={2.5} />
+                    </div>
+                    <div>
+                      <strong>Completed</strong>
+                      <span>
+                        {stage >= 4 ? "Repair completed" : "Waiting for completion"}
+                      </span>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Close */}
+              <button
+                className="vc-modal-close"
+                onClick={() => setSelectedComplaint(null)}
               >
-
-                <div className="timeline-dot">2</div>
-
-                <div>
-
-                  <strong>Work Assigned</strong>
-
-                  <span>
-                    {formatStatus(selectedComplaint.status) === "Pending"
-                      ? "Waiting for assignment"
-                      : "Workers assigned"}
-                  </span>
-
-                </div>
-
-              </div>
-
-
-              <div
-                className={`timeline-item ${formatStatus(selectedComplaint.status) === "In Progress" ||
-                  formatStatus(selectedComplaint.status) === "Completed"
-                  ? "completed"
-                  : ""
-                  }`}
-              >
-
-                <div className="timeline-dot">3</div>
-
-                <div>
-
-                  <strong>Work In Progress</strong>
-
-                  <span>
-                    {formatStatus(selectedComplaint.status) === "Pending" || formatStatus(selectedComplaint.status) === "Assigned"
-                      ? "Not started"
-                      : "Repair work started"}
-                  </span>
-
-                </div>
-
-              </div>
-
-
-              <div
-                className={`timeline-item ${formatStatus(selectedComplaint.status) === "Completed"
-                  ? "completed"
-                  : ""
-                  }`}
-              >
-
-                <div className="timeline-dot">
-                  <CheckCircle2 size={13} strokeWidth={2.5} />
-                </div>
-
-                <div>
-
-                  <strong>Completed</strong>
-
-                  <span>
-                    {formatStatus(selectedComplaint.status) === "Completed"
-                      ? "Repair completed"
-                      : "Waiting for completion"}
-                  </span>
-
-                </div>
-
-              </div>
+                Close
+              </button>
 
             </div>
-
           </div>
+        );
+      })()}
 
-
-          {/* Close */}
-
-          <button
-            className="modal-close-btn"
-            onClick={() =>
-              setSelectedComplaint(null)
-            }
-          >
-            Close
-          </button>
-
-        </div>
-
-      </div>
-
-    )}
-
-  </div>
-);
+    </div>
+  );
 };
 
 export default ViewComplaints;
