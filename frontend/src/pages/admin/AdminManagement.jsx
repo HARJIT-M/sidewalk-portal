@@ -12,9 +12,17 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   AlertTriangle,
+  AlertCircle,
   Eye,
   EyeOff,
   X,
+  ChevronLeft,
+  ChevronRight,
+  Layers,
+  Navigation,
+  ExternalLink,
+  MapPin,
+  Inbox,
 } from "lucide-react";
 import {
   getAllUsers,
@@ -56,6 +64,23 @@ const ROLE_OPTIONS = [
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const PAGE_SIZE_OPTIONS = [5, 10, 20];
+
+// builds the numbered buttons for the pager: 1 … 4 5 6 … 12
+const getPageItems = (total, current) => {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const items = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  if (start > 2) items.push("...");
+  for (let i = start; i <= end; i += 1) items.push(i);
+  if (end < total - 1) items.push("...");
+  items.push(total);
+  return items;
+};
+
 const AdminManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -78,6 +103,10 @@ const AdminManagement = () => {
 
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
+
+  // ---- pagination ----
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   const [pendingDelete, setPendingDelete] = useState(null);
   const deletionCheckRef = useRef(0);
@@ -167,6 +196,24 @@ const AdminManagement = () => {
       clearTimeout(timeoutId);
     };
   }, [placeSearchQuery, newAreaType, newAreaParent, cityMappings]);
+
+  // close popups with the Escape key
+  useEffect(() => {
+    if (!showAddModal && !pendingDelete) return undefined;
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      if (showAddModal && !submitting) setShowAddModal(false);
+      if (pendingDelete && !deletingUser) {
+        deletionCheckRef.current += 1;
+        setPendingDelete(null);
+        setDeletionDependencies(null);
+        setDeletionDependencyError("");
+        setLoadingDeletionDependencies(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showAddModal, pendingDelete, submitting, deletingUser]);
 
   const handleRouteComplaint = async (complaintId) => {
     const managerId = routingSelections[complaintId];
@@ -394,11 +441,11 @@ const AdminManagement = () => {
         ...(form.role === "WORKER" ? { manager_id: form.manager_id } : {}),
         status: "ACTIVE", // new accounts are always created as active
       };
-      console.log("Submitting new user:", payload);
       const res = await createUser(payload);
       // API returns the newly created user (without password)
       setUsers((currentUsers) => [res.data, ...currentUsers]);
       setShowAddModal(false);
+      setPage(1);
     } catch (err) {
       const message =
         err?.response?.data?.message || err.message || "Failed to create user";
@@ -409,11 +456,25 @@ const AdminManagement = () => {
   };
 
   if (loading) {
-    return <div className="admin-management">Loading accounts...</div>;
+    return (
+      <div className="am-page am-center">
+        <div className="am-loader" aria-hidden="true">
+          <i></i><i></i><i></i><i></i>
+        </div>
+        <p>Loading accounts...</p>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="admin-management">Error: {error}</div>;
+    return (
+      <div className="am-page am-center">
+        <div className="am-alert error" role="alert">
+          <AlertCircle size={18} strokeWidth={2.2} />
+          Error: {error}
+        </div>
+      </div>
+    );
   }
 
 
@@ -426,6 +487,14 @@ const AdminManagement = () => {
     return matchesSearch && matchesRole;
   });
 
+  // ================= PAGINATION =================
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedUsers = filteredUsers.slice(startIndex, startIndex + pageSize);
+  const showingFrom = filteredUsers.length === 0 ? 0 : startIndex + 1;
+  const showingTo = startIndex + paginatedUsers.length;
+
   const roleFilters = [
     { key: "ALL", label: "All Accounts", count: users.length },
     { key: "CITIZEN", label: "Citizens", count: users.filter((u) => u.role === "CITIZEN").length },
@@ -435,108 +504,135 @@ const AdminManagement = () => {
 
   const activeCount = users.filter((u) => u.status === "ACTIVE").length;
 
-  return (
-    <div className="admin-management">
+  const activeManagers = users.filter(
+    (user) => user.role === "MANAGER" && user.status === "ACTIVE"
+  );
 
-      {/* ================= HEADER ================= */}
-      <div className="admin-management-header">
-        <div>
-          <span className="admin-management-eyebrow">User Administration</span>
+  const summaryCards = [
+    { label: "Citizens", value: users.filter((u) => u.role === "CITIZEN").length, icon: Users, tone: "indigo" },
+    { label: "Workers", value: users.filter((u) => u.role === "WORKER").length, icon: Wrench, tone: "green" },
+    { label: "Managers", value: users.filter((u) => u.role === "MANAGER").length, icon: UserCog, tone: "amber" },
+  ];
+
+  const hasDependencies =
+    deletionDependencies &&
+    (deletionDependencies.activeAssignments?.length > 0 ||
+      deletionDependencies.managedWorkers > 0 ||
+      deletionDependencies.mappedAreas?.length > 0);
+
+  return (
+    <div className="am-page">
+
+      {/* ================= HERO ================= */}
+      <section className="am-hero">
+        <div className="am-hero-rings" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div className="am-hero-slabs" aria-hidden="true">
+          <i></i><i></i><i></i><i></i>
+        </div>
+
+        <div className="am-hero-text">
+          <span className="am-hero-tag">
+            <ShieldCheck size={14} strokeWidth={2.4} /> User Administration
+          </span>
           <h1>Account Management</h1>
           <p>Manage citizens, workers and managers across the portal</p>
         </div>
 
-        <div className="admin-management-profile">
-          <div className="admin-management-avatar">A</div>
+        <div className="am-admin">
+          <div className="am-admin-avatar">A</div>
           <div>
-            <strong>Administrator</strong>
+            <h3>Administrator</h3>
             <span>{users.length} accounts · Full access</span>
           </div>
         </div>
-      </div>
+      </section>
 
 
       {/* ================= SUMMARY ================= */}
-      <div className="admin-management-summary">
+      <section className="am-stats">
+        {summaryCards.map(({ label, value, icon: Icon, tone }, i) => (
+          <div
+            className={`am-stat tone-${tone}`}
+            key={label}
+            style={{ animationDelay: `${0.1 + i * 0.08}s` }}
+          >
+            <div className="am-stat-icon">
+              <Icon size={22} strokeWidth={2.2} />
+            </div>
+            <div className="am-stat-text">
+              <strong>{value}</strong>
+              <span>{label}</span>
+            </div>
+          </div>
+        ))}
 
-        <div className="admin-summary-card">
-          <div className="admin-summary-icon indigo">
-            <Users size={20} strokeWidth={2} />
+        <div
+          className="am-stat tone-violet"
+          style={{ animationDelay: "0.34s" }}
+        >
+          <div className="am-stat-icon">
+            <ShieldCheck size={22} strokeWidth={2.2} />
           </div>
-          <div className="admin-summary-content">
-            <span>Citizens</span>
-            <strong>{users.filter((u) => u.role === "CITIZEN").length}</strong>
-          </div>
-        </div>
-
-        <div className="admin-summary-card">
-          <div className="admin-summary-icon green">
-            <Wrench size={20} strokeWidth={2} />
-          </div>
-          <div className="admin-summary-content">
-            <span>Workers</span>
-            <strong>{users.filter((u) => u.role === "WORKER").length}</strong>
-          </div>
-        </div>
-
-        <div className="admin-summary-card">
-          <div className="admin-summary-icon amber">
-            <UserCog size={20} strokeWidth={2} />
-          </div>
-          <div className="admin-summary-content">
-            <span>Managers</span>
-            <strong>{users.filter((u) => u.role === "MANAGER").length}</strong>
-          </div>
-        </div>
-
-        <div className="admin-summary-card">
-          <div className="admin-summary-icon violet">
-            <ShieldCheck size={20} strokeWidth={2} />
-          </div>
-          <div className="admin-summary-content">
-            <span>Active Accounts</span>
+          <div className="am-stat-text">
             <strong>
               {activeCount} <em>/ {users.length}</em>
             </strong>
+            <span>Active Accounts</span>
+          </div>
+        </div>
+      </section>
+
+
+      {/* ================= CITY / AREA MANAGER MAPPING ================= */}
+      <section className="am-panel">
+        <div className="am-panel-head">
+          <div className="am-panel-icon">
+            <Layers size={20} strokeWidth={2.2} />
+          </div>
+          <div>
+            <h2>City / Area Manager Mapping</h2>
+            <p>
+              Search public place data to build a district-to-city-to-locality hierarchy, then assign
+              managers to the specific areas they serve.
+            </p>
           </div>
         </div>
 
-      </div>
+        {mappingError && (
+          <div className="am-alert error" role="alert">
+            <AlertCircle size={18} strokeWidth={2.2} />
+            {mappingError}
+          </div>
+        )}
 
-      <section className="city-manager-panel">
-        <div>
-          <h2>City / Area Manager Mapping</h2>
-          <p>
-            Search public place data to build a district-to-city-to-locality hierarchy, then assign
-            managers to the specific areas they serve.
-          </p>
-        </div>
-        {mappingError && <p className="city-manager-error">{mappingError}</p>}
-        <form className="area-mapping-create-form" onSubmit={handleCreateArea}>
-          <div className="area-place-search-field">
+        <form className="am-area-form" onSubmit={handleCreateArea}>
+          <div className="am-field am-place-field">
             <label htmlFor="area-place-search">Search Tamil Nadu locations</label>
-            <input
-              id="area-place-search"
-              value={placeSearchQuery}
-              onChange={(event) => {
-                setPlaceSearchQuery(event.target.value);
-                setNewAreaName("");
-                setPlaceSearchResults([]);
-                setPlaceSearchError("");
-                setSearchingPlaces(false);
-              }}
-              placeholder="e.g. Coimbatore or Ukkadam"
-              maxLength={100}
-            />
+            <div className="am-input-icon">
+              <Search size={16} strokeWidth={2.2} />
+              <input
+                id="area-place-search"
+                value={placeSearchQuery}
+                onChange={(event) => {
+                  setPlaceSearchQuery(event.target.value);
+                  setNewAreaName("");
+                  setPlaceSearchResults([]);
+                  setPlaceSearchError("");
+                  setSearchingPlaces(false);
+                }}
+                placeholder="e.g. Coimbatore or Ukkadam"
+                maxLength={100}
+              />
+            </div>
             {newAreaName && (
-              <span className="selected-area-name">Selected: {newAreaName}</span>
+              <span className="am-selected-area">Selected: {newAreaName}</span>
             )}
-            {searchingPlaces && <span className="area-place-search-note">Searching places...</span>}
-            {placeSearchError && (
-              <span className="area-place-search-error">{placeSearchError}</span>
-            )}
+            {searchingPlaces && <span className="am-note">Searching places...</span>}
+            {placeSearchError && <span className="am-note error">{placeSearchError}</span>}
             {placeSearchResults.length > 0 && (
-              <div className="area-place-search-results">
+              <div className="am-place-results">
                 {placeSearchResults.map((place) => (
                   <button
                     key={`${place.osmType}-${place.osmId}-${place.name}`}
@@ -554,9 +650,11 @@ const AdminManagement = () => {
               </div>
             )}
           </div>
-          <label>
-            Area level
+
+          <div className="am-field">
+            <label htmlFor="area-level">Area level</label>
             <select
+              id="area-level"
               value={newAreaType}
               onChange={(event) => {
                 const type = event.target.value;
@@ -574,10 +672,12 @@ const AdminManagement = () => {
               <option value="WARD">Locality / Ward</option>
               <option value="ZONE">Zone</option>
             </select>
-          </label>
-          <label>
-            Parent district / city
+          </div>
+
+          <div className="am-field">
+            <label htmlFor="area-parent">Parent district / city</label>
             <select
+              id="area-parent"
               value={newAreaParent}
               disabled={newAreaType === "DISTRICT"}
               required={newAreaType !== "DISTRICT"}
@@ -599,22 +699,29 @@ const AdminManagement = () => {
                   </option>
                 ))}
             </select>
-          </label>
-          <button type="submit" disabled={creatingArea || !newAreaName}>
+          </div>
+
+          <button
+            className="am-btn-main am-area-submit"
+            type="submit"
+            disabled={creatingArea || !newAreaName}
+          >
             {creatingArea ? "Adding..." : "Add area"}
           </button>
         </form>
-        <p className="area-hierarchy-hint">
+
+        <p className="am-hint">
           Add a district first, then select it as the parent to search its cities. Add a city next
           to search its localities. Workers remain on their manager&apos;s team.
         </p>
+
         {cityMappings.length === 0 ? (
-          <p className="city-manager-empty">
+          <p className="am-empty">
             No cities or localities are configured yet. Add one above to create manager routing.
           </p>
         ) : (
-          <div className="city-manager-table-wrap">
-            <table className="city-manager-table">
+          <div className="am-table-wrap">
+            <table className="am-table am-table-compact">
               <thead>
                 <tr>
                   <th>Area</th>
@@ -626,11 +733,14 @@ const AdminManagement = () => {
               <tbody>
                 {cityMappings.map((area) => (
                   <tr key={area.id}>
-                    <td>{area.name}</td>
-                    <td>{area.type}</td>
+                    <td className="am-strong">{area.name}</td>
+                    <td>
+                      <span className="am-level">{area.type}</span>
+                    </td>
                     <td>{area.parent || "—"}</td>
                     <td>
                       <select
+                        className="am-inline-select"
                         value={area.manager?.id || ""}
                         disabled={savingCityId === area.id}
                         onChange={(event) =>
@@ -639,16 +749,11 @@ const AdminManagement = () => {
                         aria-label={`Manager for ${area.name}`}
                       >
                         <option value="">Use parent area's manager</option>
-                        {users
-                          .filter(
-                            (user) =>
-                              user.role === "MANAGER" && user.status === "ACTIVE"
-                          )
-                          .map((manager) => (
-                            <option key={manager._id} value={manager._id}>
-                              {manager.name} ({manager.email})
-                            </option>
-                          ))}
+                        {activeManagers.map((manager) => (
+                          <option key={manager._id} value={manager._id}>
+                            {manager.name} ({manager.email})
+                          </option>
+                        ))}
                       </select>
                     </td>
                   </tr>
@@ -659,26 +764,46 @@ const AdminManagement = () => {
         )}
       </section>
 
-      <section className="city-manager-panel routing-queue-panel">
-        <div>
-          <h2>Complaints Awaiting Admin Routing</h2>
-          <p>
-            Submissions received before area boundaries are configured appear here.
-            Select an active manager to place each complaint in their work queue.
-          </p>
+
+      {/* ================= ROUTING QUEUE ================= */}
+      <section className="am-panel">
+        <div className="am-panel-head">
+          <div className="am-panel-icon">
+            <Navigation size={20} strokeWidth={2.2} />
+          </div>
+          <div>
+            <h2>Complaints Awaiting Admin Routing</h2>
+            <p>
+              Submissions received before area boundaries are configured appear here.
+              Select an active manager to place each complaint in their work queue.
+            </p>
+          </div>
         </div>
-        {routingError && <p className="city-manager-error">{routingError}</p>}
+
+        {routingError && (
+          <div className="am-alert error" role="alert">
+            <AlertCircle size={18} strokeWidth={2.2} />
+            {routingError}
+          </div>
+        )}
+
         {routingComplaints.length === 0 ? (
-          <p className="city-manager-empty">
+          <p className="am-empty">
             No complaints are waiting for administrator routing.
           </p>
         ) : (
-          <div className="routing-queue-list">
+          <div className="am-routing">
             {routingComplaints.map((complaint) => (
-              <article className="routing-queue-item" key={complaint.id}>
-                <div className="routing-queue-details">
-                  <strong>{complaint.title} · {complaint.code}</strong>
-                  <span>{complaint.address}</span>
+              <article className="am-route-item" key={complaint.id}>
+                <div className="am-route-details">
+                  <strong>
+                    {complaint.title}
+                    <span className="am-route-code">{complaint.code}</span>
+                  </strong>
+                  <span>
+                    <MapPin size={13} strokeWidth={2.2} />
+                    {complaint.address}
+                  </span>
                   <span>
                     {[complaint.locality, complaint.city, complaint.state]
                       .filter(Boolean)
@@ -691,10 +816,12 @@ const AdminManagement = () => {
                   {complaint.navigationUrl && (
                     <a href={complaint.navigationUrl} target="_blank" rel="noreferrer">
                       Open exact pin in Maps
+                      <ExternalLink size={12} strokeWidth={2.4} />
                     </a>
                   )}
                 </div>
-                <div className="routing-queue-actions">
+
+                <div className="am-route-actions">
                   <select
                     value={routingSelections[complaint.id] || ""}
                     onChange={(event) =>
@@ -706,18 +833,14 @@ const AdminManagement = () => {
                     aria-label={`Manager for complaint ${complaint.code}`}
                   >
                     <option value="">Select manager</option>
-                    {users
-                      .filter(
-                        (user) =>
-                          user.role === "MANAGER" && user.status === "ACTIVE"
-                      )
-                      .map((manager) => (
-                        <option key={manager._id} value={manager._id}>
-                          {manager.name}
-                        </option>
-                      ))}
+                    {activeManagers.map((manager) => (
+                      <option key={manager._id} value={manager._id}>
+                        {manager.name}
+                      </option>
+                    ))}
                   </select>
                   <button
+                    className="am-btn-main"
                     type="button"
                     disabled={savingComplaintId === complaint.id}
                     onClick={() => handleRouteComplaint(complaint.id)}
@@ -731,63 +854,79 @@ const AdminManagement = () => {
         )}
       </section>
 
-      {/* ================= MANAGEMENT PANEL ================= */}
-      <div className="admin-management-panel">
 
-        {/* ================= TOOLBAR ================= */}
-        <div className="admin-management-toolbar">
+      {/* ================= ACCOUNTS PANEL ================= */}
+      <section className="am-panel am-accounts">
 
-          <div className="admin-search-box">
-            <Search size={16} strokeWidth={2} />
+        {/* ---- toolbar ---- */}
+        <div className="am-toolbar">
+          <div className="am-search">
+            <Search size={18} strokeWidth={2} />
             <input
               type="text"
               placeholder="Search by name or email..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
             />
+            {search && (
+              <button
+                type="button"
+                className="am-search-clear"
+                onClick={() => {
+                  setSearch("");
+                  setPage(1);
+                }}
+                aria-label="Clear search"
+              >
+                <X size={14} strokeWidth={2.5} />
+              </button>
+            )}
           </div>
 
-          <div className="admin-filter-tabs">
-            <SlidersHorizontal size={13} strokeWidth={2} className="admin-filter-tabs-icon" />
+          <div className="am-filters">
+            <SlidersHorizontal size={15} strokeWidth={2.2} className="am-filters-icon" />
             {roleFilters.map((filter) => (
               <button
                 key={filter.key}
-                className={roleFilter === filter.key ? "admin-filter-btn active" : "admin-filter-btn"}
-                onClick={() => setRoleFilter(filter.key)}
+                className={roleFilter === filter.key ? "am-filter active" : "am-filter"}
+                onClick={() => {
+                  setRoleFilter(filter.key);
+                  setPage(1);
+                }}
               >
                 {filter.label}
-                <span className="admin-filter-count">{filter.count}</span>
+                <span>{filter.count}</span>
               </button>
             ))}
           </div>
 
-          <button className="admin-add-user-btn" onClick={openAddModal}>
-            <UserPlus size={16} strokeWidth={2} />
+          <button className="am-btn-main am-add" onClick={openAddModal}>
+            <UserPlus size={16} strokeWidth={2.3} />
             Add User
           </button>
-
         </div>
 
 
-        {/* ================= TABLE ================= */}
-        <div className="admin-table-container">
-
-          <table className="admin-users-table">
-
+        {/* ---- table ---- */}
+        <div className="am-table-wrap">
+          <table className="am-table">
             <thead>
               <tr>
                 <th>Account</th>
                 <th>Email</th>
                 <th>Role</th>
                 <th>Status</th>
-                <th className="admin-th-actions">Actions</th>
+                <th className="am-th-right">Actions</th>
               </tr>
             </thead>
 
             <tbody>
-              {filteredUsers.length > 0 ? (
-                filteredUsers.map((user) => {
-                  const roleMeta = ROLE_STYLE[user.role] || { tone: "gray", icon: Users };
+              {paginatedUsers.length > 0 ? (
+                paginatedUsers.map((user) => {
+                  const roleMeta = ROLE_STYLE[user.role] || { tone: "grey", icon: Users };
                   const RoleIcon = roleMeta.icon;
 
                   return (
@@ -795,47 +934,46 @@ const AdminManagement = () => {
 
                       {/* ACCOUNT */}
                       <td>
-                        <div className="admin-user-info">
-                          <div className={`admin-user-avatar ${roleMeta.tone}`}>
+                        <div className="am-user">
+                          <div className={`am-user-avatar tone-${roleMeta.tone}`}>
                             {user?.name?.charAt(0).toUpperCase() || "?"}
                           </div>
                           <div>
                             <strong>{user.name}</strong>
-                            <span>Account ID #{String(user._id).substring(0, 6)}</span>
+                            <span>ID #{String(user._id).substring(0, 6)}</span>
                           </div>
                         </div>
                       </td>
 
                       {/* EMAIL */}
                       <td>
-                        <span className="admin-user-email">{user.email}</span>
+                        <span className="am-email">{user.email}</span>
                       </td>
 
                       {/* ROLE */}
                       <td>
-                        <span className={`admin-role-badge ${user?.role?.toLowerCase() || "unknown"}`}>
-                          <RoleIcon size={11} strokeWidth={2.2} />
+                        <span className={`am-role tone-${roleMeta.tone}`}>
+                          <RoleIcon size={12} strokeWidth={2.3} />
                           {user.role || "UNKNOWN"}
                         </span>
                       </td>
 
                       {/* STATUS */}
                       <td>
-                        <span className={`admin-status-badge ${user?.status?.toLowerCase() || "unknown"}`}>
-                          <span className="admin-status-dot"></span>
+                        <span className={`am-status ${user?.status?.toLowerCase() || "unknown"}`}>
+                          <span className="am-dot"></span>
                           {user.status || "UNKNOWN"}
                         </span>
                       </td>
 
                       {/* ACTIONS */}
                       <td>
-                        <div className="admin-action-buttons">
-
+                        <div className="am-actions">
                           <button
                             className={
                               user.status === "ACTIVE"
-                                ? "admin-action-btn revoke"
-                                : "admin-action-btn activate"
+                                ? "am-action revoke"
+                                : "am-action activate"
                             }
                             onClick={() => handleStatusChange(user._id, user.status)}
                             title={
@@ -845,21 +983,21 @@ const AdminManagement = () => {
                             }
                           >
                             {user.status === "ACTIVE" ? (
-                              <ShieldOff size={14} strokeWidth={2} />
+                              <ShieldOff size={14} strokeWidth={2.2} />
                             ) : (
-                              <UserCheck size={14} strokeWidth={2} />
+                              <UserCheck size={14} strokeWidth={2.2} />
                             )}
                             {user.status === "ACTIVE" ? "Revoke" : "Activate"}
                           </button>
 
                           <button
-                            className="admin-action-btn delete"
+                            className="am-action delete"
                             onClick={() => requestDelete(user)}
                             title="Remove account"
+                            aria-label={`Remove ${user.name}`}
                           >
-                            <Trash2 size={14} strokeWidth={2} />
+                            <Trash2 size={14} strokeWidth={2.2} />
                           </button>
-
                         </div>
                       </td>
 
@@ -868,52 +1006,117 @@ const AdminManagement = () => {
                 })
               ) : (
                 <tr>
-                  <td colSpan="5" className="admin-no-users">
-                    <UserX size={26} strokeWidth={1.5} />
-                    <strong>No accounts found</strong>
-                    <span>Try adjusting your search or filter.</span>
+                  <td colSpan="5">
+                    <div className="am-no-users">
+                      <UserX size={34} strokeWidth={1.7} />
+                      <strong>No accounts found</strong>
+                      <span>Try adjusting your search or filter.</span>
+                    </div>
                   </td>
                 </tr>
               )}
             </tbody>
-
           </table>
-
         </div>
 
-        <div className="admin-table-footer">
-          <span>
-            Showing <strong>{filteredUsers.length}</strong> of <strong>{users.length}</strong> accounts
-          </span>
+
+        {/* ---- pagination ---- */}
+        <div className="am-pager">
+          <div className="am-pager-info">
+            Showing <strong>{showingFrom}–{showingTo}</strong> of{" "}
+            <strong>{filteredUsers.length}</strong>
+            {filteredUsers.length !== users.length && (
+              <> (filtered from {users.length})</>
+            )}{" "}
+            accounts
+          </div>
+
+          <div className="am-pager-controls">
+            <label className="am-pager-size">
+              Rows
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <nav className="am-pages" aria-label="Pagination">
+              <button
+                className="am-page-btn"
+                onClick={() => setPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                aria-label="Previous page"
+              >
+                <ChevronLeft size={16} strokeWidth={2.5} />
+              </button>
+
+              {getPageItems(totalPages, currentPage).map((item, index) =>
+                item === "..." ? (
+                  <span className="am-page-dots" key={`dots-${index}`}>
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={item}
+                    className={item === currentPage ? "am-page-btn active" : "am-page-btn"}
+                    onClick={() => setPage(item)}
+                    aria-current={item === currentPage ? "page" : undefined}
+                  >
+                    {item}
+                  </button>
+                )
+              )}
+
+              <button
+                className="am-page-btn"
+                onClick={() => setPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                aria-label="Next page"
+              >
+                <ChevronRight size={16} strokeWidth={2.5} />
+              </button>
+            </nav>
+          </div>
         </div>
 
-      </div>
+      </section>
 
 
       {/* ================= ADD USER MODAL ================= */}
       {showAddModal && (
-        <div className="admin-modal-overlay" onClick={closeAddModal}>
-          <div
-            className="admin-modal admin-modal-wide"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="am-overlay" onClick={closeAddModal}>
+          <div className="am-modal am-modal-wide" onClick={(e) => e.stopPropagation()}>
 
-            <button className="admin-modal-close" onClick={closeAddModal} type="button">
-              <X size={16} strokeWidth={2} />
-            </button>
-
-            <div className="admin-modal-icon add">
-              <UserPlus size={22} strokeWidth={2} />
+            <div className="am-modal-head">
+              <div>
+                <span className="am-modal-label">NEW ACCOUNT</span>
+                <h2>Add New Account</h2>
+                <p>Create a new account and assign its role and access status.</p>
+              </div>
+              <button
+                className="am-close"
+                onClick={closeAddModal}
+                type="button"
+                aria-label="Close"
+              >
+                <X size={18} strokeWidth={2.5} />
+              </button>
             </div>
 
-            <h2>Add New Account</h2>
-            <p>Create a new account and assign its role and access status.</p>
+            <form className="am-form" onSubmit={handleAddUser} noValidate>
 
-            <form className="admin-add-form" onSubmit={handleAddUser} noValidate>
+              <div className="am-form-grid">
 
-              <div className="admin-form-grid">
-
-                <div className="admin-form-field full">
+                <div className="am-field am-full">
                   <label htmlFor="add-name">Full Name <em>*</em></label>
                   <input
                     id="add-name"
@@ -925,10 +1128,10 @@ const AdminManagement = () => {
                     className={formErrors.name ? "invalid" : ""}
                     autoFocus
                   />
-                  {formErrors.name && <span className="admin-field-error">{formErrors.name}</span>}
+                  {formErrors.name && <span className="am-field-error">{formErrors.name}</span>}
                 </div>
 
-                <div className="admin-form-field full">
+                <div className="am-field am-full">
                   <label htmlFor="add-email">Email <em>*</em></label>
                   <input
                     id="add-email"
@@ -939,10 +1142,10 @@ const AdminManagement = () => {
                     placeholder="name@example.com"
                     className={formErrors.email ? "invalid" : ""}
                   />
-                  {formErrors.email && <span className="admin-field-error">{formErrors.email}</span>}
+                  {formErrors.email && <span className="am-field-error">{formErrors.email}</span>}
                 </div>
 
-                <div className="admin-form-field">
+                <div className="am-field am-full">
                   <label htmlFor="add-phone">Phone</label>
                   <input
                     id="add-phone"
@@ -953,12 +1156,12 @@ const AdminManagement = () => {
                     placeholder="Optional"
                     className={formErrors.phone ? "invalid" : ""}
                   />
-                  {formErrors.phone && <span className="admin-field-error">{formErrors.phone}</span>}
+                  {formErrors.phone && <span className="am-field-error">{formErrors.phone}</span>}
                 </div>
 
-                <div className="admin-form-field full">
+                <div className="am-field am-full">
                   <label htmlFor="add-password">Password <em>*</em></label>
-                  <div className="admin-password-wrap">
+                  <div className="am-password">
                     <input
                       id="add-password"
                       type={showPassword ? "text" : "password"}
@@ -971,19 +1174,21 @@ const AdminManagement = () => {
                     />
                     <button
                       type="button"
-                      className="admin-password-toggle"
+                      className="am-password-toggle"
                       onClick={() => setShowPassword((s) => !s)}
                       title={showPassword ? "Hide password" : "Show password"}
                     >
-                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
-                  {formErrors.password && <span className="admin-field-error">{formErrors.password}</span>}
+                  {formErrors.password && (
+                    <span className="am-field-error">{formErrors.password}</span>
+                  )}
                 </div>
 
-                <div className="admin-form-field full">
+                <div className="am-field am-full">
                   <label>Role</label>
-                  <div className="admin-role-chips" role="radiogroup" aria-label="Role">
+                  <div className="am-role-chips" role="radiogroup" aria-label="Role">
                     {ROLE_OPTIONS.map((opt) => {
                       const meta = ROLE_STYLE[opt.key];
                       const ChipIcon = meta.icon;
@@ -994,7 +1199,7 @@ const AdminManagement = () => {
                           type="button"
                           role="radio"
                           aria-checked={selected}
-                          className={`admin-role-chip ${meta.tone}${selected ? " selected" : ""}`}
+                          className={`am-chip tone-${meta.tone}${selected ? " selected" : ""}`}
                           onClick={() =>
                             setForm((prev) => ({
                               ...prev,
@@ -1003,7 +1208,7 @@ const AdminManagement = () => {
                             }))
                           }
                         >
-                          <ChipIcon size={13} strokeWidth={2.2} />
+                          <ChipIcon size={14} strokeWidth={2.3} />
                           {opt.label}
                         </button>
                       );
@@ -1012,7 +1217,7 @@ const AdminManagement = () => {
                 </div>
 
                 {form.role === "WORKER" && (
-                  <div className="admin-form-field full">
+                  <div className="am-field am-full">
                     <label htmlFor="add-worker-manager">Manager team <em>*</em></label>
                     <select
                       id="add-worker-manager"
@@ -1022,37 +1227,38 @@ const AdminManagement = () => {
                       className={formErrors.manager_id ? "invalid" : ""}
                     >
                       <option value="">Select an active manager</option>
-                      {users
-                        .filter(
-                          (user) => user.role === "MANAGER" && user.status === "ACTIVE"
-                        )
-                        .map((manager) => (
-                          <option key={manager._id} value={manager._id}>
-                            {manager.name} ({manager.email})
-                          </option>
-                        ))}
+                      {activeManagers.map((manager) => (
+                        <option key={manager._id} value={manager._id}>
+                          {manager.name} ({manager.email})
+                        </option>
+                      ))}
                     </select>
                     {formErrors.manager_id && (
-                      <span className="admin-field-error">{formErrors.manager_id}</span>
+                      <span className="am-field-error">{formErrors.manager_id}</span>
                     )}
                   </div>
                 )}
 
               </div>
 
-              {submitError && <div className="admin-form-alert">{submitError}</div>}
+              {submitError && (
+                <div className="am-alert error" role="alert">
+                  <AlertCircle size={18} strokeWidth={2.2} />
+                  {submitError}
+                </div>
+              )}
 
-              <div className="admin-modal-actions">
+              <div className="am-modal-footer">
                 <button
                   type="button"
-                  className="admin-modal-btn cancel"
+                  className="am-cancel"
                   onClick={closeAddModal}
                   disabled={submitting}
                 >
                   Cancel
                 </button>
-                <button type="submit" className="admin-modal-btn primary" disabled={submitting}>
-                  <UserPlus size={14} strokeWidth={2} />
+                <button type="submit" className="am-btn-main" disabled={submitting}>
+                  <UserPlus size={15} strokeWidth={2.3} />
                   {submitting ? "Creating..." : "Create Account"}
                 </button>
               </div>
@@ -1066,15 +1272,20 @@ const AdminManagement = () => {
 
       {/* ================= DELETE CONFIRMATION MODAL ================= */}
       {pendingDelete && (
-        <div className="admin-modal-overlay" onClick={cancelDelete}>
-          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="am-overlay" onClick={cancelDelete}>
+          <div className="am-modal am-modal-danger" onClick={(e) => e.stopPropagation()}>
 
-            <button className="admin-modal-close" onClick={cancelDelete} disabled={deletingUser}>
-              <X size={16} strokeWidth={2} />
+            <button
+              className="am-close am-close-dark"
+              onClick={cancelDelete}
+              disabled={deletingUser}
+              aria-label="Close"
+            >
+              <X size={16} strokeWidth={2.5} />
             </button>
 
-            <div className="admin-modal-icon">
-              <AlertTriangle size={22} strokeWidth={2} />
+            <div className="am-danger-icon">
+              <AlertTriangle size={26} strokeWidth={2.3} />
             </div>
 
             <h2>Remove this account?</h2>
@@ -1084,13 +1295,13 @@ const AdminManagement = () => {
             </p>
 
             {loadingDeletionDependencies && (
-              <p className="deletion-dependency-note">Checking active work and mappings...</p>
+              <p className="am-dep-note">Checking active work and mappings...</p>
             )}
             {deletionDependencyError && (
-              <p className="deletion-dependency-error">{deletionDependencyError}</p>
+              <p className="am-dep-error">{deletionDependencyError}</p>
             )}
             {deletionDependencies && (
-              <div className="deletion-dependency-list">
+              <div className="am-dep-list">
                 {deletionDependencies.activeAssignments?.length > 0 && (
                   <>
                     <strong>This account is linked to active work:</strong>
@@ -1114,29 +1325,25 @@ const AdminManagement = () => {
                     Manager for: {deletionDependencies.mappedAreas.map((area) => area.name).join(", ")}.
                   </div>
                 )}
-                {!deletionDependencies.activeAssignments?.length &&
-                  !deletionDependencies.managedWorkers &&
-                  !deletionDependencies.mappedAreas?.length && (
-                    <span>No active work or manager mappings found.</span>
-                  )}
-                {(deletionDependencies.activeAssignments?.length > 0 ||
-                  deletionDependencies.managedWorkers > 0 ||
-                  deletionDependencies.mappedAreas?.length > 0) && (
+                {!hasDependencies && (
+                  <span>No active work or manager mappings found.</span>
+                )}
+                {hasDependencies && (
                   <span>Reassign or resolve these dependencies before deleting this account.</span>
                 )}
               </div>
             )}
 
-            <div className="admin-modal-actions">
+            <div className="am-modal-footer am-modal-footer-center">
               <button
-                className="admin-modal-btn cancel"
+                className="am-cancel"
                 onClick={cancelDelete}
                 disabled={deletingUser}
               >
                 Cancel
               </button>
               <button
-                className="admin-modal-btn confirm"
+                className="am-danger"
                 onClick={confirmDelete}
                 disabled={
                   loadingDeletionDependencies ||
@@ -1148,7 +1355,7 @@ const AdminManagement = () => {
                   deletingUser
                 }
               >
-                <Trash2 size={14} strokeWidth={2} />
+                <Trash2 size={15} strokeWidth={2.3} />
                 {deletingUser ? "Removing..." : "Remove Account"}
               </button>
             </div>

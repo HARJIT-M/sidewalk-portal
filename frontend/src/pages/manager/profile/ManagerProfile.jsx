@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  AlertCircle,
   BadgeCheck,
   BriefcaseBusiness,
   Building2,
   CalendarDays,
   Check,
+  Info,
   LoaderCircle,
   Mail,
   MapPin,
@@ -12,6 +14,7 @@ import {
   Save,
   UserRound,
   UsersRound,
+  Wrench,
 } from "lucide-react";
 import {
   getManagerLocationOptions,
@@ -102,75 +105,113 @@ const ManagerProfile = () => {
   const selectedArea = areas.find((area) => area.id === locationId);
   const stats = profile?.stats || {};
 
+  const statCards = [
+    { label: "Active workers", value: stats.activeWorkers ?? 0, icon: UsersRound, tone: "workers" },
+    { label: "Assigned complaints", value: stats.totalComplaints ?? 0, icon: Building2, tone: "complaints" },
+    { label: "Active repairs", value: stats.activeRepairs ?? 0, icon: Wrench, tone: "repairs" },
+  ];
+
   if (loading && !profile) {
     return (
-      <main className="manager-profile-page">
-        <div className="manager-profile-loading">
-          <LoaderCircle size={22} className="manager-profile-spinner" />
-          <span>Loading your profile…</span>
+      <main className="mp-page">
+        <div className="mp-loading">
+          <div className="mp-loader" aria-hidden="true">
+            <i></i><i></i><i></i><i></i>
+          </div>
+          <p>Loading your profile...</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="manager-profile-page">
-      <header className="manager-profile-heading">
-        <div>
-          <span className="manager-profile-eyebrow">MANAGER PORTAL</span>
+    <main className="mp-page">
+
+      {/* =========================
+          HERO
+      ========================= */}
+      <header className="mp-hero">
+        <div className="mp-hero-rings" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div className="mp-hero-slabs" aria-hidden="true">
+          <i></i><i></i><i></i><i></i>
+        </div>
+
+        <div className="mp-hero-text">
+          <span className="mp-hero-tag">
+            <UserRound size={14} strokeWidth={2.4} /> Manager Portal
+          </span>
           <h1>My Profile</h1>
           <p>Review your account details and manage your service area.</p>
         </div>
-        <div className="manager-profile-heading-icon">
-          <UserRound size={25} />
+
+        <div className="mp-hero-chip">
+          <div className="mp-hero-avatar">
+            {profile?.name?.trim()?.charAt(0)?.toUpperCase() || "M"}
+          </div>
+          <div>
+            <h3>{profile?.name || "Manager"}</h3>
+            <span>{profile?.location?.name || "No service area"}</span>
+          </div>
         </div>
       </header>
 
       {error && (
-        <div className="manager-profile-alert error" role="alert">
+        <div className="mp-alert error" role="alert">
+          <AlertCircle size={18} strokeWidth={2.2} />
           {error}
         </div>
       )}
       {success && (
-        <div className="manager-profile-alert success" role="status">
-          <Check size={17} />
+        <div className="mp-alert success" role="status">
+          <Check size={18} strokeWidth={2.4} />
           {success}
         </div>
       )}
 
-      <div className="manager-profile-layout">
-        <section className="manager-profile-card manager-identity-card">
-          <div className="manager-profile-cover" />
-          <div className="manager-profile-identity">
-            <div className="manager-profile-avatar">
+      <div className="mp-layout">
+
+        {/* =========================
+            IDENTITY CARD
+        ========================= */}
+        <section className="mp-card mp-identity">
+          <div className="mp-identity-top">
+            <div className="mp-avatar">
               {profile?.name?.trim()?.charAt(0)?.toUpperCase() || "M"}
             </div>
-            <div>
-              <h2>{profile?.name || "Manager"}</h2>
-              <span className="manager-profile-role">
-                <BadgeCheck size={14} />
-                {profile?.role || "MANAGER"}
-              </span>
-            </div>
+            <h2>{profile?.name || "Manager"}</h2>
+            <span className="mp-role">
+              <BadgeCheck size={14} strokeWidth={2.4} />
+              {profile?.role || "MANAGER"}
+            </span>
           </div>
 
-          <div className="manager-profile-account-details">
-            <div className="manager-profile-detail">
-              <Mail size={17} />
+          <div className="mp-details">
+            <div className="mp-detail">
+              <div className="mp-detail-icon">
+                <Mail size={17} strokeWidth={2.2} />
+              </div>
               <div>
                 <span>Email address</span>
                 <strong>{profile?.email || "Not provided"}</strong>
               </div>
             </div>
-            <div className="manager-profile-detail">
-              <Phone size={17} />
+
+            <div className="mp-detail">
+              <div className="mp-detail-icon">
+                <Phone size={17} strokeWidth={2.2} />
+              </div>
               <div>
                 <span>Phone number</span>
                 <strong>{profile?.phone || "Not provided"}</strong>
               </div>
             </div>
-            <div className="manager-profile-detail">
-              <MapPin size={17} />
+
+            <div className="mp-detail">
+              <div className="mp-detail-icon">
+                <MapPin size={17} strokeWidth={2.2} />
+              </div>
               <div>
                 <span>Current service area</span>
                 <strong>
@@ -181,11 +222,15 @@ const ManagerProfile = () => {
                 )}
               </div>
             </div>
-            <div className="manager-profile-detail">
-              <CalendarDays size={17} />
+
+            <div className="mp-detail">
+              <div className="mp-detail-icon">
+                <CalendarDays size={17} strokeWidth={2.2} />
+              </div>
               <div>
                 <span>Account status</span>
-                <strong className="manager-profile-active">
+                <strong className="mp-active">
+                  <i></i>
                   {profile?.status || "Active"}
                 </strong>
               </div>
@@ -193,40 +238,42 @@ const ManagerProfile = () => {
           </div>
         </section>
 
-        <div className="manager-profile-right">
-          <section className="manager-profile-card manager-profile-stats">
-            <div className="manager-profile-section-heading">
-              <div className="manager-profile-section-icon">
-                <BriefcaseBusiness size={18} />
+        <div className="mp-right">
+
+          {/* =========================
+              TEAM OVERVIEW
+          ========================= */}
+          <section className="mp-card mp-section">
+            <div className="mp-section-head">
+              <div className="mp-section-icon">
+                <BriefcaseBusiness size={20} strokeWidth={2.2} />
               </div>
               <div>
                 <h2>Team overview</h2>
                 <p>Your current operational workload</p>
               </div>
             </div>
-            <div className="manager-profile-stat-grid">
-              <div>
-                <UsersRound size={18} />
-                <strong>{stats.activeWorkers ?? 0}</strong>
-                <span>Active workers</span>
-              </div>
-              <div>
-                <Building2 size={18} />
-                <strong>{stats.totalComplaints ?? 0}</strong>
-                <span>Assigned complaints</span>
-              </div>
-              <div>
-                <MapPin size={18} />
-                <strong>{stats.activeRepairs ?? 0}</strong>
-                <span>Active repairs</span>
-              </div>
+
+            <div className="mp-stats">
+              {statCards.map(({ label, value, icon: Icon, tone }) => (
+                <div className={`mp-stat mp-stat-${tone}`} key={label}>
+                  <div className="mp-stat-icon">
+                    <Icon size={20} strokeWidth={2.2} />
+                  </div>
+                  <strong>{value}</strong>
+                  <span>{label}</span>
+                </div>
+              ))}
             </div>
           </section>
 
-          <section className="manager-profile-card manager-location-card">
-            <div className="manager-profile-section-heading">
-              <div className="manager-profile-section-icon location">
-                <MapPin size={18} />
+          {/* =========================
+              SERVICE AREA
+          ========================= */}
+          <section className="mp-card mp-section">
+            <div className="mp-section-head">
+              <div className="mp-section-icon">
+                <MapPin size={20} strokeWidth={2.2} />
               </div>
               <div>
                 <h2>Service area</h2>
@@ -234,7 +281,7 @@ const ManagerProfile = () => {
               </div>
             </div>
 
-            <form onSubmit={handleSaveLocation}>
+            <form className="mp-form" onSubmit={handleSaveLocation}>
               <label htmlFor="manager-service-area">Operational location</label>
               <select
                 id="manager-service-area"
@@ -257,15 +304,16 @@ const ManagerProfile = () => {
                   </option>
                 ))}
               </select>
+
               {selectedArea && (
-                <span className="manager-location-hint">
+                <span className="mp-hint">
                   {selectedArea.state}
                   {selectedArea.parent ? ` · ${selectedArea.parent}` : ""}
                 </span>
               )}
 
-              <div className="manager-location-notice">
-                <MapPin size={16} />
+              <div className="mp-notice">
+                <Info size={17} strokeWidth={2.2} />
                 <p>
                   Changing your service area affects future complaint routing.
                   Complaints already assigned to you will remain in your list.
@@ -273,7 +321,7 @@ const ManagerProfile = () => {
               </div>
 
               <button
-                className="manager-location-save"
+                className="mp-save"
                 type="submit"
                 disabled={
                   saving ||
@@ -282,11 +330,11 @@ const ManagerProfile = () => {
                 }
               >
                 {saving ? (
-                  <LoaderCircle size={17} className="manager-profile-spinner" />
+                  <LoaderCircle size={17} className="mp-spin" />
                 ) : (
                   <Save size={17} />
                 )}
-                {saving ? "Saving area…" : "Save service area"}
+                {saving ? "Saving area..." : "Save service area"}
               </button>
             </form>
           </section>
