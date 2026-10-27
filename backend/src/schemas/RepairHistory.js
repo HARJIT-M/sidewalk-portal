@@ -35,6 +35,14 @@ const repairHistorySchema = new mongoose.Schema(
       type: Number,
       min: [0, "Repair cost cannot be negative"],
     },
+    before_image: {
+      type: String,
+      trim: true,
+    },
+    after_image: {
+      type: String,
+      trim: true,
+    },
     remarks: {
       type: String,
       trim: true,

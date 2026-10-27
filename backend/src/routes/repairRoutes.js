@@ -11,29 +11,21 @@ const {
 
 const router = express.Router();
 
-// Apply authentication middleware
+
 router.use(protect);
 
-// ==========================================
-// 1. WORKER REPAIR ACTIONS (WHAT HAPPENED?)
-// ==========================================
 router.post("/:complaintId/start", authorize("WORKER"), startRepair);
 router.put("/:complaintId/progress", authorize("WORKER"), updateRepairProgress);
+router.post("/:complaintId/update", authorize("WORKER"), updateRepairProgress);
 router.post("/:complaintId/complete", authorize("WORKER"), completeRepair);
+router.post("/:complaintId/update-work", authorize("WORKER"), completeRepair);
 
-// ==========================================
-// 2. MANAGER REPAIR VERIFICATION
-// ==========================================
+
 router.post("/:complaintId/verify", authorize("MANAGER"), verifyRepairWork);
 
-// ==========================================
-// 3. REPAIR DETAILS & LIFECYCLE
-// ==========================================
+
 router.get("/:complaintId", getRepairDetails);
 
-// ==========================================
-// 4. ALL REPAIRS OVERVIEW (MANAGER)
-// ==========================================
 router.get("/", authorize("MANAGER"), getAllRepairs);
 
 module.exports = router;

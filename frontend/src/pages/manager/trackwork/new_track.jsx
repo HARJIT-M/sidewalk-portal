@@ -146,6 +146,11 @@ const WorkTracking = () => {
 
     const matchesStatus =
       statusFilter === "All" ||
+      (statusFilter === "Completed" &&
+        (work.status === "Completed" ||
+          work.status === "Closed" ||
+          work.rawStatus === "RESOLVED" ||
+          work.rawStatus === "CLOSED")) ||
       (work.status && work.status.toLowerCase() === statusFilter.toLowerCase());
 
     return matchesSearch && matchesStatus;
@@ -173,8 +178,9 @@ const WorkTracking = () => {
   const completedWorks = works.filter(
     (work) =>
       work.status === "Completed" ||
-      work.status === "RESOLVED" ||
-      work.status === "CLOSED"
+      work.status === "Closed" ||
+      work.rawStatus === "RESOLVED" ||
+      work.rawStatus === "CLOSED"
   ).length;
 
   const statusClass = (status) =>
@@ -187,16 +193,25 @@ const WorkTracking = () => {
     { label: "Completed", value: completedWorks, icon: CheckCircle2, tone: "done" },
   ];
 
+  const isClosedWork =
+    selectedWork &&
+    (selectedWork.status === "Closed" ||
+      selectedWork.rawStatus === "CLOSED" ||
+      selectedWork.isClosed);
+
   const needsVerification =
     selectedWork &&
-    (selectedWork.progress === 100 || selectedWork.status === "Completed");
+    !isClosedWork &&
+    (selectedWork.status === "Completed" ||
+      selectedWork.rawStatus === "RESOLVED" ||
+      selectedWork.progress === 100);
 
   // ---- data shown inside the verify popup ----
   const verifyBefore = verifyWork
-    ? verifyWork.beforeImage || verifyWork.image || verifyWork.complaintImage || null
+    ? verifyWork.beforeImage || verifyWork.image_url || verifyWork.reportedImage || null
     : null;
   const verifyAfter = verifyWork
-    ? verifyWork.completionImage || verifyWork.afterImage || null
+    ? verifyWork.afterImage || verifyWork.completionImage || null
     : null;
   const verifyMaterials = verifyWork ? toList(verifyWork.materialsUsed) : [];
 
@@ -411,8 +426,21 @@ const WorkTracking = () => {
                 </div>
               </div>
 
-              {/* Verification callout */}
-              {needsVerification && (
+              {/* Verification / Closed Callout */}
+              {isClosedWork ? (
+                <div className="wt-closed-callout">
+                  <div className="wt-closed-icon">
+                    <CheckCircle2 size={24} strokeWidth={2.2} />
+                  </div>
+                  <div className="wt-closed-text">
+                    <h4>Repair Verified &amp; Closed</h4>
+                    <p>
+                      This complaint has been verified and closed by field management.
+                      {selectedWork.verifiedBy && ` Verified by ${selectedWork.verifiedBy}.`}
+                    </p>
+                  </div>
+                </div>
+              ) : needsVerification ? (
                 <div className="wt-verify-callout">
                   <div className="wt-verify-icon">
                     <BadgeCheck size={24} strokeWidth={2.2} />
@@ -431,7 +459,7 @@ const WorkTracking = () => {
                     Verify &amp; Close
                   </button>
                 </div>
-              )}
+              ) : null}
 
               {/* Meta Grid */}
               <div className="wt-info-grid">
@@ -481,6 +509,54 @@ const WorkTracking = () => {
                   </small>
                 </div>
               </div>
+
+              {/* Repair Documentation Photos (Before & After) */}
+              {(selectedWork.beforeImage || selectedWork.afterImage) && (
+                <div className="wt-block">
+                  <h3>
+                    <ImageIcon size={17} strokeWidth={2.2} /> On-Site Documentation Photos
+                  </h3>
+                  <div className="wt-compare">
+                    <figure className="wt-shot">
+                      <figcaption>
+                        <i className="before"></i> Reported Condition (Before)
+                      </figcaption>
+                      {selectedWork.beforeImage ? (
+                        <a href={selectedWork.beforeImage} target="_blank" rel="noreferrer" title="Open full size">
+                          <img src={selectedWork.beforeImage} alt="Before repair" />
+                          <span className="wt-shot-open">
+                            <ExternalLink size={13} strokeWidth={2.4} /> Open
+                          </span>
+                        </a>
+                      ) : (
+                        <div className="wt-shot-empty">
+                          <ImageIcon size={30} strokeWidth={1.7} />
+                          <span>No before photo</span>
+                        </div>
+                      )}
+                    </figure>
+
+                    <figure className="wt-shot">
+                      <figcaption>
+                        <i className="after"></i> Completion Proof (After)
+                      </figcaption>
+                      {selectedWork.afterImage ? (
+                        <a href={selectedWork.afterImage} target="_blank" rel="noreferrer" title="Open full size">
+                          <img src={selectedWork.afterImage} alt="After repair" />
+                          <span className="wt-shot-open">
+                            <ExternalLink size={13} strokeWidth={2.4} /> Open
+                          </span>
+                        </a>
+                      ) : (
+                        <div className="wt-shot-empty">
+                          <ImageIcon size={30} strokeWidth={1.7} />
+                          <span>{selectedWork.progress === 100 ? "No completion photo uploaded" : "Awaiting repair completion"}</span>
+                        </div>
+                      )}
+                    </figure>
+                  </div>
+                </div>
+              )}
 
               {/* History Timeline */}
               <div className="wt-block">

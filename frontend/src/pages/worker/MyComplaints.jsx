@@ -121,14 +121,14 @@ const MyComplaints = () => {
   });
 
   // Stats
-  const totalCount = complaints.length;
-  const pendingCount = complaints.filter(
+  const totalCount = profile?.stats?.totalAssigned ?? complaints.length;
+  const pendingCount = profile?.stats?.pending ?? complaints.filter(
     (c) => getStatusDisplay(c.status, c.assignmentStatus) === "Pending"
   ).length;
-  const progressCount = complaints.filter(
+  const progressCount = profile?.stats?.inProgress ?? complaints.filter(
     (c) => getStatusDisplay(c.status, c.assignmentStatus) === "In Progress"
   ).length;
-  const completedCount = complaints.filter(
+  const completedCount = profile?.stats?.completed ?? complaints.filter(
     (c) => getStatusDisplay(c.status, c.assignmentStatus) === "Completed"
   ).length;
 
@@ -282,7 +282,7 @@ const MyComplaints = () => {
 
                   <p className="location">
                     <MapPin size={13} strokeWidth={2} className="inline-icon" />
-                    {complaint.location}
+                    {complaint.location || complaint.area || "Location not specified"}
                   </p>
 
                   <div className="complaint-card-meta">

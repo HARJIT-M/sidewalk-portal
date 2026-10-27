@@ -112,7 +112,8 @@ function App() {
           <Route path="/worker" element={<WorkerLayout />}>
             <Route index element={<Navigate to="/worker/dashboard" replace />} />
             <Route path="dashboard" element={<WorkerDashboard />} />
-            <Route path="my-complaints" element={<MyComplaints />} />
+            {/* <Route path="my-complaints" element={<MyComplaints />} /> */}
+            <Route path="complaints" element={<MyComplaints />} />
             <Route path="complaints/:id" element={<WorkerComplaintDetails />} />
             <Route path="profile" element={<WorkerProfile />} />
             <Route path="notifications" element={<WorkerNotifications />} />

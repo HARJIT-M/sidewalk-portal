@@ -50,7 +50,24 @@ const complaintSchema = new mongoose.Schema(
     },
     address: {
       type: String,
-      required: [true, "Address is required"],
+      trim: true,
+    },
+    location: {
+      type: String,
+      trim: true,
+    },
+    latitude: {
+      type: Number,
+    },
+    longitude: {
+      type: Number,
+    },
+    image_url: {
+      type: String,
+      trim: true,
+    },
+    image_public_id: {
+      type: String,
       trim: true,
     },
     locality: {

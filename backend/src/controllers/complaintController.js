@@ -75,17 +75,19 @@ const getAssignedComplaints = async (req, res) => {
           priority: c.priority,
           status: c.status,
           assignmentStatus: a.status,
-          location: c.address,
+          location: c.address || c.location || "",
           landmark: c.landmark || "",
-          area: c.area_id?.name || c.locality || c.city || "",
+          area: c.area_id?.name || c.area || c.locality || c.city || "",
           locality: c.locality || "",
           city: c.city || "",
           state: c.state || "",
-          latitude: c.geo_location?.coordinates?.[1] ?? null,
-          longitude: c.geo_location?.coordinates?.[0] ?? null,
-          navigationUrl: c.geo_location?.coordinates
+          latitude: c.geo_location?.coordinates?.[1] ?? c.latitude ?? null,
+          longitude: c.geo_location?.coordinates?.[0] ?? c.longitude ?? null,
+          navigationUrl: (c.geo_location?.coordinates?.[1] && c.geo_location?.coordinates?.[0])
             ? `https://www.google.com/maps/dir/?api=1&destination=${c.geo_location.coordinates[1]},${c.geo_location.coordinates[0]}`
-            : null,
+            : (c.latitude && c.longitude)
+              ? `https://www.google.com/maps/dir/?api=1&destination=${c.latitude},${c.longitude}`
+              : null,
           scheduledStartAt: a.scheduled_start_at,
           scheduledEndAt: a.scheduled_end_at,
           reportedDate: c.reported_at
@@ -102,7 +104,7 @@ const getAssignedComplaints = async (req, res) => {
               year: "numeric",
             })
             : "",
-          reportedImage: imageByComplaint.get(String(c._id)) || null,
+          reportedImage: imageByComplaint.get(String(c._id)) || c.image_url || null,
           reporterName: c.reported_by ? c.reported_by.name : "Citizen",
           estimatedHours: "4 Hours",
         };
@@ -298,17 +300,19 @@ const getComplaintDetails = async (req, res) => {
         issueType: complaint.issue_type,
         priority: complaint.priority,
         status: complaint.status,
-        location: complaint.address,
+        location: complaint.address || complaint.location || "",
         landmark: complaint.landmark || "",
-        area: complaint.area_id?.name || complaint.locality || complaint.city || "",
+        area: complaint.area_id?.name || complaint.area || complaint.locality || complaint.city || "",
         locality: complaint.locality || "",
         city: complaint.city || "",
         state: complaint.state || "",
-        latitude: complaint.geo_location?.coordinates?.[1],
-        longitude: complaint.geo_location?.coordinates?.[0],
-        navigationUrl: complaint.geo_location?.coordinates
+        latitude: complaint.geo_location?.coordinates?.[1] ?? complaint.latitude ?? null,
+        longitude: complaint.geo_location?.coordinates?.[0] ?? complaint.longitude ?? null,
+        navigationUrl: (complaint.geo_location?.coordinates?.[1] && complaint.geo_location?.coordinates?.[0])
           ? `https://www.google.com/maps/dir/?api=1&destination=${complaint.geo_location.coordinates[1]},${complaint.geo_location.coordinates[0]}`
-          : null,
+          : (complaint.latitude && complaint.longitude)
+            ? `https://www.google.com/maps/dir/?api=1&destination=${complaint.latitude},${complaint.longitude}`
+            : null,
         scheduledStartAt: assignments[0]?.scheduled_start_at || null,
         scheduledEndAt: assignments[0]?.scheduled_end_at || null,
         reportedDate: complaint.reported_at
@@ -336,9 +340,9 @@ const getComplaintDetails = async (req, res) => {
           url: image.image_url,
           type: image.image_type,
         })),
-        reportedImage: beforeImageDoc ? beforeImageDoc.image_url : null,
-        image: beforeImageDoc ? beforeImageDoc.image_url : null,
-        completionImage: afterImageDoc ? afterImageDoc.image_url : null,
+        reportedImage: beforeImageDoc ? beforeImageDoc.image_url : complaint.image_url || null,
+        image: beforeImageDoc ? beforeImageDoc.image_url : complaint.image_url || null,
+        completionImage: afterImageDoc ? afterImageDoc.image_url : latestRepair?.after_image || null,
         workDescription: latestRepair ? latestRepair.repair_description : "",
         materialsUsed: latestRepair && latestRepair.materials_used ? latestRepair.materials_used.join(", ") : "",
         remarks: latestRepair ? latestRepair.remarks : "",

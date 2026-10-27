@@ -442,7 +442,8 @@
 .wt-item-pending     { --tone: #c4b8d8; }
 .wt-item-assigned    { --tone: #f59e0b; }
 .wt-item-in-progress { --tone: #3b82f6; }
-.wt-item-completed   { --tone: #16a34a; }
+.wt-item-completed,
+.wt-item-closed      { --tone: #16a34a; }
 
 .wt-item-top {
   display: flex;
@@ -723,9 +724,51 @@
 .wt-bar-fill.pending,
 .wt-bar-fill.assigned    { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
 .wt-bar-fill.in-progress { background: var(--grad); }
-.wt-bar-fill.completed   { background: linear-gradient(90deg, #22c55e, #16a34a); }
+.wt-bar-fill.completed,
+.wt-bar-fill.closed      { background: linear-gradient(90deg, #22c55e, #16a34a); }
 
+.wt-closed-callout {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 22px;
+  padding: 18px;
+  border-radius: 18px;
+  background: #f0fdf4;
+  border: 1.5px solid #bbf7d0;
+  border-left: 5px solid #16a34a;
+}
 
+.wt-closed-icon {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.wt-closed-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.wt-closed-text h4 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #166534;
+}
+
+.wt-closed-text p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #15803d;
+}
 
 .wt-verify-callout {
   display: flex;

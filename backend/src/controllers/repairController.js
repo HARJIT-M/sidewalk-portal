@@ -1,5 +1,48 @@
-const { Complaint, Assignment, RepairHistory, StatusHistory, Notification } = require("../schemas");
+const { Complaint, Assignment, RepairHistory, StatusHistory, Notification, ComplaintImage } = require("../schemas");
 const { getWorkerForUser } = require("../utils/workerHelper");
+const cloudinary = require("../config/cloudinary");
+
+// ==========================================
+// HELPER: ROBUST COMPLAINT FINDER
+// ==========================================
+const findComplaint = async (complaintId) => {
+  if (!complaintId) return null;
+  const cleanId = String(complaintId).trim();
+  let complaint = null;
+  if (cleanId.match(/^[0-9a-fA-F]{24}$/)) {
+    complaint = await Complaint.findById(cleanId);
+  }
+  if (!complaint) {
+    complaint = await Complaint.findOne({ complaint_code: cleanId });
+  }
+  return complaint;
+};
+
+// ==========================================
+// HELPER: CLOUDINARY IMAGE UPLOADER
+// ==========================================
+const uploadImageToCloudinary = async (imageInput, folder = "smart-footpath/repairs") => {
+  if (!imageInput || typeof imageInput !== "string") return null;
+  // If already an HTTP/HTTPS URL and not a data URI, keep it as is
+  if (imageInput.startsWith("http://") || imageInput.startsWith("https://")) {
+    return imageInput;
+  }
+  // If it's a data URI or base64, upload to Cloudinary
+  if (imageInput.startsWith("data:image/")) {
+    try {
+      const uploadResult = await cloudinary.uploader.upload(imageInput, {
+        folder,
+        resource_type: "image",
+      });
+      return uploadResult.secure_url;
+    } catch (err) {
+      console.error("Cloudinary upload failed for repair image:", err.message);
+      // Fallback: return imageInput so data is not lost
+      return imageInput;
+    }
+  }
+  return imageInput;
+};
 
 // ==========================================
 // 1. START REPAIR WORK (WORKER)
@@ -9,13 +52,7 @@ const startRepair = async (req, res) => {
     const { complaintId } = req.params;
     const { description } = req.body || {};
 
-    let complaint;
-    if (complaintId.match(/^[0-9a-fA-F]{24}$/)) {
-      complaint = await Complaint.findById(complaintId);
-    } else {
-      complaint = await Complaint.findOne({ complaint_code: complaintId });
-    }
-
+    const complaint = await findComplaint(complaintId);
     if (!complaint) {
       return res.status(404).json({
         success: false,
@@ -111,15 +148,20 @@ const startRepair = async (req, res) => {
 const updateRepairProgress = async (req, res) => {
   try {
     const { complaintId } = req.params;
-    const { progress, notes, materialsUsed, repairCost, beforeImage, afterImage } = req.body;
+    const {
+      progress,
+      notes,
+      workDescription,
+      repairDescription,
+      materialsUsed,
+      repairCost,
+      remarks,
+      beforeImage,
+      afterImage,
+      completionImage,
+    } = req.body;
 
-    let complaint;
-    if (complaintId.match(/^[0-9a-fA-F]{24}$/)) {
-      complaint = await Complaint.findById(complaintId);
-    } else {
-      complaint = await Complaint.findOne({ complaint_code: complaintId });
-    }
-
+    const complaint = await findComplaint(complaintId);
     if (!complaint) {
       return res.status(404).json({
         success: false,
@@ -128,37 +170,112 @@ const updateRepairProgress = async (req, res) => {
     }
 
     const worker = await getWorkerForUser(req.user._id);
+    if (!worker) {
+      return res.status(404).json({
+        success: false,
+        message: "Worker profile not found.",
+      });
+    }
 
+    // Verify worker is assigned to this complaint
+    const assignment = await Assignment.findOne({
+      complaint_id: complaint._id,
+      worker_id: worker._id,
+    });
+    if (!assignment && req.user.role === "WORKER") {
+      return res.status(403).json({
+        success: false,
+        message: "You are not assigned to this complaint.",
+      });
+    }
+
+    // Update assignment to IN_PROGRESS if not already completed
+    if (assignment && assignment.status !== "COMPLETED") {
+      assignment.status = "IN_PROGRESS";
+      assignment.started_at = assignment.started_at || new Date();
+      assignment.remarks = notes || workDescription || `Progress updated to ${progress || 65}%`;
+      await assignment.save();
+    }
+
+    // Update complaint status to IN_PROGRESS if currently ASSIGNED or PENDING
+    const oldStatus = complaint.status;
+    if (complaint.status === "ASSIGNED" || complaint.status === "PENDING") {
+      complaint.status = "IN_PROGRESS";
+      await complaint.save();
+
+      await StatusHistory.create({
+        complaint_id: complaint._id,
+        changed_by: req.user._id,
+        old_status: oldStatus,
+        new_status: "IN_PROGRESS",
+        remarks: notes || workDescription || "Worker updated repair progress on-site.",
+        changed_at: new Date(),
+      });
+    }
+
+    // Process completion/progress photo upload if provided
+    const rawImage = afterImage || completionImage || null;
+    let finalImageUrl = null;
+    if (rawImage) {
+      finalImageUrl = await uploadImageToCloudinary(rawImage);
+    }
+
+    // Sync with ComplaintImage document
+    if (finalImageUrl) {
+      await ComplaintImage.findOneAndUpdate(
+        { complaint_id: complaint._id, image_type: "AFTER" },
+        {
+          image_url: finalImageUrl,
+          image_type: "AFTER",
+          uploaded_at: new Date(),
+          uploaded_by: req.user._id,
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+    }
+
+    // Update RepairHistory
     let repairHistory = await RepairHistory.findOne({
       complaint_id: complaint._id,
+      worker_id: worker._id,
     });
 
     if (!repairHistory) {
       repairHistory = new RepairHistory({
         complaint_id: complaint._id,
-        worker_id: worker ? worker._id : req.user._id,
+        worker_id: worker._id,
+        assignment_id: assignment ? assignment._id : null,
         started_at: new Date(),
-        repair_description: notes || "Repair in progress",
+        repair_description: notes || workDescription || repairDescription || "Repair in progress",
       });
     }
 
-    if (notes) repairHistory.repair_description = notes;
-    if (materialsUsed && Array.isArray(materialsUsed)) repairHistory.materials_used = materialsUsed;
-    if (repairCost !== undefined) repairHistory.repair_cost = Number(repairCost);
+    const desc = notes || workDescription || repairDescription;
+    if (desc) repairHistory.repair_description = desc;
+
+    if (materialsUsed) {
+      repairHistory.materials_used = Array.isArray(materialsUsed)
+        ? materialsUsed
+        : String(materialsUsed)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+    }
+    if (repairCost !== undefined && !isNaN(Number(repairCost))) {
+      repairHistory.repair_cost = Number(repairCost);
+    }
+    if (remarks) repairHistory.remarks = remarks;
     if (beforeImage) repairHistory.before_image = beforeImage;
-    if (afterImage) repairHistory.after_image = afterImage;
+    if (finalImageUrl) repairHistory.after_image = finalImageUrl;
 
     await repairHistory.save();
-
-    await Assignment.updateMany(
-      { complaint_id: complaint._id },
-      { remarks: notes || `Progress updated to ${progress || 50}%` }
-    );
 
     return res.status(200).json({
       success: true,
       message: `Repair progress updated for Complaint #${complaint.complaint_code}.`,
-      progress: progress || 50,
+      status: complaint.status,
+      progress: progress || 65,
+      completionImage: finalImageUrl || repairHistory.after_image || null,
       repairHistory,
     });
   } catch (error) {
@@ -185,15 +302,10 @@ const completeRepair = async (req, res) => {
       remarks,
       afterImage,
       completionImage,
+      status: incomingRawStatus,
     } = req.body;
 
-    let complaint;
-    if (complaintId.match(/^[0-9a-fA-F]{24}$/)) {
-      complaint = await Complaint.findById(complaintId);
-    } else {
-      complaint = await Complaint.findOne({ complaint_code: complaintId });
-    }
-
+    const complaint = await findComplaint(complaintId);
     if (!complaint) {
       return res.status(404).json({
         success: false,
@@ -201,8 +313,9 @@ const completeRepair = async (req, res) => {
       });
     }
 
-    // If worker submits a progress update that is not yet completed, route to progress update
-    const incomingStatus = (req.body.status || "").toUpperCase();
+    const incomingStatus = (incomingRawStatus || "").toUpperCase().trim();
+
+    // If worker submits "In Progress", route to progress update
     if (incomingStatus === "IN PROGRESS" || incomingStatus === "IN_PROGRESS") {
       req.body.notes = workDescription || repairDescription || remarks;
       req.body.progress = 65;
@@ -210,9 +323,56 @@ const completeRepair = async (req, res) => {
       return updateRepairProgress(req, res);
     }
 
-    const worker = await getWorkerForUser(req.user._id);
-    const oldStatus = complaint.status;
+    // If worker explicitly selects "Pending" or "Assigned", keep status and save progress notes
+    if (incomingStatus === "PENDING" || incomingStatus === "ASSIGNED") {
+      req.body.notes = workDescription || repairDescription || remarks || "Work pending/not yet started.";
+      req.body.progress = 10;
+      req.body.afterImage = afterImage || completionImage;
+      return updateRepairProgress(req, res);
+    }
 
+    // Otherwise, this is a COMPLETION request (status: "Completed", "RESOLVED", or default)
+    const worker = await getWorkerForUser(req.user._id);
+    if (!worker) {
+      return res.status(404).json({
+        success: false,
+        message: "Worker profile not found.",
+      });
+    }
+
+    const assignment = await Assignment.findOne({
+      complaint_id: complaint._id,
+      worker_id: worker._id,
+    });
+    if (!assignment && req.user.role === "WORKER") {
+      return res.status(403).json({
+        success: false,
+        message: "You are not assigned to this complaint.",
+      });
+    }
+
+    // Process completion photo upload
+    const rawImage = afterImage || completionImage || null;
+    let finalImageUrl = null;
+    if (rawImage) {
+      finalImageUrl = await uploadImageToCloudinary(rawImage);
+    }
+
+    // Sync with ComplaintImage document
+    if (finalImageUrl) {
+      await ComplaintImage.findOneAndUpdate(
+        { complaint_id: complaint._id, image_type: "AFTER" },
+        {
+          image_url: finalImageUrl,
+          image_type: "AFTER",
+          uploaded_at: new Date(),
+          uploaded_by: req.user._id,
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+    }
+
+    const oldStatus = complaint.status;
     complaint.status = "RESOLVED";
     complaint.resolved_at = new Date();
     await complaint.save();
@@ -228,46 +388,54 @@ const completeRepair = async (req, res) => {
 
     let repairHistory = await RepairHistory.findOne({
       complaint_id: complaint._id,
+      worker_id: worker._id,
     });
 
     if (!repairHistory) {
       repairHistory = new RepairHistory({
         complaint_id: complaint._id,
-        worker_id: worker ? worker._id : req.user._id,
-        started_at: new Date(),
+        worker_id: worker._id,
+        assignment_id: assignment ? assignment._id : null,
+        started_at: assignment?.started_at || new Date(),
       });
     }
 
     const desc = repairDescription || workDescription || "Repair completed and verified on-site.";
-    const img = afterImage || completionImage || null;
-
     repairHistory.completed_at = new Date();
     repairHistory.repair_description = desc;
     if (materialsUsed) {
       repairHistory.materials_used = Array.isArray(materialsUsed)
         ? materialsUsed
-        : materialsUsed.split(",").map((s) => s.trim());
+        : String(materialsUsed)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
     }
-    if (repairCost !== undefined) repairHistory.repair_cost = Number(repairCost);
+    if (repairCost !== undefined && !isNaN(Number(repairCost))) {
+      repairHistory.repair_cost = Number(repairCost);
+    }
     if (remarks) repairHistory.remarks = remarks;
-    if (img) repairHistory.after_image = img;
+    if (finalImageUrl) repairHistory.after_image = finalImageUrl;
 
     await repairHistory.save();
 
-    await StatusHistory.create({
-      complaint_id: complaint._id,
-      changed_by: req.user._id,
-      old_status: oldStatus,
-      new_status: "RESOLVED",
-      remarks: remarks || `Repair completed by worker ${worker?.employee_code || ""}.`,
-      changed_at: new Date(),
-    });
+    if (oldStatus !== "RESOLVED") {
+      await StatusHistory.create({
+        complaint_id: complaint._id,
+        changed_by: req.user._id,
+        old_status: oldStatus,
+        new_status: "RESOLVED",
+        remarks: remarks || `Repair completed by worker ${worker?.employee_code || ""}.`,
+        changed_at: new Date(),
+      });
+    }
 
     return res.status(200).json({
       success: true,
       message: `Repair on Complaint #${complaint.complaint_code} marked as RESOLVED (100% complete).`,
       status: "RESOLVED",
       progress: 100,
+      completionImage: finalImageUrl || repairHistory.after_image || null,
       completedAt: new Date(),
       repairHistory,
     });
@@ -289,13 +457,7 @@ const verifyRepairWork = async (req, res) => {
     const { complaintId } = req.params;
     const { verificationNotes } = req.body;
 
-    let complaint;
-    if (complaintId.match(/^[0-9a-fA-F]{24}$/)) {
-      complaint = await Complaint.findById(complaintId);
-    } else {
-      complaint = await Complaint.findOne({ complaint_code: complaintId });
-    }
-
+    const complaint = await findComplaint(complaintId);
     if (!complaint) {
       return res.status(404).json({
         success: false,
@@ -311,7 +473,13 @@ const verifyRepairWork = async (req, res) => {
     }
 
     complaint.status = "CLOSED";
+    complaint.resolved_at = complaint.resolved_at || new Date();
     await complaint.save();
+
+    await Assignment.updateMany(
+      { complaint_id: complaint._id },
+      { status: "COMPLETED" }
+    );
 
     await RepairHistory.updateMany(
       { complaint_id: complaint._id },
@@ -353,23 +521,18 @@ const getRepairDetails = async (req, res) => {
   try {
     const { complaintId } = req.params;
 
-    let complaint;
-    if (complaintId.match(/^[0-9a-fA-F]{24}$/)) {
-      complaint = await Complaint.findById(complaintId)
-        .populate("reported_by", "name phone email")
-        .populate("area_id", "name type");
-    } else {
-      complaint = await Complaint.findOne({ complaint_code: complaintId })
-        .populate("reported_by", "name phone email")
-        .populate("area_id", "name type");
-    }
-
+    const complaint = await findComplaint(complaintId);
     if (!complaint) {
       return res.status(404).json({
         success: false,
         message: "Complaint not found.",
       });
     }
+
+    await complaint.populate([
+      { path: "reported_by", select: "name phone email" },
+      { path: "area_id", select: "name type" },
+    ]);
 
     const [assignments, repairHistory, statusHistories] = await Promise.all([
       Assignment.find({ complaint_id: complaint._id })
@@ -448,15 +611,24 @@ const getAllRepairs = async (req, res) => {
       .populate("area_id", "name type")
       .sort({ reported_at: -1 });
 
-    const [allAssignments, allRepairs] = await Promise.all([
-      Assignment.find().populate({
+    const complaintIds = complaints.map((c) => c._id);
+
+    const [allAssignments, allRepairs, allImages] = await Promise.all([
+      Assignment.find({ complaint_id: { $in: complaintIds } }).populate({
         path: "worker_id",
         populate: { path: "user_id", select: "name" },
       }),
-      RepairHistory.find().populate({
-        path: "worker_id",
-        populate: { path: "user_id", select: "name" },
-      }),
+      RepairHistory.find({ complaint_id: { $in: complaintIds } }).populate([
+        {
+          path: "worker_id",
+          populate: { path: "user_id", select: "name" },
+        },
+        {
+          path: "verified_by",
+          select: "name",
+        },
+      ]),
+      ComplaintImage.find({ complaint_id: { $in: complaintIds } }).sort({ uploaded_at: 1 }),
     ]);
 
     let trackWorks = complaints.map((c) => {
@@ -474,6 +646,15 @@ const getAllRepairs = async (req, res) => {
 
       const latestRepair = complaintRepairs[complaintRepairs.length - 1] || null;
 
+      const complaintImages = allImages.filter(
+        (img) => img.complaint_id && img.complaint_id.toString() === c._id.toString()
+      );
+      const beforeImgDoc = complaintImages.find((img) => img.image_type === "BEFORE");
+      const afterImgDoc = complaintImages.find((img) => img.image_type === "AFTER");
+
+      const beforeImage = beforeImgDoc?.image_url || latestRepair?.before_image || c.image_url || null;
+      const afterImage = afterImgDoc?.image_url || latestRepair?.after_image || null;
+
       let displayStatus = "Not Assigned";
       let progress = 0;
       if (c.status === "ASSIGNED") {
@@ -482,8 +663,11 @@ const getAllRepairs = async (req, res) => {
       } else if (c.status === "IN_PROGRESS") {
         displayStatus = "In Progress";
         progress = 65;
-      } else if (c.status === "RESOLVED" || c.status === "CLOSED") {
+      } else if (c.status === "RESOLVED") {
         displayStatus = "Completed";
+        progress = 100;
+      } else if (c.status === "CLOSED") {
+        displayStatus = "Closed";
         progress = 100;
       }
 
@@ -543,11 +727,28 @@ const getAllRepairs = async (req, res) => {
         area: c.area_id?.name || c.locality || c.city || "",
         priority: displayPriority,
         status: displayStatus,
+        rawStatus: c.status,
+        isClosed: c.status === "CLOSED",
         progress,
         assignedWorkers: assignedWorkerNames,
         assignedDate: assignedDateFormatted,
         startedDate: startedDateFormatted,
         expectedDate: expectedDateFormatted,
+        beforeImage,
+        afterImage,
+        workDescription: latestRepair?.repair_description || "",
+        materialsUsed: latestRepair?.materials_used || [],
+        remarks: latestRepair?.remarks || "",
+        verifiedBy: latestRepair?.verified_by ? latestRepair.verified_by.name : null,
+        verifiedAt: latestRepair?.verified_at
+          ? new Date(latestRepair.verified_at).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : null,
         lastUpdate: latestRepair
           ? latestRepair.repair_description
           : complaintAssignments.length > 0
@@ -571,9 +772,18 @@ const getAllRepairs = async (req, res) => {
     });
 
     if (status && status !== "All") {
-      trackWorks = trackWorks.filter(
-        (w) => w.status.toLowerCase() === status.toLowerCase()
-      );
+      const target = status.toLowerCase();
+      trackWorks = trackWorks.filter((w) => {
+        if (target === "completed") {
+          return (
+            w.status.toLowerCase() === "completed" ||
+            w.status.toLowerCase() === "closed" ||
+            w.rawStatus === "RESOLVED" ||
+            w.rawStatus === "CLOSED"
+          );
+        }
+        return w.status.toLowerCase() === target;
+      });
     }
 
     if (search && search.trim() !== "") {

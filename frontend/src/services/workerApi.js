@@ -29,17 +29,11 @@ workerApi.interceptors.response.use(
   }
 );
 
-// ==========================================
-// 1. DASHBOARD API
-// ==========================================
 export const getWorkerDashboard = async () => {
   const response = await workerApi.get("/api/dashboard/worker");
   return response.data;
 };
 
-// ==========================================
-// 2. PROFILE APIS
-// ==========================================
 export const getWorkerProfile = async () => {
   const response = await workerApi.get("/api/worker/profile");
   return response.data;
@@ -55,9 +49,6 @@ export const changeWorkerPassword = async (passwords) => {
   return response.data;
 };
 
-// ==========================================
-// 3. COMPLAINTS APIS
-// ==========================================
 export const getWorkerComplaints = async (params = {}) => {
   const response = await workerApi.get("/api/complaints/assigned", { params });
   return response.data;
@@ -68,9 +59,6 @@ export const getWorkerComplaintDetails = async (id) => {
   return response.data;
 };
 
-// ==========================================
-// 4. WORK TRACKING APIS
-// ==========================================
 export const startComplaintWork = async (id, payload = {}) => {
   const response = await workerApi.post(
     `/api/work-tracking/${id}/start`,
@@ -80,13 +68,35 @@ export const startComplaintWork = async (id, payload = {}) => {
 };
 
 export const submitWorkUpdate = async (id, workData) => {
-  const response = await workerApi.post(`/api/work-tracking/${id}/update-work`, workData);
+  const response = await workerApi.post(
+    `/api/work-tracking/${id}/update-work`,
+    workData
+  );
   return response.data;
 };
 
-// ==========================================
-// 5. NOTIFICATIONS APIS
-// ==========================================
+export const completeComplaintWork = async (id, workData) => {
+  const response = await workerApi.post(
+    `/api/work-tracking/${id}/complete`,
+    workData
+  );
+  return response.data;
+};
+
+export const updateComplaintProgress = async (id, progressData) => {
+  const response = await workerApi.post(
+    `/api/work-tracking/${id}/update`,
+    progressData
+  );
+  return response.data;
+};
+
+export const getRepairDetails = async (id) => {
+  const response = await workerApi.get(`/api/work-tracking/${id}`);
+  return response.data;
+};
+
+
 export const getWorkerNotifications = async () => {
   const response = await workerApi.get("/api/notifications");
   return response.data;

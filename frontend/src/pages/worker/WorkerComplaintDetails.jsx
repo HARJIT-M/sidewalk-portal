@@ -24,6 +24,15 @@ const WorkerComplaintDetails = () => {
   const [remarks, setRemarks] = useState("");
   const [completionImage, setCompletionImage] = useState(null);
 
+  const getStatusDisplay = (status) => {
+    if (!status) return "Pending";
+    const s = status.toUpperCase();
+    if (s === "ASSIGNED" || s === "PENDING") return "Pending";
+    if (s === "IN_PROGRESS" || s === "IN PROGRESS") return "In Progress";
+    if (s === "RESOLVED" || s === "COMPLETED" || s === "CLOSED") return "Completed";
+    return status;
+  };
+
   const loadDetails = useCallback(async () => {
     try {
       setLoading(true);
@@ -37,10 +46,27 @@ const WorkerComplaintDetails = () => {
       setWorkDescription(found.workDescription || "");
       setMaterialsUsed(found.materialsUsed || "");
       setRemarks(found.remarks || "");
-      setCompletionImage(found.completionImage || null);
-      if (found.status === "RESOLVED" || found.status === "COMPLETED" || found.status === "CLOSED") {
+
+      // Completion image fallback
+      const compImg =
+        found.completionImage ||
+        found.afterImage ||
+        (Array.isArray(found.images) &&
+          found.images.find((img) => img.type === "AFTER")?.url) ||
+        null;
+      setCompletionImage(compImg);
+
+      const normalizedStatus = (found.status || "").toUpperCase();
+      if (
+        normalizedStatus === "RESOLVED" ||
+        normalizedStatus === "COMPLETED" ||
+        normalizedStatus === "CLOSED"
+      ) {
         setWorkStatus("Completed");
-      } else if (found.status === "IN_PROGRESS") {
+      } else if (
+        normalizedStatus === "IN_PROGRESS" ||
+        normalizedStatus === "IN PROGRESS"
+      ) {
         setWorkStatus("In Progress");
       } else {
         setWorkStatus("Pending");
@@ -73,7 +99,7 @@ const WorkerComplaintDetails = () => {
       if (!res?.success) {
         throw new Error(res?.message || "Failed to start repair work.");
       }
-      setSuccessAlert(res.message || "Repair work started successfully.");
+      setSuccessAlert(res.message || "Repair work started on-site.");
       setWorkStatus("In Progress");
       await loadDetails();
       setTimeout(() => setSuccessAlert(""), 4000);
@@ -91,8 +117,13 @@ const WorkerComplaintDetails = () => {
 
   // Image Upload
   const handleImageUpload = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        setErrorAlert("Selected file is larger than 10MB. Please choose a smaller photo.");
+        return;
+      }
+      setErrorAlert("");
       const reader = new FileReader();
       reader.onloadend = () => {
         setCompletionImage(reader.result);
@@ -107,44 +138,63 @@ const WorkerComplaintDetails = () => {
     setCompletionImage(demoUrl);
   };
 
+  const handleRemoveImage = () => {
+    setCompletionImage(null);
+    const fileInput = document.getElementById("worker-photo-upload");
+    if (fileInput) {
+      fileInput.value = "";
+    }
+  };
+
   // Submit Work Update
   const handleSubmitUpdate = async (e) => {
     e.preventDefault();
+    if (!workDescription.trim()) {
+      setErrorAlert("Please enter a description of the work performed.");
+      return;
+    }
+
+    if (workStatus === "Completed" && !completionImage) {
+      setErrorAlert(
+        "Please attach a completion photo (or click 'Use Demo Photo') as proof of repair before completing."
+      );
+      return;
+    }
+
     try {
       setSubmitting(true);
       setErrorAlert("");
 
       const payload = {
         status: workStatus,
-        workDescription,
-        materialsUsed,
-        remarks,
+        workDescription: workDescription.trim(),
+        materialsUsed: materialsUsed.trim(),
+        remarks: remarks.trim(),
         completionImage,
       };
 
       const res = await submitWorkUpdate(id, payload);
-      if (res.success) {
+      if (res?.success) {
         setSuccessAlert(
           workStatus === "Completed"
-            ? "Work marked as Completed and submitted for Manager verification in MongoDB!"
-            : "Work progress logged successfully to MongoDB!"
+            ? "Work marked as Completed and submitted for Manager verification!"
+            : "Work progress logged successfully!"
         );
         await loadDetails();
         setTimeout(() => setSuccessAlert(""), 4000);
+      } else {
+        throw new Error(res?.message || "Failed to submit work update.");
       }
     } catch (err) {
       console.error("Failed to submit work update:", err);
-      setErrorAlert(err.response?.data?.message || "Failed to submit work update.");
+      setErrorAlert(
+        err.response?.data?.message ||
+          err.message ||
+          "Failed to submit work update."
+      );
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const getStatusDisplay = (status) => {
-    if (status === "ASSIGNED" || status === "PENDING") return "Pending";
-    if (status === "IN_PROGRESS") return "In Progress";
-    if (status === "RESOLVED" || status === "COMPLETED" || status === "CLOSED") return "Completed";
-    return status || "Pending";
   };
 
   if (loading && !complaint) {
@@ -176,6 +226,14 @@ const WorkerComplaintDetails = () => {
   }
 
   const currentDisplayStatus = getStatusDisplay(complaint.status);
+  const isResolved = currentDisplayStatus === "Completed";
+  const citizenPhoto =
+    complaint.reportedImage ||
+    complaint.image ||
+    (Array.isArray(complaint.images) &&
+      complaint.images.find((img) => img.type === "BEFORE")?.url) ||
+    (Array.isArray(complaint.images) && complaint.images[0]?.url) ||
+    null;
 
   return (
     <div className="complaint-details-page">
@@ -197,13 +255,19 @@ const WorkerComplaintDetails = () => {
       </div>
 
       {successAlert && (
-        <div className="details-alert-box" style={{ background: "#dcfce7", color: "#166534", border: "1px solid #86efac" }}>
+        <div
+          className="details-alert-box"
+          style={{ background: "#dcfce7", color: "#166534", border: "1px solid #86efac" }}
+        >
           <span>✅ {successAlert}</span>
         </div>
       )}
 
       {errorAlert && (
-        <div className="details-alert-box" style={{ background: "#fee2e2", color: "#991b1b", border: "1px solid #fca5a5" }}>
+        <div
+          className="details-alert-box"
+          style={{ background: "#fee2e2", color: "#991b1b", border: "1px solid #fca5a5" }}
+        >
           <span>⚠️ {errorAlert}</span>
         </div>
       )}
@@ -215,7 +279,7 @@ const WorkerComplaintDetails = () => {
         {/* LEFT CARD: Citizen Report Overview */}
         <div className="details-card">
           <div className="card-top-title">
-            <h2>{complaint.issue}</h2>
+            <h2>{complaint.issue || complaint.title || "Footpath Repair"}</h2>
             <div className="card-badge-row">
               <span className={`priority ${(complaint.priority || "MEDIUM").toLowerCase()}`}>
                 {complaint.priority}
@@ -231,7 +295,7 @@ const WorkerComplaintDetails = () => {
           </div>
 
           <div className="meta-field-group">
-            <div className="meta-field">
+            <div className="meta-field full-width">
               <label>Location</label>
               <p>📍 {complaint.location}</p>
               {(complaint.locality || complaint.city) && (
@@ -245,17 +309,21 @@ const WorkerComplaintDetails = () => {
                 <span className="landmark-hint">Landmark: {complaint.landmark}</span>
               )}
               {Number.isFinite(complaint.latitude) && Number.isFinite(complaint.longitude) && (
-                <div>
-                  <span className="landmark-hint">
+                <div style={{ marginTop: "8px" }}>
+                  <span className="landmark-hint" style={{ display: "block", marginBottom: "6px" }}>
                     Coordinates: {complaint.latitude}, {complaint.longitude}
                   </span>
                   <a
-                    href={complaint.navigationUrl || `https://www.google.com/maps/dir/?api=1&destination=${complaint.latitude},${complaint.longitude}`}
+                    href={
+                      complaint.navigationUrl ||
+                      `https://www.google.com/maps/dir/?api=1&destination=${complaint.latitude},${complaint.longitude}`
+                    }
                     target="_blank"
                     rel="noreferrer"
                     className="primary-action-btn"
+                    style={{ padding: "8px 14px", fontSize: "13px" }}
                   >
-                    Open exact location in Maps
+                    📍 Open exact location in Maps
                   </a>
                 </div>
               )}
@@ -271,8 +339,8 @@ const WorkerComplaintDetails = () => {
               <p>{complaint.assignedDate || "Assigned"}</p>
             </div>
 
-            <div className="meta-field">
-              <label>Scheduled Work</label>
+            <div className="meta-field full-width">
+              <label>Scheduled Work Window</label>
               <p>
                 {complaint.scheduledStartAt
                   ? new Date(complaint.scheduledStartAt).toLocaleDateString()
@@ -286,15 +354,15 @@ const WorkerComplaintDetails = () => {
           <div className="meta-field full-width">
             <label>Citizen Description</label>
             <div className="description-container">
-              {complaint.description}
+              {complaint.description || "No description provided."}
             </div>
           </div>
 
           <div className="meta-field full-width">
             <label>Reported Damage Photo (Citizen Evidence)</label>
-            {complaint.reportedImage ? (
+            {citizenPhoto ? (
               <div className="photo-preview-wrap">
-                <img src={complaint.reportedImage} alt="Reported damage" />
+                <img src={citizenPhoto} alt="Reported damage" />
               </div>
             ) : (
               <div className="no-photo-box">No photo attached by citizen</div>
@@ -309,6 +377,7 @@ const WorkerComplaintDetails = () => {
                 className="primary-action-btn"
                 onClick={handleStartWork}
                 disabled={submitting}
+                style={{ width: "auto", padding: "10px 18px" }}
               >
                 {submitting ? "Starting..." : "🚀 Start Work Now"}
               </button>
@@ -319,103 +388,167 @@ const WorkerComplaintDetails = () => {
         {/* RIGHT CARD: Work Execution & Update Form */}
         <div className="details-card" id="work-update-section">
           <div className="card-top-title">
-            <h2>Update Work Status & Repair Log</h2>
+            <h2>
+              {isResolved
+                ? "Repair Log & Completion Details"
+                : "Update Work Status & Repair Log"}
+            </h2>
+            {isResolved && (
+              <span className="status completed">Verified Complete</span>
+            )}
           </div>
 
-          <form onSubmit={handleSubmitUpdate} className="work-form-container">
-            <div className="form-group">
-              <label>Work Status</label>
-              <select
-                value={workStatus}
-                onChange={(e) => setWorkStatus(e.target.value)}
-              >
-                <option value="In Progress">In Progress (Active Repair)</option>
-                <option value="Completed">Completed (Submit for Verification)</option>
-                <option value="Pending">Pending (Not Started)</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Work Description *</label>
-              <textarea
-                rows={3}
-                placeholder="Describe repairs performed (e.g., Replaced broken tiles, leveled base concrete)..."
-                value={workDescription}
-                onChange={(e) => setWorkDescription(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Materials Used</label>
-              <input
-                type="text"
-                placeholder="e.g. 15 Paver Blocks, 1 bag cement, sand mix"
-                value={materialsUsed}
-                onChange={(e) => setMaterialsUsed(e.target.value)}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Upload Completion Photo</label>
-              <div className="photo-upload-row">
-                <input
-                  type="file"
-                  id="worker-photo-upload"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  style={{ display: "none" }}
-                />
-                <label htmlFor="worker-photo-upload" className="file-upload-btn">
-                  📷 Choose File
-                </label>
-                <button
-                  type="button"
-                  className="demo-photo-btn"
-                  onClick={handleUseDemoPhoto}
-                >
-                  Use Demo Photo
-                </button>
+          {isResolved ? (
+            <div className="completed-summary-box">
+              <div className="resolved-banner">
+                <span>
+                  {complaint.status === "CLOSED"
+                    ? "🎉 This repair has been verified and closed by the Field Manager. Work is complete."
+                    : "✅ This repair has been marked as Completed and submitted for Manager verification."}
+                </span>
               </div>
 
-              {completionImage && (
-                <div className="uploaded-photo-preview">
-                  <img src={completionImage} alt="Completion preview" />
+              <div className="completed-details-card">
+                <div className="completed-field">
+                  <span className="field-lbl">Current Lifecycle Status</span>
+                  <div style={{ marginTop: "4px" }}>
+                    <span className="status completed">
+                      {complaint.status === "CLOSED" ? "Closed & Verified" : "Completed / In Review"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="completed-field">
+                  <span className="field-lbl">Work Performed</span>
+                  <p className="field-val-text">
+                    {complaint.workDescription || workDescription || "Repair completed on-site."}
+                  </p>
+                </div>
+
+                <div className="completed-field">
+                  <span className="field-lbl">Materials Used</span>
+                  <p className="field-val-text">
+                    {complaint.materialsUsed || materialsUsed || "No materials specified."}
+                  </p>
+                </div>
+
+                {(complaint.remarks || remarks) && (
+                  <div className="completed-field">
+                    <span className="field-lbl">Worker Remarks</span>
+                    <p className="field-val-text">{complaint.remarks || remarks}</p>
+                  </div>
+                )}
+
+                {completionImage && (
+                  <div className="completed-field">
+                    <span className="field-lbl">Submitted Completion Proof Photo</span>
+                    <div className="submitted-proof-shot">
+                      <img
+                        src={completionImage}
+                        alt="Completion proof"
+                        className="submitted-proof-img"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmitUpdate} className="work-form-container">
+              <div className="form-group">
+                <label>Work Status</label>
+                <select
+                  value={workStatus}
+                  onChange={(e) => setWorkStatus(e.target.value)}
+                >
+                  <option value="In Progress">In Progress (Active On-Site Repair)</option>
+                  <option value="Completed">Completed (Submit for Verification)</option>
+                  <option value="Pending">Pending (Not Started / On Hold)</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Work Description *</label>
+                <textarea
+                  rows={3}
+                  placeholder="Describe repairs performed (e.g., Replaced broken paver blocks, leveled mortar base, cleared debris)..."
+                  value={workDescription}
+                  onChange={(e) => setWorkDescription(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Materials Used</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 15 Paver Blocks, 1 bag cement, sand mix"
+                  value={materialsUsed}
+                  onChange={(e) => setMaterialsUsed(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Completion Photo {workStatus === "Completed" && <span style={{ color: "#dc2626" }}>*</span>}</label>
+                <div className="photo-upload-row">
+                  <input
+                    type="file"
+                    id="worker-photo-upload"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    style={{ display: "none" }}
+                  />
+                  <label htmlFor="worker-photo-upload" className="file-upload-btn">
+                    📷 Choose File
+                  </label>
                   <button
                     type="button"
-                    className="remove-img-btn"
-                    onClick={() => setCompletionImage(null)}
+                    className="demo-photo-btn"
+                    onClick={handleUseDemoPhoto}
                   >
-                    × Remove
+                    Use Demo Photo
                   </button>
                 </div>
-              )}
-            </div>
 
-            <div className="form-group">
-              <label>Remarks & Observations</label>
-              <textarea
-                rows={2}
-                placeholder="Any special remarks or follow-up notes..."
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-              />
-            </div>
+                {completionImage && (
+                  <div className="uploaded-photo-preview">
+                    <img src={completionImage} alt="Completion preview" />
+                    <button
+                      type="button"
+                      className="remove-img-btn"
+                      onClick={handleRemoveImage}
+                    >
+                      × Remove
+                    </button>
+                  </div>
+                )}
+              </div>
 
-            <div className="form-btn-row">
-              <button
-                type="submit"
-                className="primary-action-btn"
-                disabled={submitting}
-              >
-                {submitting
-                  ? "Saving to MongoDB..."
-                  : workStatus === "Completed"
-                  ? "✓ Mark as Completed & Submit"
-                  : "Submit Work Update"}
-              </button>
-            </div>
-          </form>
+              <div className="form-group">
+                <label>Remarks & Observations</label>
+                <textarea
+                  rows={2}
+                  placeholder="Any special remarks or follow-up notes..."
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                />
+              </div>
+
+              <div className="form-btn-row">
+                <button
+                  type="submit"
+                  className="primary-action-btn"
+                  disabled={submitting}
+                >
+                  {submitting
+                    ? "Saving to MongoDB..."
+                    : workStatus === "Completed"
+                    ? "✓ Mark as Completed & Submit"
+                    : "Save Progress Update"}
+                </button>
+              </div>
+            </form>
+          )}
 
           {/* Repair Timeline History */}
           <div className="history-section">
