@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Users,
   UserCheck,
@@ -17,6 +18,7 @@ import {
   Calendar,
   TriangleAlert,
   HardHat,
+  TrendingUp,
 } from "lucide-react";
 import {
   getAllWorkers,
@@ -27,6 +29,7 @@ import {
 import "./new_worker.css";
 
 const Workers = () => {
+  const navigate = useNavigate();
   const [workers, setWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
@@ -234,6 +237,15 @@ const Workers = () => {
           <h1>Worker Management</h1>
           <p>Supervise maintenance crew, workloads, and real-time availability</p>
         </div>
+
+        <button
+          className="mw-hero-btn"
+          style={{ marginRight: "10px", background: "rgba(255, 255, 255, 0.18)", border: "1px solid rgba(255, 255, 255, 0.35)" }}
+          onClick={() => navigate("/productivity")}
+        >
+          <TrendingUp size={18} strokeWidth={2.4} />
+          Productivity Hub
+        </button>
 
         <button
           className="mw-hero-btn"

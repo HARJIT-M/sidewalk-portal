@@ -5,6 +5,7 @@ const {
   getManagerLocationOptions,
   updateManagerLocation,
 } = require("../controllers/managerController");
+const { getWorkerProductivity } = require("../controllers/workerController");
 
 const router = express.Router();
 
@@ -28,5 +29,7 @@ router.put(
 router.get("/status", authorize("MANAGER"), (req, res) => {
   res.json({ success: true, message: "Manager service online and active." });
 });
+
+router.get("/productivity", authorize("MANAGER", "ADMIN"), getWorkerProductivity);
 
 module.exports = router;

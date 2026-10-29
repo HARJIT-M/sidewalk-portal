@@ -11,6 +11,8 @@ const {
   addWorker,
   updateWorkerStatus,
   deleteWorker,
+  updateWorkerAvailability,
+  getWorkerProductivity,
 } = require("../controllers/workerController");
 
 const router = express.Router();
@@ -23,12 +25,14 @@ router.use(protect);
 // ==========================================
 router.get("/profile", authorize("WORKER"), getWorkerProfile);
 router.put("/profile", authorize("WORKER"), updateWorkerProfile);
+router.put("/availability", authorize("WORKER"), updateWorkerAvailability);
 router.put("/change-password", authorize("WORKER"), changeWorkerPassword);
 
 // ==========================================
 // 2. WORKERS ROSTER & MANAGEMENT (MANAGER ROLE)
 // ==========================================
 router.get("/", authorize("MANAGER"), getAllWorkers);
+router.get("/productivity", authorize("MANAGER", "ADMIN"), getWorkerProductivity);
 router.get("/available", authorize("MANAGER", "ADMIN"), getAvailableWorkers);
 router.post("/", authorize("MANAGER"), addWorker);
 router.put("/:id/status", authorize("MANAGER"), updateWorkerStatus);

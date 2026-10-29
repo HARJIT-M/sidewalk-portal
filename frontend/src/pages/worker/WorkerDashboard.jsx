@@ -1,7 +1,7 @@
 // WorkerDashboard.jsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getWorkerDashboard } from "../../services/workerApi";
+import { getWorkerDashboard, updateWorkerAvailability } from "../../services/workerApi";
 import "./WorkerDashboard.css";
 
 const WorkerDashboard = () => {
@@ -10,6 +10,32 @@ const WorkerDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeBarIndex, setActiveBarIndex] = useState(null);
+  const [availability, setAvailability] = useState("ACTIVE");
+  const [updatingAvailability, setUpdatingAvailability] = useState(false);
+  const [statusMsg, setStatusMsg] = useState("");
+
+  const handleToggleAvailability = async (targetStatus) => {
+    if (updatingAvailability || availability === targetStatus) return;
+    setUpdatingAvailability(true);
+    setStatusMsg("");
+    try {
+      const res = await updateWorkerAvailability(targetStatus);
+      if (res && res.success) {
+        setAvailability(res.availabilityStatus);
+        setStatusMsg(
+          targetStatus === "ACTIVE"
+            ? "Status updated: You are now Available for new tasks."
+            : "Status updated: You are on leave. You will not receive new assignments."
+        );
+        setTimeout(() => setStatusMsg(""), 4000);
+      }
+    } catch (err) {
+      console.error("Failed to update availability:", err);
+      alert(err.message || "Failed to update availability.");
+    } finally {
+      setUpdatingAvailability(false);
+    }
+  };
 
   const loadDashboard = () => {
     Promise.resolve()
@@ -21,6 +47,9 @@ const WorkerDashboard = () => {
       .then((res) => {
         if (res && res.success) {
           setDashboardData(res.dashboard);
+          if (res.dashboard?.worker?.availabilityStatus) {
+            setAvailability(res.dashboard.worker.availabilityStatus);
+          }
         } else {
           throw new Error(res?.message || "Server returned no dashboard data.");
         }
@@ -88,7 +117,34 @@ const WorkerDashboard = () => {
           </p>
         </div>
 
-        <div className="worker-info">
+        <div className="header-right-controls">
+          <div className="availability-card">
+            <span className="availability-label">Availability</span>
+            <div className="availability-switcher-pill">
+              <button
+                type="button"
+                className={`avail-btn available ${availability === "ACTIVE" ? "active" : ""}`}
+                disabled={updatingAvailability}
+                onClick={() => handleToggleAvailability("ACTIVE")}
+                title="Mark yourself available for tasks"
+              >
+                <span className="avail-dot dot-active"></span>
+                Available
+              </button>
+              <button
+                type="button"
+                className={`avail-btn on-leave ${availability === "ON_LEAVE" ? "active" : ""}`}
+                disabled={updatingAvailability}
+                onClick={() => handleToggleAvailability("ON_LEAVE")}
+                title="Mark yourself on leave"
+              >
+                <span className="avail-dot dot-leave"></span>
+                On Leave
+              </button>
+            </div>
+          </div>
+
+          <div className="worker-info">
           <div className="worker-avatar">
             {worker.name ? worker.name.charAt(0).toUpperCase() : "W"}
           </div>
@@ -99,7 +155,14 @@ const WorkerDashboard = () => {
             </span>
           </div>
         </div>
+        </div>
       </div>
+
+      {statusMsg && (
+        <div className="availability-toast">
+          <span>{statusMsg}</span>
+        </div>
+      )}
 
       {error && (
         <div style={{ background: "#fee2e2", color: "#b91c1c", padding: "12px 18px", borderRadius: "10px", margin: "14px 0", fontWeight: "500", display: "flex", justifyContent: "space-between", alignItems: "center" }}>

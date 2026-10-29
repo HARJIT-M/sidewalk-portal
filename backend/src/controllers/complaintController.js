@@ -19,6 +19,18 @@ const {
 } = require("../utils/scheduleRange");
 const cloudinary = require("../config/cloudinary");
 
+const haversineDistanceMeters = (lat1, lon1, lat2, lon2) => {
+  const R = 6371e3; // Earth radius in meters
+  const toRad = (val) => (val * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c);
+};
+
 // ==========================================
 // 1. GET ASSIGNED COMPLAINTS (WORKER)
 // ==========================================
@@ -573,6 +585,7 @@ const assignComplaintWorkers = async (req, res) => {
       startDate,
       endDate,
       remarks,
+      linkedDuplicateIds = [],
     } = req.body;
     const schedule = parseScheduleRange(startDate, endDate);
 
@@ -715,15 +728,72 @@ const assignComplaintWorkers = async (req, res) => {
         { session }
       );
 
+      let assignedDuplicatesCount = 0;
+      if (Array.isArray(linkedDuplicateIds) && linkedDuplicateIds.length > 0) {
+        const validIds = linkedDuplicateIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+        const dupCodes = linkedDuplicateIds.filter((id) => typeof id === "string" && !mongoose.Types.ObjectId.isValid(id));
+
+        const orClauses = [];
+        if (validIds.length > 0) orClauses.push({ _id: { $in: validIds } });
+        if (dupCodes.length > 0) orClauses.push({ complaint_code: { $in: dupCodes } });
+
+        if (orClauses.length > 0) {
+          const duplicateComplaints = await Complaint.find({
+            _id: { $ne: complaint._id },
+            $or: orClauses,
+          }).session(session);
+
+          for (const dup of duplicateComplaints) {
+            const oldDupStatus = dup.status;
+            await Assignment.create(
+              workerDocs.map((worker) => ({
+                complaint_id: dup._id,
+                worker_id: worker._id,
+                assigned_by: req.user._id,
+                assigned_at: now,
+                scheduled_start_at: schedule.start,
+                scheduled_end_at: schedule.end,
+                status: "ASSIGNED",
+                remarks: remarks || `Grouped with duplicate lead ${complaint.complaint_code}`,
+              })),
+              { session }
+            );
+
+            dup.status = "ASSIGNED";
+            await dup.save({ session });
+
+            await StatusHistory.create(
+              [
+                {
+                  complaint_id: dup._id,
+                  old_status: oldDupStatus,
+                  new_status: "ASSIGNED",
+                  changed_by: req.user._id,
+                  remarks: `Grouped and assigned as duplicate of ${complaint.complaint_code} to worker(s) ${workerDocs
+                    .map((w) => w.employee_code)
+                    .join(", ")}.`,
+                  changed_at: now,
+                },
+              ],
+              { session }
+            );
+
+            assignedDuplicatesCount++;
+          }
+        }
+      }
+
       result = {
         complaintCode: complaint.complaint_code,
         workerCodes: workerDocs.map((worker) => worker.employee_code),
+        assignedDuplicatesCount,
       };
     });
 
     return res.status(200).json({
       success: true,
-      message: `Successfully assigned ${result.workerCodes.length} worker(s) to complaint ${result.complaintCode}.`,
+      message: `Successfully assigned ${result.workerCodes.length} worker(s) to complaint ${result.complaintCode}${result.assignedDuplicatesCount > 0 ? ` and ${result.assignedDuplicatesCount} duplicate complaints` : ""}.`,
+      assignedDuplicatesCount: result.assignedDuplicatesCount,
       assignedWorkers: result.workerCodes,
       status: "Assigned",
     });
@@ -1103,6 +1173,146 @@ const getUserComplaints = async (req, res) => {
   }
 };
 
+// ==========================================
+// 11. GET POTENTIAL DUPLICATES BASED ON GPS COORDINATES
+// ==========================================
+const getPotentialDuplicates = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const radius = Number(req.query.radius) || 100; // default 100 meters
+
+    let complaint;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      complaint = await Complaint.findById(id);
+    } else {
+      complaint = await Complaint.findOne({ complaint_code: id });
+    }
+
+    if (!complaint) {
+      return res.status(404).json({
+        success: false,
+        message: "Complaint not found.",
+      });
+    }
+
+    const targetLat = complaint.geo_location?.coordinates?.[1] ?? complaint.latitude;
+    const targetLng = complaint.geo_location?.coordinates?.[0] ?? complaint.longitude;
+
+    if (targetLat == null || targetLng == null || isNaN(targetLat) || isNaN(targetLng)) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        radiusMeters: radius,
+        duplicates: [],
+        message: "This complaint does not have GPS coordinates attached.",
+      });
+    }
+
+    const query = {
+      _id: { $ne: complaint._id },
+      status: { $ne: "REJECTED" },
+    };
+
+    if (req.user.role === "MANAGER") {
+      query.$or = [{ manager_id: req.user._id }, { manager_id: null }];
+    }
+
+    const otherComplaints = await Complaint.find(query)
+      .populate("reported_by", "name phone email")
+      .lean();
+
+    const otherIds = otherComplaints.map((c) => c._id);
+    const beforeImages = await ComplaintImage.find({
+      complaint_id: { $in: otherIds },
+      image_type: "BEFORE",
+    }).sort({ uploaded_at: 1 }).lean();
+
+    const imageMap = new Map();
+    beforeImages.forEach((img) => {
+      const cid = String(img.complaint_id);
+      if (!imageMap.has(cid)) {
+        imageMap.set(cid, img.image_url);
+      }
+    });
+
+    const duplicates = [];
+
+    for (const other of otherComplaints) {
+      const otherLat = other.geo_location?.coordinates?.[1] ?? other.latitude;
+      const otherLng = other.geo_location?.coordinates?.[0] ?? other.longitude;
+
+      if (otherLat == null || otherLng == null || isNaN(otherLat) || isNaN(otherLng)) {
+        continue;
+      }
+
+      const distance = haversineDistanceMeters(targetLat, targetLng, otherLat, otherLng);
+
+      if (distance <= radius) {
+        const isSameType = other.issue_type === complaint.issue_type;
+        let matchConfidence = "High";
+        if (distance <= 25 && isSameType) {
+          matchConfidence = "Very High";
+        } else if (distance <= 50) {
+          matchConfidence = isSameType ? "High" : "Moderate";
+        } else {
+          matchConfidence = isSameType ? "Moderate" : "Low";
+        }
+
+        duplicates.push({
+          id: other.complaint_code,
+          mongoId: other._id,
+          title: other.title,
+          description: other.description,
+          issueType: other.issue_type,
+          priority: other.priority,
+          status: other.status,
+          location: other.address || other.location || "",
+          landmark: other.landmark || "",
+          latitude: otherLat,
+          longitude: otherLng,
+          distanceMeters: distance,
+          distanceFormatted: distance < 1000 ? `${distance}m away` : `${(distance / 1000).toFixed(2)}km away`,
+          matchConfidence,
+          sameIssueType: isSameType,
+          reportedBy: other.reported_by?.name || "Citizen",
+          reportedPhone: other.reported_by?.phone || "",
+          reportedDate: other.reported_at
+            ? new Date(other.reported_at).toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })
+            : "",
+          image: imageMap.get(String(other._id)) || other.image_url || null,
+        });
+      }
+    }
+
+    duplicates.sort((a, b) => a.distanceMeters - b.distanceMeters);
+
+    return res.status(200).json({
+      success: true,
+      count: duplicates.length,
+      radiusMeters: radius,
+      leadComplaint: {
+        id: complaint.complaint_code,
+        title: complaint.title,
+        issueType: complaint.issue_type,
+        latitude: targetLat,
+        longitude: targetLng,
+      },
+      duplicates,
+    });
+  } catch (error) {
+    console.error("Error finding duplicate complaints:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while finding duplicate complaints.",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAssignedComplaints,
   getComplaintDetails,
@@ -1114,4 +1324,5 @@ module.exports = {
   routeComplaintToManager,
   getUserComplaints,
   deleteComplaint,
+  getPotentialDuplicates,
 };

@@ -15,6 +15,8 @@ import {
   ClipboardList,
   Users,
   Clock,
+  Layers,
+  Copy,
 } from "lucide-react";
 import {
   getManagerComplaints,
@@ -22,6 +24,7 @@ import {
   updateComplaintPriority,
   assignComplaintWorkers,
   getComplaintDetails,
+  getComplaintDuplicates,
 } from "../../../services/managerApi";
 import "./new_complaint.css";
 
@@ -49,6 +52,9 @@ const Complaints = () => {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [assigning, setAssigning] = useState(false);
+  const [potentialDuplicates, setPotentialDuplicates] = useState([]);
+  const [loadingDuplicates, setLoadingDuplicates] = useState(false);
+  const [selectedDuplicates, setSelectedDuplicates] = useState([]);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -205,7 +211,39 @@ const Complaints = () => {
     setEndDate(
       complaint.workEndDate ? complaint.workEndDate.split("T")[0] : start
     );
+    setPotentialDuplicates([]);
+    setSelectedDuplicates([]);
+    setLoadingDuplicates(true);
     setShowAssignPopup(true);
+
+    getComplaintDuplicates(complaint.id || complaint.mongoId)
+      .then((res) => {
+        if (res && res.success) {
+          const dups = res.duplicates || [];
+          setPotentialDuplicates(dups);
+          setSelectedDuplicates(dups.map((d) => d.id || d.mongoId));
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not load duplicate complaints:", err);
+      })
+      .finally(() => {
+        setLoadingDuplicates(false);
+      });
+  };
+
+  const toggleDuplicate = (dupId) => {
+    setSelectedDuplicates((prev) =>
+      prev.includes(dupId) ? prev.filter((id) => id !== dupId) : [...prev, dupId]
+    );
+  };
+
+  const toggleAllDuplicates = () => {
+    if (selectedDuplicates.length === potentialDuplicates.length) {
+      setSelectedDuplicates([]);
+    } else {
+      setSelectedDuplicates(potentialDuplicates.map((d) => d.id || d.mongoId));
+    }
   };
 
   const toggleWorker = (workerId) => {
@@ -248,12 +286,13 @@ const Complaints = () => {
         selectedWorkers,
         startDate,
         endDate,
+        linkedDuplicateIds: selectedDuplicates,
       });
 
       if (res && res.success) {
         setComplaints((prev) =>
           prev.map((c) =>
-            c.id === selectedComplaint.id
+            c.id === selectedComplaint.id || selectedDuplicates.includes(c.id) || selectedDuplicates.includes(c.mongoId)
               ? {
                   ...c,
                   assignedWorkerIds: selectedWorkers,
@@ -280,7 +319,13 @@ const Complaints = () => {
         }));
 
         setShowAssignPopup(false);
-        setSuccessMsg("Workers assigned successfully!");
+        setSuccessMsg(
+          `Workers assigned successfully!${
+            selectedDuplicates.length > 0
+              ? ` (Grouped with ${selectedDuplicates.length} nearby duplicate reports)`
+              : ""
+          }`
+        );
         setTimeout(() => setSuccessMsg(""), 3000);
       }
     } catch (err) {
@@ -820,6 +865,94 @@ const Complaints = () => {
                 </span>
               </div>
 
+              {/* POTENTIAL DUPLICATES SECTION (GPS PROXIMITY) */}
+              <div className="mc-duplicates-section">
+                <div className="mc-dups-header">
+                  <div className="mc-dups-title">
+                    <Layers size={16} />
+                    <span>Potential Duplicate Reports (GPS Proximity)</span>
+                  </div>
+
+                  {potentialDuplicates.length > 0 && (
+                    <button
+                      type="button"
+                      className="mc-dups-toggle-btn"
+                      onClick={toggleAllDuplicates}
+                    >
+                      {selectedDuplicates.length === potentialDuplicates.length
+                        ? "Deselect All"
+                        : "Select All to Group"}
+                    </button>
+                  )}
+                </div>
+
+                {loadingDuplicates ? (
+                  <div className="mc-dups-loading">
+                    <span className="dups-spinner"></span>
+                    <span>Scanning for nearby reports within 100 meters...</span>
+                  </div>
+                ) : potentialDuplicates.length === 0 ? (
+                  <div className="mc-dups-empty">
+                    <CheckCircle2 size={15} color="#10b981" />
+                    <span>No duplicate reports found within 100m. This appears to be an isolated issue.</span>
+                  </div>
+                ) : (
+                  <div className="mc-dups-container">
+                    <div className="mc-dups-alert">
+                      <span>⚠️ <strong>{potentialDuplicates.length} potential duplicate(s)</strong> detected within 100m. Select reports to assign and resolve simultaneously:</span>
+                    </div>
+
+                    <div className="mc-dups-list">
+                      {potentialDuplicates.map((dup) => {
+                        const isChecked = selectedDuplicates.includes(dup.id || dup.mongoId);
+
+                        return (
+                          <div
+                            key={dup.id || dup.mongoId}
+                            className={`mc-dup-card ${isChecked ? "checked" : ""}`}
+                            onClick={() => toggleDuplicate(dup.id || dup.mongoId)}
+                          >
+                            <div className="mc-dup-check">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {}}
+                              />
+                            </div>
+
+                            {dup.image && (
+                              <img
+                                src={dup.image}
+                                alt="Report"
+                                className="mc-dup-thumb"
+                              />
+                            )}
+
+                            <div className="mc-dup-info">
+                              <div className="mc-dup-top">
+                                <span className="mc-dup-id">{dup.id}</span>
+                                <span className="mc-dup-distance">
+                                  <MapPin size={11} /> {dup.distanceFormatted}
+                                </span>
+                                <span className={`mc-dup-match ${dup.matchConfidence.toLowerCase().replace(/\s+/g, "-")}`}>
+                                  {dup.matchConfidence} Match
+                                </span>
+                              </div>
+                              <h5 className="mc-dup-title">{dup.title}</h5>
+                              <p className="mc-dup-desc">{dup.description?.slice(0, 85)}{dup.description?.length > 85 ? "..." : ""}</p>
+                              <div className="mc-dup-foot">
+                                <span>Reported by: <strong>{dup.reportedBy}</strong></span>
+                                <span>{dup.reportedDate}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* WORK SCHEDULE */}
               <div className="mc-dates">
                 <div className="mc-date-field">
@@ -915,7 +1048,13 @@ const Complaints = () => {
                 onClick={handleAssignWorkers}
                 disabled={selectedWorkers.length < 1 || assigning}
               >
-                {assigning ? "Assigning..." : `Assign ${selectedWorkers.length} Worker(s)`}
+                {assigning
+                  ? "Assigning..."
+                  : `Assign ${selectedWorkers.length} Worker(s)${
+                      selectedDuplicates.length > 0
+                        ? ` (+${selectedDuplicates.length} Duplicates)`
+                        : ""
+                    }`}
               </button>
             </div>
           </div>

@@ -44,6 +44,11 @@ export const updateWorkerProfile = async (profileData) => {
   return response.data;
 };
 
+export const updateWorkerAvailability = async (availabilityStatus) => {
+  const response = await workerApi.put("/api/worker/availability", { availabilityStatus });
+  return response.data;
+};
+
 export const changeWorkerPassword = async (passwords) => {
   const response = await workerApi.put("/api/worker/change-password", passwords);
   return response.data;

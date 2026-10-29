@@ -3,6 +3,7 @@ import {
   getWorkerProfile,
   updateWorkerProfile,
   changeWorkerPassword,
+  updateWorkerAvailability,
 } from "../../services/workerApi";
 import {
   User,
@@ -240,7 +241,44 @@ const WorkerProfile = () => {
           <h3>{profile.name}</h3>
           <span className="side-role">{profile.role}</span>
 
-          <span className="side-status-pill">
+          <div className="profile-avail-box">
+            <span className="profile-avail-title">Availability Switcher</span>
+            <div className="profile-avail-toggle">
+              <button
+                type="button"
+                className={`profile-avail-btn ${profile.availabilityStatus === "ACTIVE" || profile.status === "Available" || profile.status === "Active" ? "active-available" : ""}`}
+                onClick={async () => {
+                  try {
+                    await updateWorkerAvailability("ACTIVE");
+                    await loadProfile();
+                    setAlertMsg({ text: "Availability set to Available.", type: "success" });
+                    setTimeout(() => setAlertMsg({ text: "", type: "success" }), 4000);
+                  } catch (e) {
+                    alert(e.message || "Failed to update availability.");
+                  }
+                }}
+              >
+                ● Available
+              </button>
+              <button
+                type="button"
+                className={`profile-avail-btn ${profile.availabilityStatus === "ON_LEAVE" || profile.status === "On Leave" ? "active-leave" : ""}`}
+                onClick={async () => {
+                  try {
+                    await updateWorkerAvailability("ON_LEAVE");
+                    await loadProfile();
+                    setAlertMsg({ text: "Availability set to On Leave.", type: "success" });
+                    setTimeout(() => setAlertMsg({ text: "", type: "success" }), 4000);
+                  } catch (e) {
+                    alert(e.message || "Failed to update availability.");
+                  }
+                }}
+              >
+                ● On Leave
+              </button>
+            </div>
+          </div>
+          <span style={{ display: "none" }} className="side-status-pill">
             <CheckCircle2 size={12} strokeWidth={2.5} />
             {profile.status}
           </span>

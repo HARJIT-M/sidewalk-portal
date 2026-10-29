@@ -270,6 +270,7 @@ const getWorkerDashboard = async (req, res) => {
           team: worker.manager_id?.name || "Assigned Team",
           rating: worker.rating || 4.9,
           onTimeRate: worker.on_time_rate || 96,
+          availabilityStatus: worker.availability_status || "ACTIVE",
         },
         stats: {
           totalAssigned,

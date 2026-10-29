@@ -118,9 +118,19 @@ export const assignComplaintWorkers = async (id, payload) => {
   }
 };
 
-// ==========================================
-// 3. WORKERS ROSTER & MANAGEMENT
-// ==========================================
+export const getComplaintDuplicates = async (id, radius = 100) => {
+  try {
+    const response = await managerApi.get(`/api/complaints/${id}/duplicates`, {
+      params: { radius },
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error?.response?.data?.message || "Failed to find potential duplicates."
+    );
+  }
+};
+
 export const getAllWorkers = async () => {
   try {
     const response = await managerApi.get("/api/workers");
@@ -179,6 +189,17 @@ export const deleteWorker = async (id) => {
 // ==========================================
 // 4. WORK TRACKING & REPAIR OPERATIONS
 // ==========================================
+export const getWorkerProductivity = async () => {
+  try {
+    const response = await managerApi.get("/api/manager/productivity");
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error?.response?.data?.message || "Failed to load worker productivity."
+    );
+  }
+};
+
 export const getAllWorkTracking = async (params = {}) => {
   try {
     const response = await managerApi.get("/api/work-tracking/manager", { params });

@@ -52,7 +52,8 @@ const getWorkerProfile = async (req, res) => {
         email: worker.user_id ? worker.user_id.email : "",
         phone: worker.user_id?.phone || worker.emergency_contact || "",
         role: worker.worker_role || "Maintenance Worker",
-        status: worker.availability_status === "ACTIVE" ? "Active" : worker.availability_status,
+        status: worker.availability_status === "ACTIVE" ? "Available" : worker.availability_status === "ON_LEAVE" ? "On Leave" : "Inactive",
+        availabilityStatus: worker.availability_status || "ACTIVE",
         shift: worker.shift || "Day Shift (08:00 AM - 05:00 PM)",
         joinedDate: formattedJoinedDate,
         team: worker.manager_id?.name || "Assigned Team",
@@ -107,13 +108,8 @@ const updateWorkerProfile = async (req, res) => {
     if (emergencyContact !== undefined) worker.emergency_contact = emergencyContact;
     if (address !== undefined) worker.address = address;
     if (skills && Array.isArray(skills)) worker.skills = skills;
-
     await worker.save();
-
-    return res.status(200).json({
-      success: true,
-      message: "Worker profile updated successfully.",
-    });
+    return res.status(200).json({ success: true, message: "Worker profile updated successfully." });
   } catch (error) {
     console.error("Error updating worker profile:", error);
     return res.status(500).json({
@@ -207,7 +203,7 @@ const getAllWorkers = async (req, res) => {
           phone: worker.user_id?.phone || worker.emergency_contact || "",
           email: worker.user_id ? worker.user_id.email : "",
           role: worker.worker_role || "Maintenance Worker",
-          status: worker.availability_status === "ACTIVE" ? "Active" : "Inactive",
+          status: worker.availability_status === "ACTIVE" ? "Active" : worker.availability_status === "ON_LEAVE" ? "On Leave" : "Inactive",
           availabilityStatus: worker.availability_status,
           team: worker.manager_id?.name || "Assigned Team",
           shift: worker.shift || "Day Shift (08:00 AM - 05:00 PM)",
@@ -412,7 +408,10 @@ const updateWorkerStatus = async (req, res) => {
     }
 
     worker.availability_status = targetStatus;
-    await worker.save();
+    await Worker.updateOne(
+      { _id: worker._id },
+      { $set: { availability_status: targetStatus } }
+    );
 
     await User.findByIdAndUpdate(worker.user_id, {
       status: targetStatus === "ACTIVE" ? "ACTIVE" : "INACTIVE",
@@ -492,6 +491,220 @@ const deleteWorker = async (req, res) => {
   }
 };
 
+// ==========================================
+// 9. UPDATE WORKER AVAILABILITY (WORKER ROLE)
+// ==========================================
+const updateWorkerAvailability = async (req, res) => {
+  try {
+    const { availabilityStatus, status } = req.body;
+    const worker = await getWorkerForUser(req.user._id);
+
+    if (!worker) {
+      return res.status(404).json({
+        success: false,
+        message: "Worker profile not found.",
+      });
+    }
+
+    const raw = (availabilityStatus || status || "").trim().toUpperCase();
+    let newStatus = worker.availability_status;
+
+    if (raw === "ON_LEAVE" || raw === "ON LEAVE" || raw === "LEAVE") {
+      newStatus = "ON_LEAVE";
+    } else if (raw === "ACTIVE" || raw === "AVAILABLE") {
+      newStatus = "ACTIVE";
+    } else if (raw === "INACTIVE") {
+      newStatus = "INACTIVE";
+    } else {
+      newStatus = worker.availability_status === "ACTIVE" ? "ON_LEAVE" : "ACTIVE";
+    }
+
+    worker.availability_status = newStatus;
+    await Worker.updateOne(
+      { _id: worker._id },
+      { $set: { availability_status: newStatus } }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `Worker availability updated to ${
+        newStatus === "ACTIVE" ? "Available" : newStatus === "ON_LEAVE" ? "On Leave" : "Inactive"
+      }.`,
+      availabilityStatus: newStatus,
+      isAvailable: newStatus === "ACTIVE",
+    });
+  } catch (error) {
+    console.error("Error updating worker availability:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while updating worker availability.",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// 10. GET WORKER PRODUCTIVITY DASHBOARD (MANAGER / ADMIN)
+// ==========================================
+const getWorkerProductivity = async (req, res) => {
+  try {
+    const isManager = req.user.role === "MANAGER";
+    const filter = isManager ? { manager_id: req.user._id } : {};
+
+    const workers = await Worker.find(filter)
+      .populate("user_id", "name email phone status")
+      .populate("manager_id", "name")
+      .lean();
+
+    const workerIds = workers.map((w) => w._id);
+
+    const assignments = await Assignment.find({
+      worker_id: { $in: workerIds },
+    })
+      .populate("complaint_id", "complaint_code title priority status issue_type")
+      .lean();
+
+    const assignmentsByWorker = new Map();
+    workerIds.forEach((id) => assignmentsByWorker.set(String(id), []));
+    assignments.forEach((a) => {
+      const wid = String(a.worker_id);
+      if (assignmentsByWorker.has(wid)) {
+        assignmentsByWorker.get(wid).push(a);
+      }
+    });
+
+    let totalCompletedTeam = 0;
+    let totalAssignedTeam = 0;
+    let totalInProgressTeam = 0;
+
+    const workerStats = workers.map((worker) => {
+      const wAssignments = assignmentsByWorker.get(String(worker._id)) || [];
+      const totalAssigned = wAssignments.length;
+      const completedList = wAssignments.filter((a) => a.status === "COMPLETED");
+      const completedCount = completedList.length;
+      const inProgressCount = wAssignments.filter((a) => a.status === "IN_PROGRESS").length;
+      const assignedPendingCount = wAssignments.filter((a) => a.status === "ASSIGNED").length;
+
+      totalCompletedTeam += completedCount;
+      totalAssignedTeam += totalAssigned;
+      totalInProgressTeam += inProgressCount;
+
+      const completionRate =
+        totalAssigned > 0 ? Math.round((completedCount / totalAssigned) * 100) : 0;
+
+      let totalResolutionHours = 0;
+      let countWithHours = 0;
+      let onTimeCount = 0;
+
+      completedList.forEach((a) => {
+        if (a.completed_at) {
+          const start = a.started_at || a.assigned_at;
+          if (start) {
+            const diffHours = (new Date(a.completed_at) - new Date(start)) / (1000 * 60 * 60);
+            if (diffHours > 0) {
+              totalResolutionHours += diffHours;
+              countWithHours += 1;
+            }
+          }
+          if (a.scheduled_end_at) {
+            if (new Date(a.completed_at) <= new Date(a.scheduled_end_at)) {
+              onTimeCount += 1;
+            }
+          } else {
+            onTimeCount += 1;
+          }
+        }
+      });
+
+      const avgHours = countWithHours > 0 ? Math.round(totalResolutionHours / countWithHours) : 4;
+      const onTimeRate =
+        completedCount > 0
+          ? Math.round((onTimeCount / completedCount) * 100)
+          : worker.on_time_rate || 95;
+
+      const recentCompleted = completedList
+        .slice(-3)
+        .reverse()
+        .map((a) => ({
+          assignmentId: a._id,
+          complaintCode: a.complaint_id?.complaint_code || "",
+          title: a.complaint_id?.title || "Complaint",
+          completedAt: a.completed_at
+            ? new Date(a.completed_at).toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })
+            : "",
+        }));
+
+      return {
+        workerId: worker._id,
+        employeeCode: worker.employee_code,
+        name: worker.user_id?.name || worker.employee_code,
+        email: worker.user_id?.email || "",
+        phone: worker.user_id?.phone || worker.emergency_contact || "",
+        role: worker.worker_role || "Maintenance Worker",
+        shift: worker.shift || "Day Shift (08:00 AM - 05:00 PM)",
+        availabilityStatus: worker.availability_status || "ACTIVE",
+        statusDisplay:
+          worker.availability_status === "ACTIVE"
+            ? "Available"
+            : worker.availability_status === "ON_LEAVE"
+            ? "On Leave"
+            : "Inactive",
+        rating: worker.rating || 4.8,
+        skills: worker.skills || [],
+        totalAssigned,
+        completedCount,
+        inProgressCount,
+        pendingCount: assignedPendingCount,
+        completionRate,
+        avgCompletionHours: avgHours,
+        onTimeRate,
+        recentCompleted,
+      };
+    });
+
+    const activeCount = workers.filter((w) => w.availability_status === "ACTIVE").length;
+    const onLeaveCount = workers.filter((w) => w.availability_status === "ON_LEAVE").length;
+    const inactiveCount = workers.filter((w) => w.availability_status === "INACTIVE").length;
+
+    const overallCompletionRate =
+      totalAssignedTeam > 0 ? Math.round((totalCompletedTeam / totalAssignedTeam) * 100) : 0;
+
+    const leaderboard = [...workerStats]
+      .sort((a, b) => b.completedCount - a.completedCount || b.completionRate - a.completionRate || b.rating - a.rating)
+      .slice(0, 5);
+
+    return res.status(200).json({
+      success: true,
+      summary: {
+        totalWorkers: workers.length,
+        activeWorkers: activeCount,
+        onLeaveWorkers: onLeaveCount,
+        inactiveWorkers: inactiveCount,
+        totalAssignedTasks: totalAssignedTeam,
+        totalCompletedTasks: totalCompletedTeam,
+        totalInProgressTasks: totalInProgressTeam,
+        teamCompletionRate: overallCompletionRate,
+        averageTeamRating: (
+          workers.reduce((acc, w) => acc + (w.rating || 4.8), 0) / (workers.length || 1)
+        ).toFixed(1),
+      },
+      leaderboard,
+      workers: workerStats,
+    });
+  } catch (error) {
+    console.error("Error fetching worker productivity:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while fetching worker productivity.",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getWorkerProfile,
   updateWorkerProfile,
@@ -501,4 +714,6 @@ module.exports = {
   addWorker,
   updateWorkerStatus,
   deleteWorker,
+  updateWorkerAvailability,
+  getWorkerProductivity,
 };

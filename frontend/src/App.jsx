@@ -16,6 +16,7 @@ import Dashboard from "./pages/manager/dashboard/new_dashboard";
 import Complaint from "./pages/manager/complaints/new_complaint";
 import WorkTracking from "./pages/manager/trackwork/new_track";
 import Workers from "./pages/manager/workers/new_worker";
+import WorkerProductivity from "./pages/manager/productivity/WorkerProductivity";
 import ManagerProfile from "./pages/manager/profile/ManagerProfile";
 
 // Admin Pages
@@ -86,6 +87,8 @@ function App() {
             <Route path="/complaints" element={<Complaint />} />
             <Route path="/work-tracking" element={<WorkTracking />} />
             <Route path="/workers" element={<Workers />} />
+            <Route path="/productivity" element={<WorkerProductivity />} />
+            <Route path="/manager/productivity" element={<WorkerProductivity />} />
             <Route path="/manager/profile" element={<ManagerProfile />} />
           </Route>
         </Route>

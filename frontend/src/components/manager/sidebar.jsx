@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Wrench,
   Users,
+  TrendingUp,
   UserRound,
   LogOut,
   ChevronLeft,
@@ -37,6 +38,13 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
       name: "Workers",
       path: "/workers",
       icon: Users,
+
+    },
+    {
+      name: "Productivity",
+      path: "/productivity",
+      icon: TrendingUp,
+
     },
     {
       name: "My Profile",

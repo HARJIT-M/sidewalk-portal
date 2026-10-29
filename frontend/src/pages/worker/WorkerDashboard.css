@@ -74,6 +74,117 @@
   color: #e0e0fb;
 }
 
+.header-right-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.availability-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.availability-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #e0e0fb;
+  font-weight: 600;
+}
+
+.availability-switcher-pill {
+  display: inline-flex;
+  background: rgba(15, 23, 42, 0.28);
+  border-radius: 9999px;
+  padding: 3px;
+  gap: 4px;
+}
+
+.avail-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: #cbd5e1;
+  transition: all 0.2s ease;
+}
+
+.avail-btn:hover:not(:disabled) {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.avail-btn.available.active {
+  background: #10b981;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+}
+
+.avail-btn.on-leave.active {
+  background: #f59e0b;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
+}
+
+.avail-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.dot-active {
+  background: #34d399;
+}
+
+.dot-leave {
+  background: #fbbf24;
+}
+
+.availability-toast {
+  background: #ecfdf5;
+  border-left: 4px solid #10b981;
+  color: #065f46;
+  padding: 12px 18px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  font-size: 13.5px;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.12);
+  display: flex;
+  align-items: center;
+  animation: slideInDown 0.3s ease;
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.old-worker-info-span {
+  font-size: 12px;
+  color: #e0e0fb;
+}
+
 /* =========================================
    2. QUICK ACTIONS BAR
 ========================================= */

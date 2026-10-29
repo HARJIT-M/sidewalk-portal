@@ -11,6 +11,7 @@ const {
   routeComplaintToManager,
   getUserComplaints,
   deleteComplaint,
+  getPotentialDuplicates,
 } = require("../controllers/complaintController");
 const uploadComplaintImages = require("../middleware/complaintUploadMiddleware");
 
@@ -51,6 +52,7 @@ router.patch("/:id/route", authorize("ADMIN"), routeComplaintToManager);
 // ==========================================
 // 4. COMMON COMPLAINT DETAILS (WORKER & MANAGER & USER)
 // ==========================================
+router.get("/:id/duplicates", authorize("MANAGER", "ADMIN"), getPotentialDuplicates);
 router.get("/:id", getComplaintDetails);
 
 module.exports = router;
