@@ -1,4 +1,4 @@
-const { Assignment, Notification, Complaint, ComplaintImage, Area } = require("../schemas");
+const { Assignment, Notification, Complaint, ComplaintImage, Area, WorkGroup } = require("../schemas");
 const { getWorkerForUser } = require("../utils/workerHelper");
 
 // ==========================================
@@ -14,7 +14,6 @@ const getWorkerDashboard = async (req, res) => {
       });
     }
 
-    // Get all assignments for this worker
     const assignments = await Assignment.find({
       worker_id: worker._id,
       status: { $ne: "CANCELLED" },
@@ -24,6 +23,7 @@ const getWorkerDashboard = async (req, res) => {
         populate: [
           { path: "reported_by", select: "name phone" },
           { path: "area_id", select: "name type" },
+          { path: "workGroupId" },
         ],
       })
       .sort({ assigned_at: -1 });
@@ -46,6 +46,9 @@ const getWorkerDashboard = async (req, res) => {
       .filter((a) => a.complaint_id)
       .map((a) => {
         const c = a.complaint_id;
+        const wg = c.workGroupId;
+        const effectiveStatus = wg?.status || c.status;
+
         return {
           id: c.complaint_code,
           mongoId: c._id,
@@ -54,7 +57,8 @@ const getWorkerDashboard = async (req, res) => {
           description: c.description,
           issueType: c.issue_type,
           priority: c.priority,
-          status: c.status,
+          status: effectiveStatus,
+          rawStatus: effectiveStatus,
           assignmentStatus: a.status,
           location: c.address,
           landmark: c.landmark || "",
@@ -86,67 +90,76 @@ const getWorkerDashboard = async (req, res) => {
           reportedImage: imageByComplaint.get(String(c._id)) || null,
           reporterName: c.reported_by ? c.reported_by.name : "Citizen",
           progress:
-            c.status === "RESOLVED" ||
-            c.status === "CLOSED" ||
+            effectiveStatus === "RESOLVED" ||
+            effectiveStatus === "CLOSED" ||
             a.status === "COMPLETED"
               ? 100
-              : c.status === "IN_PROGRESS" || a.status === "IN_PROGRESS"
+              : effectiveStatus === "IN_PROGRESS" || a.status === "IN_PROGRESS"
               ? 80
               : 10,
+          workGroupId: wg?.workGroupId || null,
+          isDuplicate: Boolean(c.isDuplicate),
         };
       });
 
-    // Counts
     const totalAssigned = complaintsList.length;
     const inProgressCount = complaintsList.filter(
-      (c) =>
-        c.assignmentStatus === "IN_PROGRESS" || c.status === "IN_PROGRESS"
+      (c) => c.assignmentStatus === "IN_PROGRESS" || c.status === "IN_PROGRESS"
     ).length;
     const completedCount = complaintsList.filter(
       (c) =>
+        c.assignmentStatus === "COMPLETED" ||
         c.status === "RESOLVED" ||
-        c.status === "CLOSED" ||
-        c.assignmentStatus === "COMPLETED"
+        c.status === "CLOSED"
     ).length;
-    const activeComplaints = complaintsList.filter(
+    const highPriorityCount = complaintsList.filter(
       (c) =>
-        c.assignmentStatus !== "COMPLETED" &&
+        (c.priority === "HIGH" || c.priority === "CRITICAL") &&
         c.status !== "RESOLVED" &&
         c.status !== "CLOSED"
-    );
-    const highPriorityTasks = activeComplaints.filter(
-      (c) => c.priority === "HIGH" || c.priority === "CRITICAL"
-    );
-    const highPriorityCount = highPriorityTasks.length;
+    ).length;
 
-    // Active spotlight task
-    const activeTask =
-      activeComplaints.find(
-        (c) =>
-          c.assignmentStatus === "IN_PROGRESS" || c.status === "IN_PROGRESS"
-      ) ||
-      activeComplaints.find(
-        (c) => c.assignmentStatus === "ASSIGNED" || c.status === "ASSIGNED"
-      ) ||
-      null;
-
-    // Unread notifications count
     const unreadNotificationsCount = await Notification.countDocuments({
       user_id: req.user._id,
       is_read: false,
     });
 
-    const today = new Date();
-    const weekStart = new Date(today);
-    weekStart.setHours(0, 0, 0, 0);
-    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
-    const weeklyCounts = Array(7).fill(0);
-    assignments.forEach((assignment) => {
-      if (assignment.status !== "COMPLETED") return;
-      const completedAt = assignment.completed_at;
-      if (!completedAt) return;
+    const activeTask =
+      complaintsList.find(
+        (c) =>
+          (c.assignmentStatus === "IN_PROGRESS" ||
+            c.assignmentStatus === "ASSIGNED") &&
+          c.status !== "RESOLVED" &&
+          c.status !== "CLOSED"
+      ) || null;
+
+    const highPriorityTasks = complaintsList.filter(
+      (c) =>
+        (c.priority === "HIGH" || c.priority === "CRITICAL") &&
+        c.status !== "RESOLVED" &&
+        c.status !== "CLOSED"
+    );
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dayOfWeek = today.getDay();
+    const mondayOffset = (dayOfWeek + 6) % 7;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - mondayOffset);
+
+    const weeklyCounts = [0, 0, 0, 0, 0, 0, 0];
+    const completedThisWeek = assignments.filter(
+      (a) =>
+        (a.status === "COMPLETED" ||
+          (a.complaint_id &&
+            ["RESOLVED", "CLOSED"].includes(a.complaint_id.status))) &&
+        a.completed_at &&
+        new Date(a.completed_at) >= monday
+    );
+    completedThisWeek.forEach((assignment) => {
+      const compDate = new Date(assignment.completed_at);
       const dayOffset = Math.floor(
-        (new Date(completedAt).setHours(0, 0, 0, 0) - weekStart.getTime()) /
+        (compDate.setHours(0, 0, 0, 0) - monday.getTime()) /
           (24 * 60 * 60 * 1000)
       );
       if (dayOffset >= 0 && dayOffset < weeklyCounts.length) {
@@ -161,7 +174,6 @@ const getWorkerDashboard = async (req, res) => {
       })
     );
 
-    // Status breakdown for donut
     const resolvedCount = completedCount;
     const assignedPendingCount = complaintsList.filter(
       (c) =>
@@ -303,31 +315,30 @@ const getWorkerDashboard = async (req, res) => {
 const getManagerDashboard = async (req, res) => {
   try {
     const managerFilter = { manager_id: req.user._id };
-    const [totalComplaints, pendingCount, inProgressCount, resolvedCount] =
-      await Promise.all([
-        Complaint.countDocuments(managerFilter),
-        Complaint.countDocuments({
-          ...managerFilter,
-          status: { $in: ["PENDING", "ASSIGNED"] },
-        }),
-        Complaint.countDocuments({ ...managerFilter, status: "IN_PROGRESS" }),
-        Complaint.countDocuments({
-          ...managerFilter,
-          status: { $in: ["RESOLVED", "CLOSED"] },
-        }),
-      ]);
 
-    const [recentComplaints, managerArea] = await Promise.all([
+    const [allManagerComplaints, managerArea] = await Promise.all([
       Complaint.find(managerFilter)
         .populate("reported_by", "name phone email")
         .populate("area_id", "name type")
-        .sort({ reported_at: -1 })
-        .limit(10),
+        .populate("workGroupId")
+        .sort({ reported_at: -1 }),
       Area.findOne({ manager_id: req.user._id, active: true })
         .sort({ type: 1 })
         .select("name type"),
     ]);
 
+    const totalComplaints = allManagerComplaints.length;
+    const pendingCount = allManagerComplaints.filter((c) =>
+      ["PENDING", "ASSIGNED"].includes(c.workGroupId?.status || c.status)
+    ).length;
+    const inProgressCount = allManagerComplaints.filter(
+      (c) => (c.workGroupId?.status || c.status) === "IN_PROGRESS"
+    ).length;
+    const resolvedCount = allManagerComplaints.filter((c) =>
+      ["RESOLVED", "CLOSED", "COMPLETED"].includes(c.workGroupId?.status || c.status)
+    ).length;
+
+    const recentComplaints = allManagerComplaints.slice(0, 10);
     const latestComplaintCity = recentComplaints.find((complaint) => complaint.city)?.city;
     const recentComplaintIds = recentComplaints.map((c) => c._id);
     const recentImages = await ComplaintImage.find({
@@ -343,10 +354,11 @@ const getManagerDashboard = async (req, res) => {
 
     // Format complaint rows matching Manager frontend table
     const formattedComplaints = recentComplaints.map((c) => {
+      const effectiveStatus = c.workGroupId?.status || c.status;
       let displayStatus = "Pending";
-      if (c.status === "IN_PROGRESS") displayStatus = "In Progress";
-      else if (c.status === "RESOLVED" || c.status === "CLOSED") displayStatus = "Resolved";
-      else if (c.status === "ASSIGNED") displayStatus = "Assigned";
+      if (effectiveStatus === "IN_PROGRESS") displayStatus = "In Progress";
+      else if (["RESOLVED", "CLOSED", "COMPLETED"].includes(effectiveStatus)) displayStatus = "Resolved";
+      else if (effectiveStatus === "ASSIGNED") displayStatus = "Assigned";
 
       let displayPriority = "Medium";
       if (c.priority === "HIGH" || c.priority === "CRITICAL") displayPriority = "High";
@@ -372,9 +384,11 @@ const getManagerDashboard = async (req, res) => {
         priority: displayPriority,
         rawPriority: c.priority,
         status: displayStatus,
-        rawStatus: c.status,
+        rawStatus: effectiveStatus,
         reportedBy: c.reported_by ? c.reported_by.name : "Citizen",
         image: managerImageMap.get(String(c._id)) || null,
+        isDuplicate: Boolean(c.isDuplicate),
+        workGroupId: c.workGroupId?.workGroupId || null,
       };
     });
 
@@ -415,25 +429,36 @@ const getUserDashboard = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    // Fetch complaints for the user
+    // Fetch complaints for the user with WorkGroup populated
     const userComplaints = await Complaint.find({ reported_by: userId })
+      .populate("workGroupId")
       .sort({ reported_at: -1 });
 
     const totalReported = userComplaints.length;
-    const inProgressCount = userComplaints.filter(c => c.status === "IN_PROGRESS").length;
-    const resolvedCount = userComplaints.filter(c => c.status === "RESOLVED" || c.status === "CLOSED").length;
-    const pendingCount = userComplaints.filter(c => c.status === "PENDING" || c.status === "ASSIGNED").length;
+    const inProgressCount = userComplaints.filter(
+      (c) => (c.workGroupId?.status || c.status) === "IN_PROGRESS"
+    ).length;
+    const resolvedCount = userComplaints.filter((c) =>
+      ["RESOLVED", "CLOSED", "COMPLETED"].includes(c.workGroupId?.status || c.status)
+    ).length;
+    const pendingCount = userComplaints.filter((c) =>
+      ["PENDING", "ASSIGNED"].includes(c.workGroupId?.status || c.status)
+    ).length;
 
     // Recent activity map (e.g. up to 3)
-    const recentActivity = userComplaints.slice(0, 3).map(c => {
+    const recentActivity = userComplaints.slice(0, 3).map((c) => {
+      const effectiveStatus = c.workGroupId?.status || c.status;
       let iconType = "reported";
       let actionText = "Reported new issue";
-      if (c.status === "RESOLVED" || c.status === "CLOSED") {
+      if (effectiveStatus === "RESOLVED" || effectiveStatus === "CLOSED" || effectiveStatus === "COMPLETED") {
         iconType = "resolved";
         actionText = "Issue resolved by team";
-      } else if (c.status === "IN_PROGRESS") {
+      } else if (effectiveStatus === "IN_PROGRESS") {
         iconType = "progress";
         actionText = "Repair work started";
+      } else if (effectiveStatus === "ASSIGNED") {
+        iconType = "assigned";
+        actionText = "Maintenance crew assigned";
       }
 
       return {
@@ -443,14 +468,23 @@ const getUserDashboard = async (req, res) => {
         issue: c.title,
         location: c.address || c.location || "",
         priority: c.priority,
-        status: c.status,
-        date: c.reported_at ? new Date(c.reported_at).toLocaleDateString("en-GB", {
-          day: "2-digit", month: "short", year: "numeric"
-        }) : "Recently",
-        time: c.reported_at ? new Date(c.reported_at).toLocaleDateString("en-GB", {
-          day: "2-digit", month: "short"
-        }) : "Recently",
-        iconType
+        status: effectiveStatus,
+        date: c.reported_at
+          ? new Date(c.reported_at).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })
+          : "Recently",
+        time: c.reported_at
+          ? new Date(c.reported_at).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+            })
+          : "Recently",
+        iconType,
+        isDuplicate: Boolean(c.isDuplicate),
+        workGroupId: c.workGroupId?.workGroupId || null,
       };
     });
 
@@ -460,9 +494,9 @@ const getUserDashboard = async (req, res) => {
         totalReported,
         inProgress: inProgressCount,
         resolved: resolvedCount,
-        pending: pendingCount
+        pending: pendingCount,
       },
-      recentActivity
+      recentActivity,
     });
   } catch (error) {
     console.error("Error generating user dashboard:", error);

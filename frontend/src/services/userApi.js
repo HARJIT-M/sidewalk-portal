@@ -5,7 +5,7 @@ const API = axios.create({
   baseURL:
     import.meta.env.VITE_API_BASE_URL ||
     import.meta.env.VITE_API_URL ||
-    "http://localhost:8000",
+    "http://localhost:5000",
 });
 
 // Add a request interceptor to inject the JWT token

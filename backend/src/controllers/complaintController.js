@@ -9,6 +9,7 @@ const {
   Worker,
   Notification,
   User,
+  WorkGroup,
 } = require("../schemas");
 const { getWorkerForUser } = require("../utils/workerHelper");
 const { findManagerForPoint } = require("../utils/findManagerForPoint");
@@ -18,17 +19,37 @@ const {
   getBusyAssignmentsFilter,
 } = require("../utils/scheduleRange");
 const cloudinary = require("../config/cloudinary");
+const {
+  haversineDistanceMeters,
+  findActiveWorkGroupWithinRadius,
+  linkComplaintToWorkGroup,
+  createWorkGroupForComplaint,
+  ensureWorkGroupForComplaint,
+  syncWorkGroupStatus,
+} = require("../utils/workGroupHelper");
 
-const haversineDistanceMeters = (lat1, lon1, lat2, lon2) => {
-  const R = 6371e3; // Earth radius in meters
-  const toRad = (val) => (val * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return Math.round(R * c);
+// Helper to run operations in transaction if supported, or fallback to direct execution
+const runSafeTransaction = async (work) => {
+  let session = null;
+  try {
+    session = await mongoose.startSession();
+    let result;
+    await session.withTransaction(async () => {
+      result = await work(session);
+    });
+    return result;
+  } catch (err) {
+    if (
+      err.message?.includes("Transaction numbers are only allowed") ||
+      err.message?.includes("replica set member") ||
+      err.message?.includes("standalone")
+    ) {
+      return await work(null);
+    }
+    throw err;
+  } finally {
+    if (session) await session.endSession();
+  }
 };
 
 // ==========================================
@@ -55,6 +76,7 @@ const getAssignedComplaints = async (req, res) => {
         populate: [
           { path: "reported_by", select: "name phone" },
           { path: "area_id", select: "name type" },
+          { path: "workGroupId" },
         ],
       })
       .sort({ assigned_at: -1 });
@@ -77,6 +99,10 @@ const getAssignedComplaints = async (req, res) => {
       .filter((a) => a.complaint_id)
       .map((a) => {
         const c = a.complaint_id;
+        const wg = c.workGroupId;
+        const linkedCount = wg?.linkedComplaints?.length || 1;
+        const sharedStatus = wg?.status || c.status;
+
         return {
           id: c.complaint_code,
           mongoId: c._id,
@@ -85,7 +111,8 @@ const getAssignedComplaints = async (req, res) => {
           description: c.description,
           issueType: c.issue_type,
           priority: c.priority,
-          status: c.status,
+          status: sharedStatus,
+          rawStatus: sharedStatus,
           assignmentStatus: a.status,
           location: c.address || c.location || "",
           landmark: c.landmark || "",
@@ -118,38 +145,21 @@ const getAssignedComplaints = async (req, res) => {
             : "",
           reportedImage: imageByComplaint.get(String(c._id)) || c.image_url || null,
           reporterName: c.reported_by ? c.reported_by.name : "Citizen",
-          estimatedHours: "4 Hours",
+          isDuplicate: c.isDuplicate || false,
+          workGroupId: wg?.workGroupId || null,
+          linkedReportsCount: linkedCount,
         };
       });
 
     if (status && status !== "All") {
-      if (status === "Pending" || status === "ASSIGNED") {
-        complaints = complaints.filter(
-          (c) =>
-            c.assignmentStatus === "ASSIGNED" ||
-            c.status === "ASSIGNED" ||
-            c.status === "PENDING"
-        );
-      } else if (status === "In Progress" || status === "IN_PROGRESS") {
-        complaints = complaints.filter(
-          (c) =>
-            c.assignmentStatus === "IN_PROGRESS" ||
-            c.status === "IN_PROGRESS"
-        );
-      } else if (status === "Completed" || status === "RESOLVED") {
-        complaints = complaints.filter(
-          (c) =>
-            c.status === "RESOLVED" ||
-            c.status === "COMPLETED" ||
-            c.status === "CLOSED" ||
-            c.assignmentStatus === "COMPLETED"
-        );
-      }
+      complaints = complaints.filter(
+        (c) => c.status.toLowerCase() === status.toLowerCase()
+      );
     }
 
     if (priority && priority !== "All") {
       complaints = complaints.filter(
-        (c) => c.priority?.toLowerCase() === priority.toLowerCase()
+        (c) => c.priority.toLowerCase() === priority.toLowerCase()
       );
     }
 
@@ -159,8 +169,8 @@ const getAssignedComplaints = async (req, res) => {
         (c) =>
           c.id.toLowerCase().includes(q) ||
           c.issue.toLowerCase().includes(q) ||
-          (c.location || "").toLowerCase().includes(q) ||
-          (c.area || "").toLowerCase().includes(q)
+          c.location.toLowerCase().includes(q) ||
+          (c.workGroupId && c.workGroupId.toLowerCase().includes(q))
       );
     }
 
@@ -170,17 +180,17 @@ const getAssignedComplaints = async (req, res) => {
       complaints,
     });
   } catch (error) {
-    console.error("Error getting assigned complaints:", error);
+    console.error("Error fetching worker assigned complaints:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to fetch assigned complaints.",
+      message: "Server error while fetching assigned complaints.",
       error: error.message,
     });
   }
 };
 
 // ==========================================
-// 2. GET SINGLE COMPLAINT DETAILS
+// 2. GET COMPLAINT DETAILS (UNIFIED / WORKGROUP AWARE)
 // ==========================================
 const getComplaintDetails = async (req, res) => {
   try {
@@ -190,11 +200,15 @@ const getComplaintDetails = async (req, res) => {
     if (id.match(/^[0-9a-fA-F]{24}$/)) {
       complaint = await Complaint.findById(id)
         .populate("reported_by", "name phone email")
-        .populate("area_id", "name type");
+        .populate("area_id", "name type")
+        .populate("masterComplaintId", "complaint_code title status reported_at")
+        .populate("workGroupId");
     } else {
       complaint = await Complaint.findOne({ complaint_code: id })
         .populate("reported_by", "name phone email")
-        .populate("area_id", "name type");
+        .populate("area_id", "name type")
+        .populate("masterComplaintId", "complaint_code title status reported_at")
+        .populate("workGroupId");
     }
 
     if (!complaint) {
@@ -204,6 +218,7 @@ const getComplaintDetails = async (req, res) => {
       });
     }
 
+    // Role-based authorization
     if (
       req.user.role === "MANAGER" &&
       String(complaint.manager_id) !== String(req.user._id)
@@ -214,15 +229,44 @@ const getComplaintDetails = async (req, res) => {
       });
     }
 
+    // Ensure WorkGroup exists
+    let workGroup = complaint.workGroupId;
+    if (!workGroup) {
+      workGroup = await ensureWorkGroupForComplaint(complaint);
+    } else if (typeof workGroup.populate === "function") {
+      await workGroup.populate([
+        {
+          path: "assignedWorkers",
+          populate: { path: "user_id", select: "name phone email" },
+        },
+        {
+          path: "linkedComplaints",
+          select: "complaint_code title description status reported_at address image_url reported_by isDuplicate",
+          populate: { path: "reported_by", select: "name phone" },
+        },
+      ]);
+    }
+
+    // Master Complaint lookup ID for assignments
+    const masterId = complaint.masterComplaintId?._id || complaint.masterComplaintId || complaint._id;
+    const lookupIds = [complaint._id, masterId].filter(Boolean);
+
     if (req.user.role === "WORKER") {
       const worker = await getWorkerForUser(req.user._id);
       const isAssigned = worker
         ? await Assignment.exists({
-            complaint_id: complaint._id,
+            complaint_id: { $in: lookupIds },
             worker_id: worker._id,
           })
         : false;
-      if (!isAssigned) {
+      const isInWorkGroup =
+        worker &&
+        workGroup &&
+        workGroup.assignedWorkers?.some(
+          (w) => String(w._id || w) === String(worker._id)
+        );
+
+      if (!isAssigned && !isInWorkGroup) {
         return res.status(404).json({
           success: false,
           message: "Complaint record not found.",
@@ -230,23 +274,28 @@ const getComplaintDetails = async (req, res) => {
       }
     }
 
-    const assignments = await Assignment.find({ complaint_id: complaint._id })
+    // Shared assignments from master or complaint
+    const assignments = await Assignment.find({ complaint_id: { $in: lookupIds } })
       .populate({
         path: "worker_id",
         populate: { path: "user_id", select: "name phone email" },
       })
       .populate("assigned_by", "name email");
 
-    const assignedWorkerNames = assignments
-      .map((a) => (a.worker_id && a.worker_id.user_id ? a.worker_id.user_id.name : null))
-      .filter(Boolean);
+    const assignedWorkerNames = [
+      ...new Set([
+        ...assignments
+          .map((a) => (a.worker_id && a.worker_id.user_id ? a.worker_id.user_id.name : null))
+          .filter(Boolean),
+        ...(workGroup?.assignedWorkers || [])
+          .map((w) => (w.user_id ? w.user_id.name : null))
+          .filter(Boolean),
+      ]),
+    ];
 
     const images = await ComplaintImage.find({
       complaint_id: complaint._id,
     }).sort({ uploaded_at: 1 });
-
-    const beforeImageDoc = images.find((img) => img.image_type === "BEFORE");
-    const afterImageDoc = images.find((img) => img.image_type === "AFTER");
 
     const statusHistories = await StatusHistory.find({
       complaint_id: complaint._id,
@@ -255,7 +304,7 @@ const getComplaintDetails = async (req, res) => {
       .sort({ changed_at: 1 });
 
     const repairHistories = await RepairHistory.find({
-      complaint_id: complaint._id,
+      complaint_id: { $in: lookupIds },
     })
       .populate("worker_id", "employee_code")
       .populate("verified_by", "name")
@@ -301,6 +350,30 @@ const getComplaintDetails = async (req, res) => {
       verifiedAt: rh.verified_at || null,
     }));
 
+    // Shared dates from WorkGroup or assignments
+    const effectiveStatus = workGroup?.status || complaint.status;
+    const scheduledStartAt = workGroup?.workStartDate || assignments[0]?.scheduled_start_at || null;
+    const scheduledEndAt = workGroup?.workEndDate || assignments[0]?.scheduled_end_at || null;
+
+    // Filter linked complaints for managers (never leak private info to citizens)
+    let safeLinkedComplaints = [];
+    if (["MANAGER", "ADMIN"].includes(req.user.role) && workGroup?.linkedComplaints) {
+      safeLinkedComplaints = workGroup.linkedComplaints.map((lc) => ({
+        id: lc.complaint_code,
+        mongoId: lc._id,
+        title: lc.title,
+        description: lc.description,
+        status: lc.status,
+        reportedBy: lc.reported_by?.name || "Citizen",
+        reportedPhone: lc.reported_by?.phone || "",
+        reportedAt: lc.reported_at,
+        address: lc.address,
+        isMaster: String(lc._id) === String(workGroup.masterComplaintId?._id || workGroup.masterComplaintId),
+      }));
+    }
+
+    const isDup = Boolean(complaint.isDuplicate);
+
     return res.status(200).json({
       success: true,
       complaint: {
@@ -311,7 +384,8 @@ const getComplaintDetails = async (req, res) => {
         description: complaint.description,
         issueType: complaint.issue_type,
         priority: complaint.priority,
-        status: complaint.status,
+        status: effectiveStatus,
+        rawStatus: effectiveStatus,
         location: complaint.address || complaint.location || "",
         landmark: complaint.landmark || "",
         area: complaint.area_id?.name || complaint.area || complaint.locality || complaint.city || "",
@@ -325,8 +399,8 @@ const getComplaintDetails = async (req, res) => {
           : (complaint.latitude && complaint.longitude)
             ? `https://www.google.com/maps/dir/?api=1&destination=${complaint.latitude},${complaint.longitude}`
             : null,
-        scheduledStartAt: assignments[0]?.scheduled_start_at || null,
-        scheduledEndAt: assignments[0]?.scheduled_end_at || null,
+        scheduledStartAt,
+        scheduledEndAt,
         reportedDate: complaint.reported_at
           ? new Date(complaint.reported_at).toLocaleDateString("en-GB", {
             day: "2-digit",
@@ -341,23 +415,51 @@ const getComplaintDetails = async (req, res) => {
               month: "short",
               year: "numeric",
             })
+            : scheduledStartAt
+            ? new Date(scheduledStartAt).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })
             : "",
         assignedWorkers: assignedWorkerNames,
-        workStartDate: assignments.length > 0 && assignments[0].scheduled_start_at ? assignments[0].scheduled_start_at : "",
-        workEndDate: assignments.length > 0 && assignments[0].scheduled_end_at ? assignments[0].scheduled_end_at : "",
+        workStartDate: scheduledStartAt || "",
+        workEndDate: scheduledEndAt || "",
         reporterName: complaint.reported_by ? complaint.reported_by.name : "Citizen",
-        reporterPhone: complaint.reported_by ? complaint.reported_by.phone : "",
+        reporterPhone: ["MANAGER", "ADMIN"].includes(req.user.role)
+          ? complaint.reported_by?.phone || ""
+          : "",
+        // Duplicate & WorkGroup attributes
+        isDuplicate: isDup,
+        masterComplaintId: complaint.masterComplaintId?.complaint_code || complaint.masterComplaintId || null,
+        workGroupId: workGroup?.workGroupId || null,
+        sharedWorkStatus: effectiveStatus,
+        linkedMessage: isDup
+          ? "Your complaint has been linked to an existing maintenance activity at this location. Our maintenance team is already working on this issue."
+          : null,
+        workGroup: workGroup
+          ? {
+              workGroupId: workGroup.workGroupId,
+              masterComplaintId: workGroup.masterComplaintId?.complaint_code || workGroup.masterComplaintId,
+              status: workGroup.status,
+              assignedWorkers: assignedWorkerNames,
+              linkedComplaintsCount: workGroup.linkedComplaints?.length || 1,
+              linkedComplaints: safeLinkedComplaints,
+              workStartDate: workGroup.workStartDate,
+              workEndDate: workGroup.workEndDate,
+            }
+          : null,
         images: images.map((image) => ({
-          id: image._id,
           url: image.image_url,
           type: image.image_type,
+          uploadedAt: image.uploaded_at
+            ? new Date(image.uploaded_at).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })
+            : "",
         })),
-        reportedImage: beforeImageDoc ? beforeImageDoc.image_url : complaint.image_url || null,
-        image: beforeImageDoc ? beforeImageDoc.image_url : complaint.image_url || null,
-        completionImage: afterImageDoc ? afterImageDoc.image_url : latestRepair?.after_image || null,
-        workDescription: latestRepair ? latestRepair.repair_description : "",
-        materialsUsed: latestRepair && latestRepair.materials_used ? latestRepair.materials_used.join(", ") : "",
-        remarks: latestRepair ? latestRepair.remarks : "",
         statusHistory: formattedStatusHistory,
         repairHistory: formattedRepairHistory,
       },
@@ -366,14 +468,14 @@ const getComplaintDetails = async (req, res) => {
     console.error("Error fetching complaint details:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to fetch complaint details.",
+      message: "Server error while fetching complaint details.",
       error: error.message,
     });
   }
 };
 
 // ==========================================
-// 3. GET MANAGER COMPLAINTS LIST
+// 3. GET MANAGER COMPLAINTS LIST (WORKGROUP AWARE)
 // ==========================================
 const getManagerComplaints = async (req, res) => {
   try {
@@ -382,16 +484,23 @@ const getManagerComplaints = async (req, res) => {
     const allComplaints = await Complaint.find({ manager_id: req.user._id })
       .populate("reported_by", "name phone email")
       .populate("area_id", "name type")
+      .populate({
+        path: "workGroupId",
+        populate: {
+          path: "assignedWorkers",
+          populate: { path: "user_id", select: "name" },
+        },
+      })
+      .populate("masterComplaintId", "complaint_code")
       .sort({ reported_at: -1 });
 
     const complaintIds = allComplaints.map((complaint) => complaint._id);
     const [allAssignments, allImages] = await Promise.all([
       Assignment.find({
-        complaint_id: { $in: complaintIds },
         status: { $in: ["ASSIGNED", "IN_PROGRESS"] },
       }).populate({
-      path: "worker_id",
-      populate: { path: "user_id", select: "name" },
+        path: "worker_id",
+        populate: { path: "user_id", select: "name" },
       }),
       ComplaintImage.find({
         complaint_id: { $in: complaintIds },
@@ -407,22 +516,36 @@ const getManagerComplaints = async (req, res) => {
     });
 
     let formattedComplaints = allComplaints.map((c) => {
+      const wg = c.workGroupId;
+      const effectiveStatus = wg?.status || c.status;
+
+      // Find assignments directly or through master complaint
+      const masterId = c.masterComplaintId?._id || c.masterComplaintId || c._id;
       const complaintAssignments = allAssignments.filter(
-        (a) => a.complaint_id && a.complaint_id.toString() === c._id.toString()
+        (a) =>
+          a.complaint_id &&
+          (a.complaint_id.toString() === c._id.toString() ||
+            a.complaint_id.toString() === masterId.toString())
       );
 
-      const assignedWorkerNames = complaintAssignments
-        .map((a) => (a.worker_id && a.worker_id.user_id ? a.worker_id.user_id.name : null))
-        .filter(Boolean);
+      const assignedWorkerNames = [
+        ...new Set([
+          ...complaintAssignments
+            .map((a) => (a.worker_id && a.worker_id.user_id ? a.worker_id.user_id.name : null))
+            .filter(Boolean),
+          ...(wg?.assignedWorkers || [])
+            .map((w) => (w.user_id ? w.user_id.name : null))
+            .filter(Boolean),
+        ]),
+      ];
 
       let displayStatus = "Not Assigned";
-      if (c.status === "ASSIGNED") displayStatus = "Assigned";
-      else if (c.status === "IN_PROGRESS") displayStatus = "In Progress";
-      else if (c.status === "RESOLVED" || c.status === "CLOSED") displayStatus = "Completed";
+      if (effectiveStatus === "ASSIGNED") displayStatus = "Assigned";
+      else if (effectiveStatus === "IN_PROGRESS") displayStatus = "In Progress";
+      else if (["RESOLVED", "CLOSED", "COMPLETED"].includes(effectiveStatus)) displayStatus = "Completed";
 
-      let displayPriority = "Not Set";
+      let displayPriority = "Medium";
       if (c.priority === "HIGH") displayPriority = "High";
-      else if (c.priority === "MEDIUM") displayPriority = "Medium";
       else if (c.priority === "LOW") displayPriority = "Low";
       else if (c.priority === "CRITICAL") displayPriority = "Critical";
 
@@ -433,6 +556,9 @@ const getManagerComplaints = async (req, res) => {
           year: "numeric",
         })
         : "Recent";
+
+      const startDate = wg?.workStartDate || complaintAssignments[0]?.scheduled_start_at || "";
+      const endDate = wg?.workEndDate || complaintAssignments[0]?.scheduled_end_at || "";
 
       return {
         id: c.complaint_code,
@@ -455,14 +581,19 @@ const getManagerComplaints = async (req, res) => {
         priority: displayPriority,
         rawPriority: c.priority,
         status: displayStatus,
-        rawStatus: c.status,
+        rawStatus: effectiveStatus,
         image: imageByComplaint.get(String(c._id)) || null,
-        assignedWorkerIds: complaintAssignments.map((assignment) =>
-          String(assignment.worker_id?._id || "")
-        ).filter(Boolean),
+        assignedWorkerIds: complaintAssignments.map((a) => String(a.worker_id?._id || "")).filter(Boolean),
         assignedWorkers: assignedWorkerNames,
-        workStartDate: complaintAssignments.length > 0 && complaintAssignments[0].scheduled_start_at ? complaintAssignments[0].scheduled_start_at : "",
-        workEndDate: complaintAssignments.length > 0 && complaintAssignments[0].scheduled_end_at ? complaintAssignments[0].scheduled_end_at : "",
+        workStartDate: startDate,
+        workEndDate: endDate,
+        // WorkGroup fields
+        isDuplicate: Boolean(c.isDuplicate),
+        masterComplaintId: c.masterComplaintId?.complaint_code || c.masterComplaintId || null,
+        workGroupId: wg?.workGroupId || null,
+        workGroupMongoId: wg?._id || null,
+        linkedCount: wg?.linkedComplaints?.length || 1,
+        isWorkGroupAssigned: assignedWorkerNames.length > 0 || effectiveStatus !== "PENDING",
       };
     });
 
@@ -485,7 +616,8 @@ const getManagerComplaints = async (req, res) => {
           c.id.toLowerCase().includes(q) ||
           c.title.toLowerCase().includes(q) ||
           (c.location || "").toLowerCase().includes(q) ||
-          c.reportedBy.toLowerCase().includes(q)
+          c.reportedBy.toLowerCase().includes(q) ||
+          (c.workGroupId && c.workGroupId.toLowerCase().includes(q))
       );
     }
 
@@ -574,10 +706,9 @@ const updateComplaintPriority = async (req, res) => {
 };
 
 // ==========================================
-// 5. ASSIGN WORKERS TO COMPLAINT (MANAGER)
+// 5. ASSIGN WORKERS TO WORKGROUP (UNIFIED SINGLE SOURCE OF TRUTH)
 // ==========================================
 const assignComplaintWorkers = async (req, res) => {
-  let session;
   try {
     const { id } = req.params;
     const {
@@ -620,13 +751,14 @@ const assignComplaintWorkers = async (req, res) => {
       });
     }
 
-    session = await mongoose.startSession();
-    let result;
-    await session.withTransaction(async () => {
+    const result = await runSafeTransaction(async (session) => {
       const complaintQuery = mongoose.Types.ObjectId.isValid(id)
         ? { _id: id }
         : { complaint_code: id };
-      const complaint = await Complaint.findOne(complaintQuery).session(session);
+      const complaintQueryExec = Complaint.findOne(complaintQuery);
+      if (session) complaintQueryExec.session(session);
+      const complaint = await complaintQueryExec;
+
       if (!complaint) {
         const error = new Error("Complaint not found.");
         error.statusCode = 404;
@@ -669,10 +801,13 @@ const assignComplaintWorkers = async (req, res) => {
         throw error;
       }
 
-      const overlappingAssignments = await Assignment.find({
+      const busyFilterQuery = Assignment.find({
         worker_id: { $in: workerIds },
         ...getBusyAssignmentsFilter(schedule.start, schedule.end),
-      }).session(session);
+      });
+      if (session) busyFilterQuery.session(session);
+      const overlappingAssignments = await busyFilterQuery;
+
       if (overlappingAssignments.length > 0) {
         const error = new Error(
           "A selected worker is already assigned to work during those dates."
@@ -681,140 +816,148 @@ const assignComplaintWorkers = async (req, res) => {
         throw error;
       }
 
-      const oldStatus = complaint.status;
-      const now = new Date();
-      await Assignment.create(
-        workerDocs.map((worker) => ({
-          complaint_id: complaint._id,
-          worker_id: worker._id,
-          assigned_by: req.user._id,
-          assigned_at: now,
-          scheduled_start_at: schedule.start,
-          scheduled_end_at: schedule.end,
-          status: "ASSIGNED",
-          remarks: remarks || `Assigned by ${req.user.name}`,
-        })),
-        { session }
-      );
+      // Ensure this complaint has an active WorkGroup
+      let workGroup = await ensureWorkGroupForComplaint(complaint);
 
-      complaint.status = "ASSIGNED";
-      await complaint.save({ session });
-
-      await StatusHistory.create(
-        [
-          {
-            complaint_id: complaint._id,
-            old_status: oldStatus,
-            new_status: "ASSIGNED",
-            changed_by: req.user._id,
-            remarks: `Assigned to worker(s) ${workerDocs
-              .map((worker) => worker.employee_code)
-              .join(", ")}.`,
-            changed_at: now,
-          },
-        ],
-        { session }
-      );
-
-      await Notification.create(
-        workerDocs.map((worker) => ({
-          user_id: worker.user_id._id,
-          complaint_id: complaint._id,
-          type: "ASSIGNMENT",
-          message: `${req.user.name} assigned you task ${complaint.complaint_code}: ${complaint.title}.`,
-          is_read: false,
-          created_at: now,
-        })),
-        { session }
-      );
-
-      let assignedDuplicatesCount = 0;
+      // Handle any manually checked duplicate complaints to link into this WorkGroup
+      let newlyLinkedCount = 0;
       if (Array.isArray(linkedDuplicateIds) && linkedDuplicateIds.length > 0) {
         const validIds = linkedDuplicateIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
         const dupCodes = linkedDuplicateIds.filter((id) => typeof id === "string" && !mongoose.Types.ObjectId.isValid(id));
-
         const orClauses = [];
         if (validIds.length > 0) orClauses.push({ _id: { $in: validIds } });
         if (dupCodes.length > 0) orClauses.push({ complaint_code: { $in: dupCodes } });
 
         if (orClauses.length > 0) {
-          const duplicateComplaints = await Complaint.find({
+          const dupFind = Complaint.find({
             _id: { $ne: complaint._id },
             $or: orClauses,
-          }).session(session);
+          });
+          if (session) dupFind.session(session);
+          const duplicateComplaints = await dupFind;
 
           for (const dup of duplicateComplaints) {
-            const oldDupStatus = dup.status;
-            await Assignment.create(
-              workerDocs.map((worker) => ({
-                complaint_id: dup._id,
-                worker_id: worker._id,
-                assigned_by: req.user._id,
-                assigned_at: now,
-                scheduled_start_at: schedule.start,
-                scheduled_end_at: schedule.end,
-                status: "ASSIGNED",
-                remarks: remarks || `Grouped with duplicate lead ${complaint.complaint_code}`,
-              })),
-              { session }
-            );
-
+            dup.isDuplicate = true;
+            dup.masterComplaintId = workGroup.masterComplaintId;
+            dup.workGroupId = workGroup._id;
             dup.status = "ASSIGNED";
-            await dup.save({ session });
+            if (session) await dup.save({ session });
+            else await dup.save();
 
-            await StatusHistory.create(
-              [
-                {
-                  complaint_id: dup._id,
-                  old_status: oldDupStatus,
-                  new_status: "ASSIGNED",
-                  changed_by: req.user._id,
-                  remarks: `Grouped and assigned as duplicate of ${complaint.complaint_code} to worker(s) ${workerDocs
-                    .map((w) => w.employee_code)
-                    .join(", ")}.`,
-                  changed_at: now,
-                },
-              ],
-              { session }
-            );
-
-            assignedDuplicatesCount++;
+            if (!workGroup.linkedComplaints.some((cid) => String(cid) === String(dup._id))) {
+              workGroup.linkedComplaints.push(dup._id);
+            }
+            newlyLinkedCount++;
           }
         }
       }
 
-      result = {
+      const now = new Date();
+      const oldStatus = workGroup.status;
+
+      // Update the WorkGroup (single source of truth)
+      workGroup.assignedWorkers = workerIds;
+      workGroup.workStartDate = schedule.start;
+      workGroup.workEndDate = schedule.end;
+      workGroup.status = "ASSIGNED";
+      if (session) await workGroup.save({ session });
+      else await workGroup.save();
+
+      // Update all complaints in this WorkGroup to ASSIGNED
+      const allLinkedIds = workGroup.linkedComplaints || [complaint._id];
+      const updateComplaintsQuery = Complaint.updateMany(
+        { _id: { $in: allLinkedIds } },
+        { $set: { status: "ASSIGNED" } }
+      );
+      if (session) updateComplaintsQuery.session(session);
+      await updateComplaintsQuery;
+
+      // Single Assignment records: create ONLY ONCE for the master complaint (NOT for each duplicate)
+      const masterComplaintId = workGroup.masterComplaintId || complaint._id;
+      const deleteOldAssignments = Assignment.deleteMany({
+        complaint_id: masterComplaintId,
+        status: { $in: ["ASSIGNED", "IN_PROGRESS"] },
+      });
+      if (session) deleteOldAssignments.session(session);
+      await deleteOldAssignments;
+
+      const assignmentPayload = workerDocs.map((worker) => ({
+        complaint_id: masterComplaintId,
+        worker_id: worker._id,
+        assigned_by: req.user._id,
+        assigned_at: now,
+        scheduled_start_at: schedule.start,
+        scheduled_end_at: schedule.end,
+        status: "ASSIGNED",
+        remarks: remarks || `Assigned to WorkGroup ${workGroup.workGroupId} by ${req.user.name}`,
+      }));
+
+      if (session) {
+        await Assignment.create(assignmentPayload, { session });
+      } else {
+        await Assignment.create(assignmentPayload);
+      }
+
+      // Record StatusHistory for all linked complaints
+      const statusHistoryEntries = allLinkedIds.map((cid) => ({
+        complaint_id: cid,
+        old_status: oldStatus,
+        new_status: "ASSIGNED",
+        changed_by: req.user._id,
+        remarks: `Assigned to worker(s) ${workerDocs.map((w) => w.employee_code).join(", ")} via WorkGroup ${workGroup.workGroupId}.`,
+        changed_at: now,
+      }));
+
+      if (session) {
+        await StatusHistory.create(statusHistoryEntries, { session });
+      } else {
+        await StatusHistory.create(statusHistoryEntries);
+      }
+
+      // Notify workers
+      const workerNotifications = workerDocs.map((worker) => ({
+        user_id: worker.user_id._id,
+        complaint_id: masterComplaintId,
+        type: "ASSIGNMENT",
+        message: `${req.user.name} assigned you maintenance task in WorkGroup ${workGroup.workGroupId} (${allLinkedIds.length} citizen report(s)).`,
+        is_read: false,
+        created_at: now,
+      }));
+
+      if (session) {
+        await Notification.create(workerNotifications, { session });
+      } else {
+        await Notification.create(workerNotifications);
+      }
+
+      return {
         complaintCode: complaint.complaint_code,
-        workerCodes: workerDocs.map((worker) => worker.employee_code),
-        assignedDuplicatesCount,
+        workGroupId: workGroup.workGroupId,
+        workerCodes: workerDocs.map((w) => w.employee_code),
+        totalLinkedReports: allLinkedIds.length,
+        newlyLinkedCount,
       };
     });
 
     return res.status(200).json({
       success: true,
-      message: `Successfully assigned ${result.workerCodes.length} worker(s) to complaint ${result.complaintCode}${result.assignedDuplicatesCount > 0 ? ` and ${result.assignedDuplicatesCount} duplicate complaints` : ""}.`,
-      assignedDuplicatesCount: result.assignedDuplicatesCount,
+      message: `Successfully assigned ${result.workerCodes.length} worker(s) to WorkGroup ${result.workGroupId} (${result.totalLinkedReports} linked citizen report(s)).`,
+      workGroupId: result.workGroupId,
       assignedWorkers: result.workerCodes,
+      totalLinkedReports: result.totalLinkedReports,
       status: "Assigned",
     });
   } catch (error) {
     console.error("Error assigning workers to complaint:", error);
-    const statusCode =
-      error.statusCode || (error.code === 11000 ? 409 : 500);
-    return res.status(statusCode).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
-      message:
-        statusCode === 500
-          ? "Server error while assigning workers."
-          : error.message,
+      message: error.message || "Failed to assign workers.",
     });
-  } finally {
-    if (session) await session.endSession();
   }
 };
 
 // ==========================================
-// 6. SUBMIT NEW COMPLAINT (USER)
+// 6. SUBMIT NEW COMPLAINT (CITIZEN - SMART AUTO-LINKING)
 // ==========================================
 const submitComplaint = async (req, res) => {
   const uploadedImages = [];
@@ -837,6 +980,7 @@ const submitComplaint = async (req, res) => {
     const locality = typeof rawLocality === "string" ? rawLocality.trim() : "";
     const city = typeof rawCity === "string" ? rawCity.trim() : "";
     const state = typeof rawState === "string" ? rawState.trim() : "";
+
     if (
       !title?.trim() ||
       !description?.trim() ||
@@ -853,8 +997,7 @@ const submitComplaint = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message:
-          "Title, description, issue type, address, and valid coordinates are required.",
+        message: "Title, description, issue type, address, and valid coordinates are required.",
       });
     }
 
@@ -888,6 +1031,7 @@ const submitComplaint = async (req, res) => {
       .toString("hex")
       .toUpperCase()}`;
 
+    // Step 1: Create the new individual citizen complaint record
     const newComplaint = await Complaint.create({
       complaint_code: complaintCode,
       reported_by: req.user._id,
@@ -905,9 +1049,14 @@ const submitComplaint = async (req, res) => {
         type: "Point",
         coordinates: [longitude, latitude],
       },
+      latitude,
+      longitude,
       area_id: resolved?.area?._id || null,
       manager_id: resolved?.manager_id || null,
       requires_admin_routing: !resolved?.manager_id,
+      isDuplicate: false,
+      masterComplaintId: null,
+      workGroupId: null,
     });
 
     if (uploadedImages.length > 0) {
@@ -922,24 +1071,69 @@ const submitComplaint = async (req, res) => {
       );
     }
 
-    await StatusHistory.create({
-      complaint_id: newComplaint._id,
-      old_status: null,
-      new_status: "PENDING",
-      changed_by: req.user._id,
-      remarks: resolved?.manager_id
-        ? "Complaint submitted by citizen."
-        : "Complaint queued for administrator routing.",
-      changed_at: new Date(),
+    // Step 2: Smart Duplicate Detection & Active WorkGroup Linking (100m radius)
+    const existingActiveMatch = await findActiveWorkGroupWithinRadius({
+      latitude,
+      longitude,
+      issueType,
+      radiusMeters: 100,
+      managerId: resolved?.manager_id,
     });
+
+    let workGroup;
+    let isDuplicate = false;
+    let masterComplaint = null;
+
+    if (existingActiveMatch && existingActiveMatch.workGroup) {
+      // MATCH FOUND: Auto-link to existing active maintenance WorkGroup
+      const activeWorkGroup = existingActiveMatch.workGroup;
+      isDuplicate = true;
+      masterComplaint = activeWorkGroup.masterComplaintId;
+
+      await linkComplaintToWorkGroup(newComplaint, activeWorkGroup);
+      workGroup = activeWorkGroup;
+
+      await StatusHistory.create({
+        complaint_id: newComplaint._id,
+        old_status: null,
+        new_status: activeWorkGroup.status,
+        changed_by: req.user._id,
+        remarks: `Automatically linked to active WorkGroup ${activeWorkGroup.workGroupId} (Master: ${masterComplaint?.complaint_code || "Lead"}). Distance: ${existingActiveMatch.distanceMeters}m. Shared status: ${activeWorkGroup.status}.`,
+        changed_at: new Date(),
+      });
+    } else {
+      // NO ACTIVE MATCH: Create new WorkGroup for this complaint
+      workGroup = await createWorkGroupForComplaint(newComplaint);
+
+      await StatusHistory.create({
+        complaint_id: newComplaint._id,
+        old_status: null,
+        new_status: "PENDING",
+        changed_by: req.user._id,
+        remarks: resolved?.manager_id
+          ? `Complaint registered as lead issue in WorkGroup ${workGroup.workGroupId}.`
+          : `Complaint queued for administrator routing (WorkGroup ${workGroup.workGroupId}).`,
+        changed_at: new Date(),
+      });
+    }
 
     return res.status(201).json({
       success: true,
-      message: resolved?.manager_id
+      message: isDuplicate
+        ? `Your complaint has been submitted and linked to an existing active maintenance activity (${workGroup.workGroupId}) at this location. Our maintenance team is already working on this issue.`
+        : resolved?.manager_id
         ? `Complaint submitted successfully. Your ID is ${complaintCode}.`
         : `Complaint submitted and queued for administrator routing. Your ID is ${complaintCode}.`,
       complaintId: complaintCode,
       complaint_code: complaintCode,
+      isDuplicate,
+      masterComplaintId: masterComplaint?.complaint_code || null,
+      workGroupId: workGroup.workGroupId,
+      status: workGroup.status,
+      sharedStatus: workGroup.status,
+      linkedMessage: isDuplicate
+        ? "Your complaint has been linked to an existing maintenance activity at this location. Our maintenance team is already working on this issue."
+        : null,
       area: resolved?.area ? { name: resolved.area.name } : null,
       locality: locality || null,
       city: city || null,
@@ -968,6 +1162,9 @@ const submitComplaint = async (req, res) => {
   }
 };
 
+// ==========================================
+// 7. GET ADMIN ROUTING COMPLAINTS (ADMIN)
+// ==========================================
 const getAdminRoutingComplaints = async (req, res) => {
   try {
     const complaints = await Complaint.find({ requires_admin_routing: true })
@@ -1044,6 +1241,11 @@ const routeComplaintToManager = async (req, res) => {
     complaint.requires_admin_routing = false;
     await complaint.save();
 
+    // If complaint has a WorkGroup, update manager_id there too
+    if (complaint.workGroupId) {
+      await WorkGroup.findByIdAndUpdate(complaint.workGroupId, { manager_id: manager._id });
+    }
+
     return res.status(200).json({
       success: true,
       message: "Complaint routed to the selected manager.",
@@ -1058,7 +1260,7 @@ const routeComplaintToManager = async (req, res) => {
 };
 
 // ==========================================
-// 7. DELETE COMPLAINT (MANAGER)
+// 8. DELETE COMPLAINT (EDGE-CASE SAFE)
 // ==========================================
 const deleteComplaint = async (req, res) => {
   try {
@@ -1079,6 +1281,39 @@ const deleteComplaint = async (req, res) => {
         success: false,
         message: "Complaint not found",
       });
+    }
+
+    // WorkGroup dissociation: ensure we do not break remaining linked complaints
+    if (complaint.workGroupId) {
+      const wg = await WorkGroup.findById(complaint.workGroupId);
+      if (wg) {
+        wg.linkedComplaints = wg.linkedComplaints.filter(
+          (cid) => String(cid) !== String(complaint._id)
+        );
+
+        // If this was the master complaint, re-elect the first remaining complaint as master
+        if (String(wg.masterComplaintId) === String(complaint._id)) {
+          if (wg.linkedComplaints.length > 0) {
+            const newMasterId = wg.linkedComplaints[0];
+            wg.masterComplaintId = newMasterId;
+            await Complaint.findByIdAndUpdate(newMasterId, {
+              isDuplicate: false,
+              masterComplaintId: null,
+            });
+            // Update remaining linked complaints to point to new master
+            await Complaint.updateMany(
+              { _id: { $in: wg.linkedComplaints.slice(1) } },
+              { masterComplaintId: newMasterId }
+            );
+          } else {
+            // No complaints left in this WorkGroup: remove it
+            await WorkGroup.findByIdAndDelete(wg._id);
+          }
+        }
+        if (wg.linkedComplaints.length > 0) {
+          await wg.save();
+        }
+      }
     }
 
     const complaintImages = await ComplaintImage.find({
@@ -1107,7 +1342,7 @@ const deleteComplaint = async (req, res) => {
 };
 
 // ==========================================
-// 7. GET USER COMPLAINTS (USER)
+// 9. GET USER COMPLAINTS (CITIZEN - SYNCHRONIZED SHARED STATUS)
 // ==========================================
 const getUserComplaints = async (req, res) => {
   try {
@@ -1118,7 +1353,7 @@ const getUserComplaints = async (req, res) => {
     if (status && status !== "All") {
       const s = status.toUpperCase().replace(/\s+/g, "_");
       if (s === "COMPLETED" || s === "RESOLVED") {
-        filter.status = { $in: ["RESOLVED", "CLOSED"] };
+        filter.status = { $in: ["RESOLVED", "CLOSED", "COMPLETED"] };
       } else if (s === "PENDING" || s === "NOT_ASSIGNED") {
         filter.status = { $in: ["PENDING", "ASSIGNED"] };
       } else {
@@ -1128,7 +1363,9 @@ const getUserComplaints = async (req, res) => {
 
     const complaints = await Complaint.find(filter)
       .populate("area_id", "name type")
+      .populate("workGroupId")
       .sort({ reported_at: -1 });
+
     const complaintIds = complaints.map((complaint) => complaint._id);
     const images = await ComplaintImage.find({
       complaint_id: { $in: complaintIds },
@@ -1141,22 +1378,44 @@ const getUserComplaints = async (req, res) => {
       }
     });
 
-    const formattedComplaints = complaints.map(c => ({
-      id: c.complaint_code,
-      mongoId: c._id,
-      title: c.title,
-      location: c.address,
-      area: c.area_id?.name || c.locality || c.city || "",
-      locality: c.locality || "",
-      city: c.city || "",
-      state: c.state || "",
-      date: c.reported_at ? new Date(c.reported_at).toLocaleDateString("en-GB", {
-        day: "2-digit", month: "short", year: "numeric"
-      }) : "Recent",
-      priority: c.priority,
-      status: c.status,
-      image: imageByComplaint.get(String(c._id)) || null,
-    }));
+    const formattedComplaints = complaints.map((c) => {
+      const wg = c.workGroupId;
+      // Single source of truth: status is synchronized from WorkGroup
+      const effectiveStatus = wg?.status || c.status;
+      const isDup = Boolean(c.isDuplicate);
+
+      return {
+        id: c.complaint_code,
+        mongoId: c._id,
+        title: c.title,
+        description: c.description,
+        location: c.address,
+        area: c.area_id?.name || c.locality || c.city || "",
+        locality: c.locality || "",
+        city: c.city || "",
+        state: c.state || "",
+        date: c.reported_at
+          ? new Date(c.reported_at).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })
+          : "Recent",
+        priority: c.priority,
+        status: effectiveStatus,
+        rawStatus: effectiveStatus,
+        image: imageByComplaint.get(String(c._id)) || c.image_url || null,
+        // Shared WorkGroup attributes
+        isDuplicate: isDup,
+        workGroupId: wg?.workGroupId || null,
+        masterComplaintId: c.masterComplaintId || null,
+        workStartDate: wg?.workStartDate || null,
+        workEndDate: wg?.workEndDate || null,
+        linkedMessage: isDup
+          ? "Your complaint has been linked to an existing maintenance activity at this location. Our maintenance team is already working on this issue."
+          : null,
+      };
+    });
 
     return res.status(200).json({
       success: true,
@@ -1174,7 +1433,7 @@ const getUserComplaints = async (req, res) => {
 };
 
 // ==========================================
-// 11. GET POTENTIAL DUPLICATES BASED ON GPS COORDINATES
+// 10. GET POTENTIAL DUPLICATES (GPS PROXIMITY)
 // ==========================================
 const getPotentialDuplicates = async (req, res) => {
   try {
@@ -1183,9 +1442,9 @@ const getPotentialDuplicates = async (req, res) => {
 
     let complaint;
     if (mongoose.Types.ObjectId.isValid(id)) {
-      complaint = await Complaint.findById(id);
+      complaint = await Complaint.findById(id).populate("workGroupId");
     } else {
-      complaint = await Complaint.findOne({ complaint_code: id });
+      complaint = await Complaint.findOne({ complaint_code: id }).populate("workGroupId");
     }
 
     if (!complaint) {
@@ -1219,6 +1478,7 @@ const getPotentialDuplicates = async (req, res) => {
 
     const otherComplaints = await Complaint.find(query)
       .populate("reported_by", "name phone email")
+      .populate("workGroupId")
       .lean();
 
     const otherIds = otherComplaints.map((c) => c._id);
@@ -1258,6 +1518,13 @@ const getPotentialDuplicates = async (req, res) => {
           matchConfidence = isSameType ? "Moderate" : "Low";
         }
 
+        const otherWg = other.workGroupId;
+        const isAlreadyInSameGroup = Boolean(
+          complaint.workGroupId &&
+          otherWg &&
+          String(complaint.workGroupId?._id || complaint.workGroupId) === String(otherWg._id || otherWg)
+        );
+
         duplicates.push({
           id: other.complaint_code,
           mongoId: other._id,
@@ -1265,7 +1532,8 @@ const getPotentialDuplicates = async (req, res) => {
           description: other.description,
           issueType: other.issue_type,
           priority: other.priority,
-          status: other.status,
+          status: otherWg?.status || other.status,
+          rawStatus: otherWg?.status || other.status,
           location: other.address || other.location || "",
           landmark: other.landmark || "",
           latitude: otherLat,
@@ -1284,6 +1552,11 @@ const getPotentialDuplicates = async (req, res) => {
               })
             : "",
           image: imageMap.get(String(other._id)) || other.image_url || null,
+          // WorkGroup duplicate attributes
+          isDuplicate: Boolean(other.isDuplicate),
+          workGroupId: otherWg?.workGroupId || null,
+          masterComplaintId: other.masterComplaintId || null,
+          isAlreadyInSameGroup,
         });
       }
     }
@@ -1300,6 +1573,7 @@ const getPotentialDuplicates = async (req, res) => {
         issueType: complaint.issue_type,
         latitude: targetLat,
         longitude: targetLng,
+        workGroupId: complaint.workGroupId?.workGroupId || null,
       },
       duplicates,
     });
@@ -1308,6 +1582,289 @@ const getPotentialDuplicates = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Server error while finding duplicate complaints.",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// 11. UPDATE WORKGROUP STATUS (MANAGER DIRECT UPDATE)
+// ==========================================
+const updateWorkGroupStatus = async (req, res) => {
+  try {
+    const { id } = req.params; // Can be workGroupId (e.g. WG001) or Complaint ID
+    const { status: newStatus, remarks } = req.body;
+
+    if (!newStatus) {
+      return res.status(400).json({
+        success: false,
+        message: "New status is required.",
+      });
+    }
+
+    let wg = null;
+    if (id.startsWith("WG")) {
+      wg = await WorkGroup.findOne({ workGroupId: id });
+    } else if (mongoose.Types.ObjectId.isValid(id)) {
+      wg = await WorkGroup.findById(id);
+      if (!wg) {
+        const c = await Complaint.findById(id);
+        if (c?.workGroupId) wg = await WorkGroup.findById(c.workGroupId);
+      }
+    } else {
+      const c = await Complaint.findOne({ complaint_code: id });
+      if (c?.workGroupId) wg = await WorkGroup.findById(c.workGroupId);
+    }
+
+    if (!wg) {
+      return res.status(404).json({
+        success: false,
+        message: "WorkGroup not found.",
+      });
+    }
+
+    const updatedWg = await syncWorkGroupStatus({
+      workGroupId: wg._id,
+      newStatus,
+      changedByUserId: req.user._id,
+      remarks: remarks || `Manager updated status to ${newStatus}.`,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `WorkGroup ${wg.workGroupId} and all linked complaints updated to ${newStatus}.`,
+      workGroup: {
+        workGroupId: updatedWg.workGroupId,
+        status: updatedWg.status,
+        linkedComplaintsCount: updatedWg.linkedComplaints?.length || 0,
+      },
+    });
+  } catch (error) {
+    console.error("Error updating WorkGroup status:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while updating WorkGroup status.",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// 12. GET WORKGROUP DETAILS (MANAGER)
+// ==========================================
+const getWorkGroupDetails = async (req, res) => {
+  try {
+    const { id } = req.params; // WorkGroup code or ID
+
+    let wg = null;
+    if (id.startsWith("WG")) {
+      wg = await WorkGroup.findOne({ workGroupId: id });
+    } else if (mongoose.Types.ObjectId.isValid(id)) {
+      wg = await WorkGroup.findById(id);
+    }
+
+    if (!wg) {
+      return res.status(404).json({
+        success: false,
+        message: "WorkGroup not found.",
+      });
+    }
+
+    await wg.populate([
+      {
+        path: "masterComplaintId",
+        populate: [
+          { path: "reported_by", select: "name phone email" },
+          { path: "area_id", select: "name type" },
+        ],
+      },
+      {
+        path: "linkedComplaints",
+        populate: [
+          { path: "reported_by", select: "name phone email" },
+          { path: "area_id", select: "name type" },
+        ],
+      },
+      {
+        path: "assignedWorkers",
+        populate: { path: "user_id", select: "name phone email" },
+      },
+    ]);
+
+    const linkedIds = (wg.linkedComplaints || []).map((c) => c._id);
+    const images = await ComplaintImage.find({
+      complaint_id: { $in: linkedIds },
+      image_type: "BEFORE",
+    });
+    const imageMap = new Map();
+    images.forEach((img) => imageMap.set(String(img.complaint_id), img.image_url));
+
+    const formattedLinked = (wg.linkedComplaints || []).map((c) => ({
+      id: c.complaint_code,
+      mongoId: c._id,
+      title: c.title,
+      description: c.description,
+      status: c.status,
+      reportedBy: c.reported_by?.name || "Citizen",
+      reportedPhone: c.reported_by?.phone || "",
+      reportedEmail: c.reported_by?.email || "",
+      reportedDate: c.reported_at
+        ? new Date(c.reported_at).toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })
+        : "",
+      address: c.address,
+      image: imageMap.get(String(c._id)) || c.image_url || null,
+      isMaster: String(c._id) === String(wg.masterComplaintId?._id),
+    }));
+
+    return res.status(200).json({
+      success: true,
+      workGroup: {
+        workGroupId: wg.workGroupId,
+        mongoId: wg._id,
+        status: wg.status,
+        damageType: wg.damageType,
+        workStartDate: wg.workStartDate,
+        workEndDate: wg.workEndDate,
+        assignedWorkers: (wg.assignedWorkers || []).map((w) => ({
+          id: w._id,
+          employeeCode: w.employee_code,
+          name: w.user_id?.name || "Worker",
+          phone: w.user_id?.phone || "",
+        })),
+        masterComplaint: {
+          id: wg.masterComplaintId?.complaint_code,
+          title: wg.masterComplaintId?.title,
+          description: wg.masterComplaintId?.description,
+          location: wg.masterComplaintId?.address,
+        },
+        linkedComplaintsCount: formattedLinked.length,
+        linkedComplaints: formattedLinked,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching WorkGroup details:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while fetching WorkGroup details.",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// 13. LINK COMPLAINT TO EXISTING WORKGROUP (MANAGER)
+// ==========================================
+const linkComplaintToWorkGroupHandler = async (req, res) => {
+  try {
+    const { id } = req.params; // Complaint to link
+    const { targetWorkGroupId } = req.body; // WorkGroupID or MongoId
+
+    if (!targetWorkGroupId) {
+      return res.status(400).json({
+        success: false,
+        message: "targetWorkGroupId is required.",
+      });
+    }
+
+    const complaint = mongoose.Types.ObjectId.isValid(id)
+      ? await Complaint.findById(id)
+      : await Complaint.findOne({ complaint_code: id });
+
+    if (!complaint) {
+      return res.status(404).json({ success: false, message: "Complaint not found." });
+    }
+
+    let wg = null;
+    if (targetWorkGroupId.startsWith("WG")) {
+      wg = await WorkGroup.findOne({ workGroupId: targetWorkGroupId });
+    } else {
+      wg = await WorkGroup.findById(targetWorkGroupId);
+    }
+
+    if (!wg) {
+      return res.status(404).json({ success: false, message: "Target WorkGroup not found." });
+    }
+
+    await linkComplaintToWorkGroup(complaint, wg);
+
+    await StatusHistory.create({
+      complaint_id: complaint._id,
+      old_status: complaint.status,
+      new_status: wg.status,
+      changed_by: req.user._id,
+      remarks: `Manager manually linked complaint to WorkGroup ${wg.workGroupId}.`,
+      changed_at: new Date(),
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Complaint ${complaint.complaint_code} successfully linked to WorkGroup ${wg.workGroupId}.`,
+      workGroupId: wg.workGroupId,
+      status: wg.status,
+    });
+  } catch (error) {
+    console.error("Error linking complaint to WorkGroup:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while linking complaint to WorkGroup.",
+      error: error.message,
+    });
+  }
+};
+
+// ==========================================
+// 14. UNLINK COMPLAINT FROM WORKGROUP (MANAGER)
+// ==========================================
+const unlinkComplaintFromWorkGroupHandler = async (req, res) => {
+  try {
+    const { id } = req.params; // Complaint to unlink
+
+    const complaint = mongoose.Types.ObjectId.isValid(id)
+      ? await Complaint.findById(id)
+      : await Complaint.findOne({ complaint_code: id });
+
+    if (!complaint) {
+      return res.status(404).json({ success: false, message: "Complaint not found." });
+    }
+
+    if (!complaint.workGroupId) {
+      return res.status(400).json({ success: false, message: "Complaint is not linked to any WorkGroup." });
+    }
+
+    const oldWg = await WorkGroup.findById(complaint.workGroupId);
+    if (oldWg) {
+      oldWg.linkedComplaints = oldWg.linkedComplaints.filter(
+        (cid) => String(cid) !== String(complaint._id)
+      );
+      await oldWg.save();
+    }
+
+    // Create a new separate WorkGroup for this unlinked complaint
+    const newWg = await createWorkGroupForComplaint(complaint);
+
+    await StatusHistory.create({
+      complaint_id: complaint._id,
+      old_status: complaint.status,
+      new_status: complaint.status,
+      changed_by: req.user._id,
+      remarks: `Manager unlinked complaint from WorkGroup ${oldWg?.workGroupId || ""}. Registered under new WorkGroup ${newWg.workGroupId}.`,
+      changed_at: new Date(),
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Complaint ${complaint.complaint_code} unlinked and assigned new WorkGroup ${newWg.workGroupId}.`,
+      newWorkGroupId: newWg.workGroupId,
+    });
+  } catch (error) {
+    console.error("Error unlinking complaint from WorkGroup:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while unlinking complaint from WorkGroup.",
       error: error.message,
     });
   }
@@ -1325,4 +1882,8 @@ module.exports = {
   getUserComplaints,
   deleteComplaint,
   getPotentialDuplicates,
+  updateWorkGroupStatus,
+  getWorkGroupDetails,
+  linkComplaintToWorkGroupHandler,
+  unlinkComplaintFromWorkGroupHandler,
 };

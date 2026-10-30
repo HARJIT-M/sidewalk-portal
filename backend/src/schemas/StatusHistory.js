@@ -9,12 +9,31 @@ const statusHistorySchema = new mongoose.Schema(
     },
     old_status: {
       type: String,
-      enum: ["PENDING", "ASSIGNED", "IN_PROGRESS", "RESOLVED", "CLOSED", "REJECTED", null],
+      enum: [
+        "PENDING",
+        "ASSIGNED",
+        "IN_PROGRESS",
+        "RESOLVED",
+        "COMPLETED",
+        "CLOSED",
+        "REJECTED",
+        "CANCELLED",
+        null,
+      ],
       default: null,
     },
     new_status: {
       type: String,
-      enum: ["PENDING", "ASSIGNED", "IN_PROGRESS", "RESOLVED", "CLOSED", "REJECTED"],
+      enum: [
+        "PENDING",
+        "ASSIGNED",
+        "IN_PROGRESS",
+        "RESOLVED",
+        "COMPLETED",
+        "CLOSED",
+        "REJECTED",
+        "CANCELLED",
+      ],
       required: [true, "New status is required"],
     },
     changed_by: {

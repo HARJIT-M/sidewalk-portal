@@ -17,6 +17,7 @@ import {
   Clock,
   Layers,
   Copy,
+  Link2,
 } from "lucide-react";
 import {
   getManagerComplaints,
@@ -25,6 +26,8 @@ import {
   assignComplaintWorkers,
   getComplaintDetails,
   getComplaintDuplicates,
+  updateWorkGroupStatus,
+  getWorkGroupDetails,
 } from "../../../services/managerApi";
 import "./new_complaint.css";
 
@@ -48,6 +51,8 @@ const Complaints = () => {
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showAssignPopup, setShowAssignPopup] = useState(false);
+  const [showLinkedReports, setShowLinkedReports] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
   const [selectedWorkers, setSelectedWorkers] = useState([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -98,24 +103,25 @@ const Complaints = () => {
       })
       .then((res) => {
         if (!isCurrentRequest || !res) return;
-        setAvailableWorkers(
-          (res.workers || []).map((worker) => ({
-            id: worker.workerId,
-            employeeCode: worker.employeeCode,
-            name: worker.name,
-            role: worker.role || "Maintenance Worker",
-            team: worker.team || "Assigned Team",
-            phone: worker.phone || "",
-          }))
-        );
+        const workers = (res.workers || []).map((w) => ({
+          id: w._id || w.id,
+          name: w.name,
+          employeeCode: w.employeeCode || w.employee_code || "WRK",
+          team: w.zone || w.area || "City Maintenance",
+          role: w.specialization || "Sidewalk Repair",
+          phone: w.phone || "",
+        }));
+        setAvailableWorkers(workers);
       })
       .catch((err) => {
         if (!isCurrentRequest) return;
+        console.warn("Could not load available workers for dates:", err);
         setAvailableWorkers([]);
-        setErrorMsg(err.message || "Failed to load available workers.");
       })
       .finally(() => {
-        if (isCurrentRequest) setLoadingWorkers(false);
+        if (isCurrentRequest) {
+          setLoadingWorkers(false);
+        }
       });
 
     return () => {
@@ -123,59 +129,39 @@ const Complaints = () => {
     };
   }, [showAssignPopup, startDate, endDate]);
 
-  // close popups with the Escape key
-  useEffect(() => {
-    if (!showDetails && !showAssignPopup) return undefined;
-    const onKey = (e) => {
-      if (e.key === "Escape") {
-        setShowDetails(false);
-        setShowAssignPopup(false);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [showDetails, showAssignPopup]);
+  const updateScheduleDate = (setter, value) => {
+    setter(value);
+    setSelectedWorkers([]);
+  };
 
-  const filteredComplaints = complaints.filter((complaint) => {
-    const q = search.toLowerCase();
-    const matchesSearch =
-      (complaint.id && complaint.id.toLowerCase().includes(q)) ||
-      (complaint.title && complaint.title.toLowerCase().includes(q)) ||
-      (complaint.location && complaint.location.toLowerCase().includes(q)) ||
-      (complaint.city && complaint.city.toLowerCase().includes(q)) ||
-      (complaint.locality && complaint.locality.toLowerCase().includes(q)) ||
-      (complaint.reportedBy && complaint.reportedBy.toLowerCase().includes(q));
-
-    const matchesStatus =
-      statusFilter === "All" ||
-      (complaint.status && complaint.status.toLowerCase() === statusFilter.toLowerCase());
-
-    const matchesPriority =
-      priorityFilter === "All" ||
-      (complaint.priority && complaint.priority.toLowerCase() === priorityFilter.toLowerCase());
-
-    return matchesSearch && matchesStatus && matchesPriority;
-  });
-
-  // ---- Priority Change ----
   const handlePriorityChange = async (complaintId, newPriority) => {
     try {
-      setErrorMsg("");
       await updateComplaintPriority(complaintId, newPriority);
       setComplaints((prev) =>
         prev.map((c) =>
-          c.id === complaintId ? { ...c, priority: newPriority } : c
+          c.id === complaintId
+            ? {
+                ...c,
+                priority: newPriority === "Not Set" ? "Medium" : newPriority,
+                rawPriority: newPriority,
+              }
+            : c
         )
       );
 
-      if (selectedComplaint?.id === complaintId) {
-        setSelectedComplaint((prev) => ({ ...prev, priority: newPriority }));
+      if (selectedComplaint && selectedComplaint.id === complaintId) {
+        setSelectedComplaint((prev) => ({
+          ...prev,
+          priority: newPriority === "Not Set" ? "Medium" : newPriority,
+          rawPriority: newPriority,
+        }));
       }
-      setSuccessMsg(`Priority updated to ${newPriority}.`);
+
+      setSuccessMsg(`Priority updated to ${newPriority}!`);
       setTimeout(() => setSuccessMsg(""), 3000);
     } catch (err) {
       console.error("Error updating priority:", err);
-      setErrorMsg(err.message || "Failed to update priority.");
+      alert(err.message || "Failed to update priority.");
     }
   };
 
@@ -183,6 +169,7 @@ const Complaints = () => {
   const handleViewDetails = async (complaint) => {
     setSelectedComplaint(complaint);
     setShowDetails(true);
+    setShowLinkedReports(false);
     try {
       const res = await getComplaintDetails(complaint.id || complaint.mongoId);
       if (res && res.success && res.complaint) {
@@ -196,7 +183,7 @@ const Complaints = () => {
     }
   };
 
-  // ---- Assign Workers ----
+  // ---- Open Assign Popup ----
   const handleOpenAssign = (complaint) => {
     if (complaint.priority === "Not Set" || !complaint.priority) {
       alert("Please set a priority before assigning workers.");
@@ -204,6 +191,7 @@ const Complaints = () => {
     }
     setSelectedComplaint(complaint);
     setSelectedWorkers([]);
+    setShowLinkedReports(false);
     const start = complaint.workStartDate
       ? complaint.workStartDate.split("T")[0]
       : toDateInputValue(new Date());
@@ -248,21 +236,49 @@ const Complaints = () => {
 
   const toggleWorker = (workerId) => {
     if (selectedWorkers.includes(workerId)) {
-      setSelectedWorkers(selectedWorkers.filter((id) => id !== workerId));
+      setSelectedWorkers((prev) => prev.filter((id) => id !== workerId));
     } else {
       if (selectedWorkers.length >= 3) {
-        alert("You can assign a maximum of 3 workers.");
+        alert("You can select up to 3 workers.");
         return;
       }
-      setSelectedWorkers([...selectedWorkers, workerId]);
+      setSelectedWorkers((prev) => [...prev, workerId]);
     }
   };
 
-  const updateScheduleDate = (setter, value) => {
-    setSelectedWorkers([]);
-    setter(value);
+  // ---- Manager Updates WorkGroup Status Directly ----
+  const handleUpdateWorkGroupStatus = async (status) => {
+    if (!selectedComplaint) return;
+    const targetId = selectedComplaint.workGroupId || selectedComplaint.id;
+    setUpdatingStatus(true);
+    try {
+      const res = await updateWorkGroupStatus(targetId, status);
+      if (res && res.success) {
+        setSuccessMsg(`WorkGroup ${targetId} and all linked complaints updated to ${status}!`);
+        setTimeout(() => setSuccessMsg(""), 3500);
+        loadData();
+        const displayStatus =
+          status === "RESOLVED" || status === "CLOSED" || status === "COMPLETED"
+            ? "Completed"
+            : status === "IN_PROGRESS"
+            ? "In Progress"
+            : status === "ASSIGNED"
+            ? "Assigned"
+            : "Pending";
+        setSelectedComplaint((prev) => ({
+          ...prev,
+          status: displayStatus,
+          rawStatus: status,
+        }));
+      }
+    } catch (err) {
+      alert(err.message || "Failed to update WorkGroup status.");
+    } finally {
+      setUpdatingStatus(false);
+    }
   };
 
+  // ---- Handle Worker Assignment Submission ----
   const handleAssignWorkers = async () => {
     if (selectedWorkers.length < 1) {
       alert("Please select at least 1 worker.");
@@ -302,6 +318,7 @@ const Complaints = () => {
                   status: "Assigned",
                   workStartDate: startDate,
                   workEndDate: endDate,
+                  isWorkGroupAssigned: true,
                 }
               : c
           )
@@ -316,17 +333,18 @@ const Complaints = () => {
           status: "Assigned",
           workStartDate: startDate,
           workEndDate: endDate,
+          isWorkGroupAssigned: true,
         }));
 
         setShowAssignPopup(false);
         setSuccessMsg(
-          `Workers assigned successfully!${
+          `Workers assigned successfully to WorkGroup ${res.workGroupId || ""}!${
             selectedDuplicates.length > 0
               ? ` (Grouped with ${selectedDuplicates.length} nearby duplicate reports)`
               : ""
           }`
         );
-        setTimeout(() => setSuccessMsg(""), 3000);
+        setTimeout(() => setSuccessMsg(""), 3500);
       }
     } catch (err) {
       console.error("Error assigning workers:", err);
@@ -358,83 +376,114 @@ const Complaints = () => {
       return null;
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     const end = new Date(complaint.workEndDate);
-    end.setHours(0, 0, 0, 0);
+    if (isNaN(end.getTime())) return null;
 
-    const diffDays = Math.round((end - today) / (1000 * 60 * 60 * 24));
+    const now = new Date();
+    const diffDays = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
 
     if (diffDays < 0) {
-      return { label: `Overdue by ${Math.abs(diffDays)}d`, type: "overdue" };
+      return {
+        type: "overdue",
+        label: `${Math.abs(diffDays)}d overdue`,
+      };
     }
-    if (diffDays === 0) {
-      return { label: "Due today", type: "due-today" };
+    if (diffDays <= 2) {
+      return {
+        type: "warning",
+        label: `${diffDays}d left`,
+      };
     }
-    return { label: `${diffDays}d left`, type: "on-track" };
+    return null;
   };
+
+  // ---- FILTERS ----
+  const filteredComplaints = complaints.filter((c) => {
+    const query = search.toLowerCase();
+    const matchesSearch =
+      !search ||
+      c.id.toLowerCase().includes(query) ||
+      c.title.toLowerCase().includes(query) ||
+      (c.location && c.location.toLowerCase().includes(query)) ||
+      (c.locality && c.locality.toLowerCase().includes(query)) ||
+      (c.city && c.city.toLowerCase().includes(query)) ||
+      (c.reportedBy && c.reportedBy.toLowerCase().includes(query)) ||
+      (c.workGroupId && c.workGroupId.toLowerCase().includes(query));
+
+    const matchesStatus =
+      statusFilter === "All" ||
+      c.status.toLowerCase() === statusFilter.toLowerCase();
+
+    const matchesPriority =
+      priorityFilter === "All" ||
+      c.priority.toLowerCase() === priorityFilter.toLowerCase();
+
+    return matchesSearch && matchesStatus && matchesPriority;
+  });
 
   return (
     <div className="mc-page">
-
-      {/* ================= HEADER ================= */}
-      <section className="mc-hero">
-        <div className="mc-hero-rings" aria-hidden="true">
-          <span></span><span></span><span></span>
-        </div>
-        <div className="mc-hero-slabs" aria-hidden="true">
-          <i></i><i></i><i></i><i></i>
+      {/* ================= PAGE HEADER ================= */}
+      <div className="mc-header">
+        <div className="mc-header-text">
+          <h1>Footpath Complaints</h1>
+          <p>Review damage reports, link duplicates into unified maintenance WorkGroups, and assign teams.</p>
         </div>
 
-        <div className="mc-hero-text">
-          <span className="mc-hero-tag">
-            <ClipboardList size={14} strokeWidth={2.4} /> Manager Console
-          </span>
-          <h1>Complaints</h1>
-          <p>Supervise, prioritize and assign reported footpath issues</p>
+        <div className="mc-header-stats">
+          <div className="mc-stat">
+            <strong>{complaints.length}</strong>
+            <span>Total</span>
+          </div>
+          <div className="mc-stat">
+            <strong>
+              {complaints.filter((c) => c.status === "Pending" || c.status === "Not Assigned").length}
+            </strong>
+            <span>Pending</span>
+          </div>
+          <div className="mc-stat">
+            <strong>
+              {complaints.filter((c) => c.status === "In Progress").length}
+            </strong>
+            <span>In Progress</span>
+          </div>
+          <div className="mc-stat">
+            <strong>
+              {complaints.filter((c) => c.status === "Completed" || c.status === "Resolved").length}
+            </strong>
+            <span>Resolved</span>
+          </div>
         </div>
+      </div>
 
-        <div className="mc-count">
-          <strong>{filteredComplaints.length}</strong>
-          <span>Complaints</span>
+      {/* ================= ALERTS ================= */}
+      {errorMsg && (
+        <div className="mc-alert mc-alert-error">
+          <AlertCircle size={16} strokeWidth={2.4} />
+          <span>{errorMsg}</span>
+          <button onClick={() => setErrorMsg("")} aria-label="Close">
+            <X size={14} />
+          </button>
         </div>
-      </section>
+      )}
 
       {successMsg && (
-        <div className="mc-alert success" role="status">
-          <CheckCircle2 size={18} strokeWidth={2.2} />
-          {successMsg}
+        <div className="mc-alert mc-alert-success">
+          <CheckCircle2 size={16} strokeWidth={2.4} />
+          <span>{successMsg}</span>
         </div>
       )}
 
-      {errorMsg && (
-        <div className="mc-alert error" role="alert">
-          <AlertCircle size={18} strokeWidth={2.2} />
-          {errorMsg}
-        </div>
-      )}
-
-      {/* ================= FILTERS ================= */}
-      <div className="mc-filters">
+      {/* ================= TOOLBAR ================= */}
+      <div className="mc-toolbar">
         <div className="mc-search">
-          <Search size={18} strokeWidth={2} />
+          <Search size={16} strokeWidth={2.2} />
           <input
             type="text"
-            placeholder="Search complaint, location, reporter..."
+            placeholder="Search by ID, title, locality or WorkGroup..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          {search && (
-            <button
-              type="button"
-              className="mc-search-clear"
-              onClick={() => setSearch("")}
-              aria-label="Clear search"
-            >
-              <X size={15} strokeWidth={2.5} />
-            </button>
-          )}
         </div>
 
         <select
@@ -442,7 +491,7 @@ const Complaints = () => {
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
-          <option value="All">All Status</option>
+          <option value="All">All Statuses</option>
           {STATUS_FLOW.map((s) => (
             <option key={s} value={s}>
               {s}
@@ -510,7 +559,48 @@ const Complaints = () => {
 
                 <div className="mc-card-body">
                   <div className="mc-card-top">
-                    <span className="mc-id">{complaint.id}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                      <span className="mc-id">{complaint.id}</span>
+
+                      {/* WorkGroup & Duplicate Badge */}
+                      {complaint.isDuplicate ? (
+                        <span style={{
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          padding: "2px 7px",
+                          borderRadius: "10px",
+                          background: "#fef3c7",
+                          color: "#92400e",
+                          border: "1px solid #fde68a",
+                        }}>
+                          Duplicate · {complaint.workGroupId || "WG"}
+                        </span>
+                      ) : complaint.linkedCount > 1 ? (
+                        <span style={{
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          padding: "2px 7px",
+                          borderRadius: "10px",
+                          background: "#e0e7ff",
+                          color: "#3730a3",
+                          border: "1px solid #c7d2fe",
+                        }}>
+                          Lead ({complaint.linkedCount} reports · {complaint.workGroupId || "WG"})
+                        </span>
+                      ) : complaint.workGroupId ? (
+                        <span style={{
+                          fontSize: "11px",
+                          fontWeight: 600,
+                          padding: "2px 7px",
+                          borderRadius: "10px",
+                          background: "#f3f4f6",
+                          color: "#4b5563",
+                        }}>
+                          {complaint.workGroupId}
+                        </span>
+                      ) : null}
+                    </div>
+
                     <span className={`mc-status ${statusClass(complaint.status)}`}>
                       <span className="mc-dot"></span>
                       {complaint.status}
@@ -677,6 +767,115 @@ const Complaints = () => {
                 </div>
               )}
 
+              {/* UNIFIED WORKGROUP BANNER & CONTROLS */}
+              {selectedComplaint.workGroupId && (
+                <div style={{
+                  background: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  borderRadius: "12px",
+                  padding: "16px",
+                  marginBottom: "16px",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#16a34a", fontWeight: 700 }}>
+                      <CheckCircle2 size={18} />
+                      <span>Unified Maintenance WorkGroup ({selectedComplaint.workGroupId})</span>
+                    </div>
+
+                    <span style={{ fontSize: "12px", background: "#dcfce7", color: "#15803d", padding: "3px 8px", borderRadius: "10px", fontWeight: 600 }}>
+                      {selectedComplaint.workGroup?.linkedComplaintsCount || selectedComplaint.linkedCount || 1} Citizen Report(s) Linked
+                    </span>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "10px", fontSize: "13px", marginTop: "10px" }}>
+                    <div>
+                      <span style={{ color: "#6b7280" }}>Lead Report:</span>
+                      <div style={{ fontWeight: 600, color: "#111827" }}>{selectedComplaint.masterComplaintId || selectedComplaint.id}</div>
+                    </div>
+                    <div>
+                      <span style={{ color: "#6b7280" }}>Shared Status:</span>
+                      <div style={{ fontWeight: 600, color: "#16a34a" }}>{selectedComplaint.status}</div>
+                    </div>
+                    <div>
+                      <span style={{ color: "#6b7280" }}>Assigned Crew:</span>
+                      <div style={{ fontWeight: 600, color: "#111827" }}>
+                        {selectedComplaint.assignedWorkers?.join(", ") || "No crew assigned yet"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* UPDATE SHARED STATUS BUTTONS */}
+                  <div style={{ marginTop: "14px", display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", borderTop: "1px dashed #bbf7d0", paddingTop: "10px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 600, color: "#374151" }}>Update WorkGroup Status:</span>
+                    <button
+                      type="button"
+                      disabled={updatingStatus}
+                      style={{ padding: "4px 10px", borderRadius: "10px", background: "#4f46e5", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 600 }}
+                      onClick={() => handleUpdateWorkGroupStatus("IN_PROGRESS")}
+                    >
+                      In Progress
+                    </button>
+                    <button
+                      type="button"
+                      disabled={updatingStatus}
+                      style={{ padding: "4px 10px", borderRadius: "10px", background: "#10b981", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 600 }}
+                      onClick={() => handleUpdateWorkGroupStatus("COMPLETED")}
+                    >
+                      Completed
+                    </button>
+                    <button
+                      type="button"
+                      disabled={updatingStatus}
+                      style={{ padding: "4px 10px", borderRadius: "10px", background: "#6b7280", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 600 }}
+                      onClick={() => handleUpdateWorkGroupStatus("PENDING")}
+                    >
+                      Reset to Pending
+                    </button>
+                  </div>
+
+                  {/* VIEW ALL LINKED REPORTS ACCORDION */}
+                  {selectedComplaint.workGroup?.linkedComplaints?.length > 1 && (
+                    <div style={{ marginTop: "12px" }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowLinkedReports(!showLinkedReports)}
+                        style={{
+                          background: "#fff",
+                          border: "1px solid #d1d5db",
+                          borderRadius: "8px",
+                          padding: "6px 12px",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          color: "#374151",
+                        }}
+                      >
+                        <Layers size={13} />
+                        {showLinkedReports ? "Hide Linked Citizen Reports" : `View All ${selectedComplaint.workGroup.linkedComplaints.length} Linked Reports`}
+                      </button>
+
+                      {showLinkedReports && (
+                        <div style={{ marginTop: "10px", maxHeight: "180px", overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "10px", background: "#ffffff" }}>
+                          {selectedComplaint.workGroup.linkedComplaints.map((lc) => (
+                            <div key={lc.id} style={{ padding: "6px 0", borderBottom: "1px solid #f3f4f6", fontSize: "12px" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600 }}>
+                                <span>{lc.id} {lc.isMaster ? "(Lead)" : "(Duplicate)"}</span>
+                                <span style={{ color: "#16a34a" }}>{lc.status}</span>
+                              </div>
+                              <div style={{ color: "#4b5563" }}>{lc.title} · {lc.description?.slice(0, 50)}...</div>
+                              <div style={{ color: "#9ca3af", fontSize: "11px" }}>Reported by: {lc.reportedBy} ({lc.reportedPhone || "No phone"})</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* PRIORITY EDITOR IN MODAL */}
               <div className="mc-priority-editor">
                 <span>Set Priority</span>
@@ -826,240 +1025,315 @@ const Complaints = () => {
       )}
 
       {/* ================================================= */}
-      {/* ASSIGN WORKERS POPUP */}
+      {/* ASSIGN WORKERS POPUP (WORKGROUP AWARE) */}
       {/* ================================================= */}
-      {showAssignPopup && selectedComplaint && (
-        <div
-          className="mc-overlay"
-          onClick={() => setShowAssignPopup(false)}
-        >
-          <div className="mc-modal mc-modal-narrow" onClick={(e) => e.stopPropagation()}>
-            <div className="mc-modal-head">
-              <div>
-                <span className="mc-modal-id">{selectedComplaint.id}</span>
-                <h2>Assign Maintenance Team</h2>
-              </div>
+      {showAssignPopup && selectedComplaint && (() => {
+        const isAlreadyAssigned = Boolean(
+          selectedComplaint.isWorkGroupAssigned ||
+          (selectedComplaint.assignedWorkers && selectedComplaint.assignedWorkers.length > 0 && selectedComplaint.status !== "Not Assigned" && selectedComplaint.status !== "Pending")
+        );
 
-              <button
-                className="mc-close"
-                onClick={() => setShowAssignPopup(false)}
-                aria-label="Close"
-              >
-                <X size={18} strokeWidth={2.5} />
-              </button>
-            </div>
+        return (
+          <div
+            className="mc-overlay"
+            onClick={() => setShowAssignPopup(false)}
+          >
+            <div className="mc-modal mc-modal-narrow" onClick={(e) => e.stopPropagation()}>
+              <div className="mc-modal-head">
+                <div>
+                  <span className="mc-modal-id">{selectedComplaint.id}</span>
+                  <h2>{isAlreadyAssigned ? "Unified WorkGroup Details" : "Assign Maintenance Team"}</h2>
+                </div>
 
-            <div className="mc-modal-body">
-              <div className="mc-assign-info">
-                <h3>{selectedComplaint.title}</h3>
-                <p>
-                  <MapPin size={14} strokeWidth={2} />
-                  {selectedComplaint.location}
-                </p>
-                <span
-                  className={`mc-priority ${priorityClass(
-                    selectedComplaint.priority
-                  )}`}
+                <button
+                  className="mc-close"
+                  onClick={() => setShowAssignPopup(false)}
+                  aria-label="Close"
                 >
-                  {selectedComplaint.priority} Priority
-                </span>
+                  <X size={18} strokeWidth={2.5} />
+                </button>
               </div>
 
-              {/* POTENTIAL DUPLICATES SECTION (GPS PROXIMITY) */}
-              <div className="mc-duplicates-section">
-                <div className="mc-dups-header">
-                  <div className="mc-dups-title">
-                    <Layers size={16} />
-                    <span>Potential Duplicate Reports (GPS Proximity)</span>
-                  </div>
-
-                  {potentialDuplicates.length > 0 && (
-                    <button
-                      type="button"
-                      className="mc-dups-toggle-btn"
-                      onClick={toggleAllDuplicates}
-                    >
-                      {selectedDuplicates.length === potentialDuplicates.length
-                        ? "Deselect All"
-                        : "Select All to Group"}
-                    </button>
-                  )}
+              <div className="mc-modal-body">
+                <div className="mc-assign-info">
+                  <h3>{selectedComplaint.title}</h3>
+                  <p>
+                    <MapPin size={14} strokeWidth={2} />
+                    {selectedComplaint.location}
+                  </p>
+                  <span
+                    className={`mc-priority ${priorityClass(
+                      selectedComplaint.priority
+                    )}`}
+                  >
+                    {selectedComplaint.priority} Priority
+                  </span>
                 </div>
 
-                {loadingDuplicates ? (
-                  <div className="mc-dups-loading">
-                    <span className="dups-spinner"></span>
-                    <span>Scanning for nearby reports within 100 meters...</span>
-                  </div>
-                ) : potentialDuplicates.length === 0 ? (
-                  <div className="mc-dups-empty">
-                    <CheckCircle2 size={15} color="#10b981" />
-                    <span>No duplicate reports found within 100m. This appears to be an isolated issue.</span>
-                  </div>
-                ) : (
-                  <div className="mc-dups-container">
-                    <div className="mc-dups-alert">
-                      <span>⚠️ <strong>{potentialDuplicates.length} potential duplicate(s)</strong> detected within 100m. Select reports to assign and resolve simultaneously:</span>
+                {/* IF ALREADY ASSIGNED: Display WorkGroup Info, DO NOT show worker assignment form */}
+                {isAlreadyAssigned ? (
+                  <div style={{
+                    background: "#f0fdf4",
+                    border: "1px solid #bbf7d0",
+                    borderRadius: "12px",
+                    padding: "16px",
+                    marginTop: "16px",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#16a34a", fontWeight: 700, marginBottom: "8px" }}>
+                      <CheckCircle2 size={18} />
+                      <span>Unified Maintenance WorkGroup ({selectedComplaint.workGroupId || "WG001"})</span>
                     </div>
 
-                    <div className="mc-dups-list">
-                      {potentialDuplicates.map((dup) => {
-                        const isChecked = selectedDuplicates.includes(dup.id || dup.mongoId);
+                    <p style={{ margin: "0 0 12px 0", fontSize: "13px", color: "#166534" }}>
+                      This complaint is already linked to an active maintenance group. All linked reports share the same assigned workers and repair progress.
+                    </p>
 
-                        return (
-                          <div
-                            key={dup.id || dup.mongoId}
-                            className={`mc-dup-card ${isChecked ? "checked" : ""}`}
-                            onClick={() => toggleDuplicate(dup.id || dup.mongoId)}
-                          >
-                            <div className="mc-dup-check">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => {}}
-                              />
-                            </div>
-
-                            {dup.image && (
-                              <img
-                                src={dup.image}
-                                alt="Report"
-                                className="mc-dup-thumb"
-                              />
-                            )}
-
-                            <div className="mc-dup-info">
-                              <div className="mc-dup-top">
-                                <span className="mc-dup-id">{dup.id}</span>
-                                <span className="mc-dup-distance">
-                                  <MapPin size={11} /> {dup.distanceFormatted}
-                                </span>
-                                <span className={`mc-dup-match ${dup.matchConfidence.toLowerCase().replace(/\s+/g, "-")}`}>
-                                  {dup.matchConfidence} Match
-                                </span>
-                              </div>
-                              <h5 className="mc-dup-title">{dup.title}</h5>
-                              <p className="mc-dup-desc">{dup.description?.slice(0, 85)}{dup.description?.length > 85 ? "..." : ""}</p>
-                              <div className="mc-dup-foot">
-                                <span>Reported by: <strong>{dup.reportedBy}</strong></span>
-                                <span>{dup.reportedDate}</span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* WORK SCHEDULE */}
-              <div className="mc-dates">
-                <div className="mc-date-field">
-                  <label>Work Start Date</label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => updateScheduleDate(setStartDate, e.target.value)}
-                  />
-                </div>
-
-                <div className="mc-date-field">
-                  <label>Work End Date</label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    min={startDate || undefined}
-                    onChange={(e) => updateScheduleDate(setEndDate, e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="mc-selected">
-                <div className="mc-selected-text">
-                  <span>Selected Workers</span>
-                  <strong>{selectedWorkers.length} / 3</strong>
-                </div>
-
-                <div className="mc-progress">
-                  <div
-                    className="mc-progress-fill"
-                    style={{
-                      width: `${(selectedWorkers.length / 3) * 100}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="mc-workers">
-                {loadingWorkers ? (
-                  <p className="mc-workers-note">
-                    Checking team availability for these dates...
-                  </p>
-                ) : !startDate || !endDate ? (
-                  <p className="mc-workers-note">
-                    Select a valid work date range to check availability.
-                  </p>
-                ) : availableWorkers.length === 0 ? (
-                  <p className="mc-workers-note">
-                    No available workers in your team for the selected dates.
-                  </p>
-                ) : (
-                  availableWorkers.map((worker) => {
-                    const isSelected = selectedWorkers.includes(worker.id);
-
-                    return (
-                      <div
-                        key={worker.id}
-                        className={`mc-worker ${isSelected ? "selected" : ""}`}
-                        onClick={() => toggleWorker(worker.id)}
-                      >
-                        <div className="mc-worker-avatar">
-                          {worker.name.charAt(0)}
-                        </div>
-
-                        <div className="mc-worker-details">
-                          <strong>{worker.name} ({worker.employeeCode || "WRK"})</strong>
-                          <span>
-                            {worker.team} • {worker.role} • {worker.phone}
-                          </span>
-                        </div>
-
-                        <div className="mc-worker-check">
-                          {isSelected && <Check size={14} strokeWidth={3.2} />}
-                        </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "13px", marginBottom: "14px" }}>
+                      <div>
+                        <span style={{ color: "#6b7280" }}>Lead Complaint ID:</span>
+                        <div style={{ fontWeight: 600, color: "#111827" }}>{selectedComplaint.masterComplaintId || selectedComplaint.id}</div>
                       </div>
-                    );
-                  })
+                      <div>
+                        <span style={{ color: "#6b7280" }}>Total Linked Reports:</span>
+                        <div style={{ fontWeight: 600, color: "#111827" }}>{selectedComplaint.workGroup?.linkedComplaintsCount || selectedComplaint.linkedCount || 1} report(s)</div>
+                      </div>
+                      <div>
+                        <span style={{ color: "#6b7280" }}>Shared Assigned Workers:</span>
+                        <div style={{ fontWeight: 600, color: "#111827" }}>{selectedComplaint.assignedWorkers?.join(", ") || "Assigned Crew"}</div>
+                      </div>
+                      <div>
+                        <span style={{ color: "#6b7280" }}>Current Status:</span>
+                        <div style={{ fontWeight: 600, color: "#16a34a" }}>{selectedComplaint.status}</div>
+                      </div>
+                    </div>
+
+                    {/* Quick Shared Status Update Buttons */}
+                    <div style={{ borderTop: "1px dashed #bbf7d0", paddingTop: "12px" }}>
+                      <span style={{ fontSize: "12px", fontWeight: 600, color: "#374151", display: "block", marginBottom: "8px" }}>
+                        Update Shared WorkGroup Status:
+                      </span>
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          disabled={updatingStatus}
+                          style={{ padding: "5px 12px", borderRadius: "10px", background: "#4f46e5", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 600 }}
+                          onClick={() => handleUpdateWorkGroupStatus("IN_PROGRESS")}
+                        >
+                          Mark In Progress
+                        </button>
+                        <button
+                          type="button"
+                          disabled={updatingStatus}
+                          style={{ padding: "5px 12px", borderRadius: "10px", background: "#10b981", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 600 }}
+                          onClick={() => handleUpdateWorkGroupStatus("COMPLETED")}
+                        >
+                          Mark Completed
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* POTENTIAL DUPLICATES SECTION (GPS PROXIMITY) */}
+                    <div className="mc-duplicates-section">
+                      <div className="mc-dups-header">
+                        <div className="mc-dups-title">
+                          <Layers size={16} />
+                          <span>Potential Duplicate Reports (GPS Proximity)</span>
+                        </div>
+
+                        {potentialDuplicates.length > 0 && (
+                          <button
+                            type="button"
+                            className="mc-dups-toggle-btn"
+                            onClick={toggleAllDuplicates}
+                          >
+                            {selectedDuplicates.length === potentialDuplicates.length
+                              ? "Deselect All"
+                              : "Select All to Group"}
+                          </button>
+                        )}
+                      </div>
+
+                      {loadingDuplicates ? (
+                        <div className="mc-dups-loading">
+                          <span className="dups-spinner"></span>
+                          <span>Scanning for nearby reports within 100 meters...</span>
+                        </div>
+                      ) : potentialDuplicates.length === 0 ? (
+                        <div className="mc-dups-empty">
+                          <CheckCircle2 size={15} color="#10b981" />
+                          <span>No duplicate reports found within 100m. This appears to be an isolated issue.</span>
+                        </div>
+                      ) : (
+                        <div className="mc-dups-container">
+                          <div className="mc-dups-alert">
+                            <span>⚠️ <strong>{potentialDuplicates.length} potential duplicate(s)</strong> detected within 100m. Select reports to link to this WorkGroup:</span>
+                          </div>
+
+                          <div className="mc-dups-list">
+                            {potentialDuplicates.map((dup) => {
+                              const isChecked = selectedDuplicates.includes(dup.id || dup.mongoId);
+
+                              return (
+                                <div
+                                  key={dup.id || dup.mongoId}
+                                  className={`mc-dup-card ${isChecked ? "checked" : ""}`}
+                                  onClick={() => toggleDuplicate(dup.id || dup.mongoId)}
+                                >
+                                  <div className="mc-dup-check">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => {}}
+                                    />
+                                  </div>
+
+                                  {dup.image && (
+                                    <img
+                                      src={dup.image}
+                                      alt="Report"
+                                      className="mc-dup-thumb"
+                                    />
+                                  )}
+
+                                  <div className="mc-dup-info">
+                                    <div className="mc-dup-top">
+                                      <span className="mc-dup-id">{dup.id}</span>
+                                      <span className="mc-dup-distance">
+                                        <MapPin size={11} /> {dup.distanceFormatted}
+                                      </span>
+                                      <span className={`mc-dup-match ${dup.matchConfidence.toLowerCase().replace(/\s+/g, "-")}`}>
+                                        {dup.matchConfidence} Match
+                                      </span>
+                                    </div>
+                                    <h5 className="mc-dup-title">{dup.title}</h5>
+                                    <p className="mc-dup-desc">{dup.description?.slice(0, 85)}{dup.description?.length > 85 ? "..." : ""}</p>
+                                    <div className="mc-dup-foot">
+                                      <span>Reported by: <strong>{dup.reportedBy}</strong></span>
+                                      <span>{dup.reportedDate}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* WORK SCHEDULE */}
+                    <div className="mc-dates">
+                      <div className="mc-date-field">
+                        <label>Work Start Date</label>
+                        <input
+                          type="date"
+                          value={startDate}
+                          onChange={(e) => updateScheduleDate(setStartDate, e.target.value)}
+                        />
+                      </div>
+
+                      <div className="mc-date-field">
+                        <label>Work End Date</label>
+                        <input
+                          type="date"
+                          value={endDate}
+                          min={startDate || undefined}
+                          onChange={(e) => updateScheduleDate(setEndDate, e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mc-selected">
+                      <div className="mc-selected-text">
+                        <span>Selected Workers</span>
+                        <strong>{selectedWorkers.length} / 3</strong>
+                      </div>
+
+                      <div className="mc-progress">
+                        <div
+                          className="mc-progress-fill"
+                          style={{
+                            width: `${(selectedWorkers.length / 3) * 100}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mc-workers">
+                      {loadingWorkers ? (
+                        <p className="mc-workers-note">
+                          Checking team availability for these dates...
+                        </p>
+                      ) : !startDate || !endDate ? (
+                        <p className="mc-workers-note">
+                          Select a valid work date range to check availability.
+                        </p>
+                      ) : availableWorkers.length === 0 ? (
+                        <p className="mc-workers-note">
+                          No available workers in your team for the selected dates.
+                        </p>
+                      ) : (
+                        availableWorkers.map((worker) => {
+                          const isSelected = selectedWorkers.includes(worker.id);
+
+                          return (
+                            <div
+                              key={worker.id}
+                              className={`mc-worker ${isSelected ? "selected" : ""}`}
+                              onClick={() => toggleWorker(worker.id)}
+                            >
+                              <div className="mc-worker-avatar">
+                                {worker.name.charAt(0)}
+                              </div>
+
+                              <div className="mc-worker-details">
+                                <strong>{worker.name} ({worker.employeeCode || "WRK"})</strong>
+                                <span>
+                                  {worker.team} • {worker.role} • {worker.phone}
+                                </span>
+                              </div>
+
+                              <div className="mc-worker-check">
+                                {isSelected && <Check size={14} strokeWidth={3.2} />}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
-            </div>
 
-            <div className="mc-modal-footer">
-              <button
-                className="mc-cancel"
-                onClick={() => setShowAssignPopup(false)}
-              >
-                Cancel
-              </button>
+              <div className="mc-modal-footer">
+                <button
+                  className="mc-cancel"
+                  onClick={() => setShowAssignPopup(false)}
+                >
+                  {isAlreadyAssigned ? "Close" : "Cancel"}
+                </button>
 
-              <button
-                className="mc-save"
-                onClick={handleAssignWorkers}
-                disabled={selectedWorkers.length < 1 || assigning}
-              >
-                {assigning
-                  ? "Assigning..."
-                  : `Assign ${selectedWorkers.length} Worker(s)${
-                      selectedDuplicates.length > 0
-                        ? ` (+${selectedDuplicates.length} Duplicates)`
-                        : ""
-                    }`}
-              </button>
+                {!isAlreadyAssigned && (
+                  <button
+                    className="mc-save"
+                    onClick={handleAssignWorkers}
+                    disabled={selectedWorkers.length < 1 || assigning}
+                  >
+                    {assigning
+                      ? "Assigning..."
+                      : `Assign to WorkGroup${
+                          selectedDuplicates.length > 0
+                            ? ` (${selectedWorkers.length} Workers · ${selectedDuplicates.length + 1} Reports)`
+                            : ` (${selectedWorkers.length} Workers)`
+                        }`}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

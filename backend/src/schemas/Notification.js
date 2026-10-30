@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const express = require("express");
 
 const notificationSchema = new mongoose.Schema(
   {
@@ -20,7 +19,14 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["STATUS_CHANGE", "ASSIGNMENT", "REPAIR_COMPLETED", "SYSTEM", "OTHER"],
+      enum: [
+        "STATUS_CHANGE",
+        "STATUS_UPDATE",
+        "ASSIGNMENT",
+        "REPAIR_COMPLETED",
+        "SYSTEM",
+        "OTHER",
+      ],
       default: "SYSTEM",
     },
     is_read: {

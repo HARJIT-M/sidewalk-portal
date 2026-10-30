@@ -181,73 +181,88 @@
   margin-bottom: 24px;
 }
 
-.vc-stat {
+.vc-stat,
+.vc-stat-card {
   position: relative;
   overflow: hidden;
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 20px;
+  padding: 20px 22px;
   border-radius: 18px;
-  background: white;
+  background: #ffffff;
   border: 1.5px solid var(--line);
   box-shadow: 0 6px 16px var(--shadow);
   animation: vcRise 0.6s ease both;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-.vc-stat::before {
+.vc-stat::before,
+.vc-stat-card::before {
   content: "";
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   height: 4px;
-  background: var(--tone);
+  background: var(--tone, #7c3aed);
 }
 
-.vc-stat:hover {
+.vc-stat:hover,
+.vc-stat-card:hover {
   transform: translateY(-4px);
-  border-color: var(--tone);
+  border-color: var(--tone, #7c3aed);
   box-shadow: 0 16px 28px rgba(91, 33, 182, 0.16);
 }
 
 .vc-stat-icon {
-  width: 50px;
-  height: 50px;
-  min-width: 50px;
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
   border-radius: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--tone);
-  background: var(--tone-soft);
+  color: var(--tone, #7c3aed);
+  background: var(--tone-soft, #f1e9ff);
   transition: transform 0.25s ease;
 }
 
-.vc-stat:hover .vc-stat-icon {
+.vc-stat:hover .vc-stat-icon,
+.vc-stat-card:hover .vc-stat-icon {
   transform: scale(1.1) rotate(-6deg);
 }
 
-.vc-stat strong {
+.vc-stat-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.vc-stat strong,
+.vc-stat-card strong,
+.vc-stat-num {
   display: block;
   font-size: 28px;
   font-weight: 800;
-  line-height: 1;
+  line-height: 1.1;
+  color: var(--ink, #1f1535);
 }
 
-.vc-stat span {
+.vc-stat span,
+.vc-stat-card span,
+.vc-stat-label {
   display: block;
-  margin-top: 6px;
-  font-size: 12.5px;
+  margin-top: 5px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--muted);
+  color: var(--muted, #6b6280);
 }
 
-.vc-stat-total    { --tone: #7c3aed; --tone-soft: #f1e9ff; }
-.vc-stat-pending  { --tone: #9a8fb0; --tone-soft: #f3f0f8; }
-.vc-stat-progress { --tone: #f59e0b; --tone-soft: #fef3c7; }
-.vc-stat-done     { --tone: #16a34a; --tone-soft: #dcfce7; }
+.vc-stat-total, .vc-stat.total, .vc-stat-card.total, .vc-stat-card.vc-stat-total       { --tone: #7c3aed; --tone-soft: #f1e9ff; }
+.vc-stat-pending, .vc-stat.pending, .vc-stat-card.pending, .vc-stat-card.vc-stat-pending { --tone: #8b5cf6; --tone-soft: #f3f0f8; }
+.vc-stat-progress, .vc-stat.progress, .vc-stat-card.progress, .vc-stat-card.vc-stat-progress { --tone: #f59e0b; --tone-soft: #fef3c7; }
+.vc-stat-done, .vc-stat.done, .vc-stat-card.done, .vc-stat-card.vc-stat-done          { --tone: #16a34a; --tone-soft: #dcfce7; }
 
 
 /* =====================================================

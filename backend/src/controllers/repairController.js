@@ -1,5 +1,14 @@
-const { Complaint, Assignment, RepairHistory, StatusHistory, Notification, ComplaintImage } = require("../schemas");
+const {
+  Complaint,
+  Assignment,
+  RepairHistory,
+  StatusHistory,
+  Notification,
+  ComplaintImage,
+  WorkGroup,
+} = require("../schemas");
 const { getWorkerForUser } = require("../utils/workerHelper");
+const { syncWorkGroupStatus } = require("../utils/workGroupHelper");
 const cloudinary = require("../config/cloudinary");
 
 // ==========================================
@@ -23,11 +32,9 @@ const findComplaint = async (complaintId) => {
 // ==========================================
 const uploadImageToCloudinary = async (imageInput, folder = "smart-footpath/repairs") => {
   if (!imageInput || typeof imageInput !== "string") return null;
-  // If already an HTTP/HTTPS URL and not a data URI, keep it as is
   if (imageInput.startsWith("http://") || imageInput.startsWith("https://")) {
     return imageInput;
   }
-  // If it's a data URI or base64, upload to Cloudinary
   if (imageInput.startsWith("data:image/")) {
     try {
       const uploadResult = await cloudinary.uploader.upload(imageInput, {
@@ -37,7 +44,6 @@ const uploadImageToCloudinary = async (imageInput, folder = "smart-footpath/repa
       return uploadResult.secure_url;
     } catch (err) {
       console.error("Cloudinary upload failed for repair image:", err.message);
-      // Fallback: return imageInput so data is not lost
       return imageInput;
     }
   }
@@ -45,7 +51,7 @@ const uploadImageToCloudinary = async (imageInput, folder = "smart-footpath/repa
 };
 
 // ==========================================
-// 1. START REPAIR WORK (WORKER)
+// 1. START REPAIR WORK (WORKER - SYNCHRONIZED)
 // ==========================================
 const startRepair = async (req, res) => {
   try {
@@ -68,11 +74,15 @@ const startRepair = async (req, res) => {
       });
     }
 
+    const masterId = complaint.masterComplaintId || complaint._id;
+    const lookupIds = [complaint._id, masterId].filter(Boolean);
+
     const assignment = await Assignment.findOne({
-      complaint_id: complaint._id,
+      complaint_id: { $in: lookupIds },
       worker_id: worker._id,
       status: { $in: ["ASSIGNED", "IN_PROGRESS"] },
     });
+
     if (!assignment) {
       return res.status(403).json({
         success: false,
@@ -93,13 +103,13 @@ const startRepair = async (req, res) => {
     }
 
     let repairHistory = await RepairHistory.findOne({
-      complaint_id: complaint._id,
+      complaint_id: { $in: lookupIds },
       worker_id: worker._id,
     });
 
     if (!repairHistory) {
       repairHistory = await RepairHistory.create({
-        complaint_id: complaint._id,
+        complaint_id: masterId,
         worker_id: worker._id,
         assignment_id: assignment._id,
         started_at: assignment.started_at || new Date(),
@@ -115,13 +125,27 @@ const startRepair = async (req, res) => {
     }
 
     if (oldStatus !== "IN_PROGRESS") {
-      await StatusHistory.create({
-        complaint_id: complaint._id,
-        changed_by: req.user._id,
-        old_status: oldStatus,
-        new_status: "IN_PROGRESS",
-        remarks: "Worker started on-site repair work.",
-        changed_at: new Date(),
+      try {
+        await StatusHistory.create({
+          complaint_id: complaint._id,
+          changed_by: req.user._id,
+          old_status: oldStatus,
+          new_status: "IN_PROGRESS",
+          remarks: "Worker started on-site repair work.",
+          changed_at: new Date(),
+        });
+      } catch (shErr) {
+        console.warn("Could not log StatusHistory in startRepair:", shErr.message);
+      }
+    }
+
+    // Synchronize status across the entire WorkGroup and all linked complaints
+    if (complaint.workGroupId) {
+      await syncWorkGroupStatus({
+        workGroupId: complaint.workGroupId,
+        newStatus: "IN_PROGRESS",
+        changedByUserId: req.user._id,
+        remarks: description || "Worker started on-site repair work.",
       });
     }
 
@@ -143,7 +167,7 @@ const startRepair = async (req, res) => {
 };
 
 // ==========================================
-// 2. UPDATE REPAIR PROGRESS (WORKER)
+// 2. UPDATE REPAIR PROGRESS (WORKER - SYNCHRONIZED)
 // ==========================================
 const updateRepairProgress = async (req, res) => {
   try {
@@ -152,13 +176,10 @@ const updateRepairProgress = async (req, res) => {
       progress,
       notes,
       workDescription,
-      repairDescription,
       materialsUsed,
-      repairCost,
-      remarks,
-      beforeImage,
       afterImage,
       completionImage,
+      status: incomingStatus,
     } = req.body;
 
     const complaint = await findComplaint(complaintId);
@@ -177,9 +198,11 @@ const updateRepairProgress = async (req, res) => {
       });
     }
 
-    // Verify worker is assigned to this complaint
+    const masterId = complaint.masterComplaintId || complaint._id;
+    const lookupIds = [complaint._id, masterId].filter(Boolean);
+
     const assignment = await Assignment.findOne({
-      complaint_id: complaint._id,
+      complaint_id: { $in: lookupIds },
       worker_id: worker._id,
     });
     if (!assignment && req.user.role === "WORKER") {
@@ -189,7 +212,6 @@ const updateRepairProgress = async (req, res) => {
       });
     }
 
-    // Update assignment to IN_PROGRESS if not already completed
     if (assignment && assignment.status !== "COMPLETED") {
       assignment.status = "IN_PROGRESS";
       assignment.started_at = assignment.started_at || new Date();
@@ -197,7 +219,6 @@ const updateRepairProgress = async (req, res) => {
       await assignment.save();
     }
 
-    // Update complaint status to IN_PROGRESS if currently ASSIGNED or PENDING
     const oldStatus = complaint.status;
     if (complaint.status === "ASSIGNED" || complaint.status === "PENDING") {
       complaint.status = "IN_PROGRESS";
@@ -213,17 +234,15 @@ const updateRepairProgress = async (req, res) => {
       });
     }
 
-    // Process completion/progress photo upload if provided
     const rawImage = afterImage || completionImage || null;
     let finalImageUrl = null;
     if (rawImage) {
       finalImageUrl = await uploadImageToCloudinary(rawImage);
     }
 
-    // Sync with ComplaintImage document
     if (finalImageUrl) {
       await ComplaintImage.findOneAndUpdate(
-        { complaint_id: complaint._id, image_type: "AFTER" },
+        { complaint_id: masterId, image_type: "AFTER" },
         {
           image_url: finalImageUrl,
           image_type: "AFTER",
@@ -234,62 +253,61 @@ const updateRepairProgress = async (req, res) => {
       );
     }
 
-    // Update RepairHistory
     let repairHistory = await RepairHistory.findOne({
-      complaint_id: complaint._id,
+      complaint_id: { $in: lookupIds },
       worker_id: worker._id,
     });
 
     if (!repairHistory) {
       repairHistory = new RepairHistory({
-        complaint_id: complaint._id,
+        complaint_id: masterId,
         worker_id: worker._id,
         assignment_id: assignment ? assignment._id : null,
-        started_at: new Date(),
-        repair_description: notes || workDescription || repairDescription || "Repair in progress",
+        started_at: assignment?.started_at || new Date(),
       });
     }
 
-    const desc = notes || workDescription || repairDescription;
-    if (desc) repairHistory.repair_description = desc;
-
+    const updateText = notes || workDescription || `Progress updated to ${progress || 65}%.`;
+    repairHistory.repair_description = updateText;
     if (materialsUsed) {
       repairHistory.materials_used = Array.isArray(materialsUsed)
         ? materialsUsed
-        : String(materialsUsed)
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean);
+        : String(materialsUsed).split(",").map((s) => s.trim()).filter(Boolean);
     }
-    if (repairCost !== undefined && !isNaN(Number(repairCost))) {
-      repairHistory.repair_cost = Number(repairCost);
+    if (finalImageUrl) {
+      repairHistory.after_image = finalImageUrl;
     }
-    if (remarks) repairHistory.remarks = remarks;
-    if (beforeImage) repairHistory.before_image = beforeImage;
-    if (finalImageUrl) repairHistory.after_image = finalImageUrl;
-
     await repairHistory.save();
+
+    // Synchronize across WorkGroup
+    if (complaint.workGroupId) {
+      await syncWorkGroupStatus({
+        workGroupId: complaint.workGroupId,
+        newStatus: "IN_PROGRESS",
+        changedByUserId: req.user._id,
+        remarks: updateText,
+      });
+    }
 
     return res.status(200).json({
       success: true,
-      message: `Repair progress updated for Complaint #${complaint.complaint_code}.`,
-      status: complaint.status,
-      progress: progress || 65,
-      completionImage: finalImageUrl || repairHistory.after_image || null,
+      message: `Progress updated on Complaint #${complaint.complaint_code}.`,
+      status: "IN_PROGRESS",
+      progress: Number(progress) || 65,
       repairHistory,
     });
   } catch (error) {
     console.error("Error updating repair progress:", error);
     return res.status(500).json({
       success: false,
-      message: "Server error while updating repair progress.",
+      message: "Server error while updating progress.",
       error: error.message,
     });
   }
 };
 
 // ==========================================
-// 3. COMPLETE REPAIR WORK (WORKER)
+// 3. COMPLETE REPAIR WORK (WORKER - SYNCHRONIZED)
 // ==========================================
 const completeRepair = async (req, res) => {
   try {
@@ -315,7 +333,6 @@ const completeRepair = async (req, res) => {
 
     const incomingStatus = (incomingRawStatus || "").toUpperCase().trim();
 
-    // If worker submits "In Progress", route to progress update
     if (incomingStatus === "IN PROGRESS" || incomingStatus === "IN_PROGRESS") {
       req.body.notes = workDescription || repairDescription || remarks;
       req.body.progress = 65;
@@ -323,7 +340,6 @@ const completeRepair = async (req, res) => {
       return updateRepairProgress(req, res);
     }
 
-    // If worker explicitly selects "Pending" or "Assigned", keep status and save progress notes
     if (incomingStatus === "PENDING" || incomingStatus === "ASSIGNED") {
       req.body.notes = workDescription || repairDescription || remarks || "Work pending/not yet started.";
       req.body.progress = 10;
@@ -331,7 +347,6 @@ const completeRepair = async (req, res) => {
       return updateRepairProgress(req, res);
     }
 
-    // Otherwise, this is a COMPLETION request (status: "Completed", "RESOLVED", or default)
     const worker = await getWorkerForUser(req.user._id);
     if (!worker) {
       return res.status(404).json({
@@ -340,8 +355,11 @@ const completeRepair = async (req, res) => {
       });
     }
 
+    const masterId = complaint.masterComplaintId || complaint._id;
+    const lookupIds = [complaint._id, masterId].filter(Boolean);
+
     const assignment = await Assignment.findOne({
-      complaint_id: complaint._id,
+      complaint_id: { $in: lookupIds },
       worker_id: worker._id,
     });
     if (!assignment && req.user.role === "WORKER") {
@@ -351,17 +369,15 @@ const completeRepair = async (req, res) => {
       });
     }
 
-    // Process completion photo upload
     const rawImage = afterImage || completionImage || null;
     let finalImageUrl = null;
     if (rawImage) {
       finalImageUrl = await uploadImageToCloudinary(rawImage);
     }
 
-    // Sync with ComplaintImage document
     if (finalImageUrl) {
       await ComplaintImage.findOneAndUpdate(
-        { complaint_id: complaint._id, image_type: "AFTER" },
+        { complaint_id: masterId, image_type: "AFTER" },
         {
           image_url: finalImageUrl,
           image_type: "AFTER",
@@ -378,7 +394,7 @@ const completeRepair = async (req, res) => {
     await complaint.save();
 
     await Assignment.updateMany(
-      { complaint_id: complaint._id },
+      { complaint_id: { $in: lookupIds } },
       {
         status: "COMPLETED",
         completed_at: new Date(),
@@ -387,13 +403,13 @@ const completeRepair = async (req, res) => {
     );
 
     let repairHistory = await RepairHistory.findOne({
-      complaint_id: complaint._id,
+      complaint_id: { $in: lookupIds },
       worker_id: worker._id,
     });
 
     if (!repairHistory) {
       repairHistory = new RepairHistory({
-        complaint_id: complaint._id,
+        complaint_id: masterId,
         worker_id: worker._id,
         assignment_id: assignment ? assignment._id : null,
         started_at: assignment?.started_at || new Date(),
@@ -430,6 +446,16 @@ const completeRepair = async (req, res) => {
       });
     }
 
+    // Synchronize across all linked complaints in the WorkGroup
+    if (complaint.workGroupId) {
+      await syncWorkGroupStatus({
+        workGroupId: complaint.workGroupId,
+        newStatus: "RESOLVED",
+        changedByUserId: req.user._id,
+        remarks: remarks || `Repair completed on-site by worker ${worker?.employee_code || ""}.`,
+      });
+    }
+
     return res.status(200).json({
       success: true,
       message: `Repair on Complaint #${complaint.complaint_code} marked as RESOLVED (100% complete).`,
@@ -450,7 +476,7 @@ const completeRepair = async (req, res) => {
 };
 
 // ==========================================
-// 4. VERIFY REPAIR WORK (MANAGER)
+// 4. VERIFY REPAIR WORK (MANAGER - SYNCHRONIZED)
 // ==========================================
 const verifyRepairWork = async (req, res) => {
   try {
@@ -472,17 +498,20 @@ const verifyRepairWork = async (req, res) => {
       });
     }
 
+    const masterId = complaint.masterComplaintId || complaint._id;
+    const lookupIds = [complaint._id, masterId].filter(Boolean);
+
     complaint.status = "CLOSED";
     complaint.resolved_at = complaint.resolved_at || new Date();
     await complaint.save();
 
     await Assignment.updateMany(
-      { complaint_id: complaint._id },
+      { complaint_id: { $in: lookupIds } },
       { status: "COMPLETED" }
     );
 
     await RepairHistory.updateMany(
-      { complaint_id: complaint._id },
+      { complaint_id: { $in: lookupIds } },
       {
         verified_by: req.user._id,
         verified_at: new Date(),
@@ -498,6 +527,16 @@ const verifyRepairWork = async (req, res) => {
       remarks: `Repair verified and signed off by Manager ${req.user.name}.`,
       changed_at: new Date(),
     });
+
+    // Synchronize across all linked complaints in the WorkGroup
+    if (complaint.workGroupId) {
+      await syncWorkGroupStatus({
+        workGroupId: complaint.workGroupId,
+        newStatus: "CLOSED",
+        changedByUserId: req.user._id,
+        remarks: verificationNotes || `Repair verified and closed by Manager ${req.user.name}.`,
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -515,7 +554,7 @@ const verifyRepairWork = async (req, res) => {
 };
 
 // ==========================================
-// 5. GET REPAIR DETAILS & TIMELINE
+// 5. GET REPAIR DETAILS
 // ==========================================
 const getRepairDetails = async (req, res) => {
   try {
@@ -532,16 +571,20 @@ const getRepairDetails = async (req, res) => {
     await complaint.populate([
       { path: "reported_by", select: "name phone email" },
       { path: "area_id", select: "name type" },
+      { path: "workGroupId" },
     ]);
 
+    const masterId = complaint.masterComplaintId || complaint._id;
+    const lookupIds = [complaint._id, masterId].filter(Boolean);
+
     const [assignments, repairHistory, statusHistories] = await Promise.all([
-      Assignment.find({ complaint_id: complaint._id })
+      Assignment.find({ complaint_id: { $in: lookupIds } })
         .populate({
           path: "worker_id",
           populate: { path: "user_id", select: "name email phone" },
         })
         .populate("assigned_by", "name email"),
-      RepairHistory.findOne({ complaint_id: complaint._id })
+      RepairHistory.findOne({ complaint_id: { $in: lookupIds } })
         .populate({
           path: "worker_id",
           populate: { path: "user_id", select: "name email phone" },
@@ -552,12 +595,13 @@ const getRepairDetails = async (req, res) => {
         .sort({ changed_at: -1 }),
     ]);
 
+    const effectiveStatus = complaint.workGroupId?.status || complaint.status;
     const progress =
-      complaint.status === "RESOLVED" || complaint.status === "CLOSED"
+      effectiveStatus === "RESOLVED" || effectiveStatus === "CLOSED" || effectiveStatus === "COMPLETED"
         ? 100
-        : complaint.status === "IN_PROGRESS"
+        : effectiveStatus === "IN_PROGRESS"
         ? 80
-        : complaint.status === "ASSIGNED"
+        : effectiveStatus === "ASSIGNED"
         ? 20
         : 0;
 
@@ -571,12 +615,15 @@ const getRepairDetails = async (req, res) => {
           description: complaint.description,
           issueType: complaint.issue_type,
           priority: complaint.priority,
-          status: complaint.status,
+          status: effectiveStatus,
           location: complaint.address || complaint.location || "",
           landmark: complaint.landmark || "",
           area: complaint.area_id?.name || complaint.locality || complaint.city || "",
           reportedAt: complaint.reported_at,
           reportedBy: complaint.reported_by?.name,
+          isDuplicate: Boolean(complaint.isDuplicate),
+          workGroupId: complaint.workGroupId?.workGroupId || null,
+          masterComplaintId: complaint.masterComplaintId || null,
         },
         progress,
         assignments,
@@ -595,7 +642,7 @@ const getRepairDetails = async (req, res) => {
 };
 
 // ==========================================
-// 6. GET ALL REPAIRS & WORK TRACKING (MANAGER)
+// 6. GET ALL REPAIRS & WORK TRACKING (MANAGER - WORKGROUP AWARE)
 // ==========================================
 const getAllRepairs = async (req, res) => {
   try {
@@ -609,16 +656,17 @@ const getAllRepairs = async (req, res) => {
     const complaints = await Complaint.find(complaintFilter)
       .populate("reported_by", "name phone")
       .populate("area_id", "name type")
+      .populate("workGroupId")
       .sort({ reported_at: -1 });
 
     const complaintIds = complaints.map((c) => c._id);
 
     const [allAssignments, allRepairs, allImages] = await Promise.all([
-      Assignment.find({ complaint_id: { $in: complaintIds } }).populate({
+      Assignment.find().populate({
         path: "worker_id",
         populate: { path: "user_id", select: "name" },
       }),
-      RepairHistory.find({ complaint_id: { $in: complaintIds } }).populate([
+      RepairHistory.find().populate([
         {
           path: "worker_id",
           populate: { path: "user_id", select: "name" },
@@ -632,8 +680,12 @@ const getAllRepairs = async (req, res) => {
     ]);
 
     let trackWorks = complaints.map((c) => {
+      const masterId = c.masterComplaintId || c._id;
       const complaintAssignments = allAssignments.filter(
-        (a) => a.complaint_id && a.complaint_id.toString() === c._id.toString()
+        (a) =>
+          a.complaint_id &&
+          (a.complaint_id.toString() === c._id.toString() ||
+            a.complaint_id.toString() === masterId.toString())
       );
 
       const assignedWorkerNames = complaintAssignments
@@ -641,13 +693,19 @@ const getAllRepairs = async (req, res) => {
         .filter(Boolean);
 
       const complaintRepairs = allRepairs.filter(
-        (r) => r.complaint_id && r.complaint_id.toString() === c._id.toString()
+        (r) =>
+          r.complaint_id &&
+          (r.complaint_id.toString() === c._id.toString() ||
+            r.complaint_id.toString() === masterId.toString())
       );
 
       const latestRepair = complaintRepairs[complaintRepairs.length - 1] || null;
 
       const complaintImages = allImages.filter(
-        (img) => img.complaint_id && img.complaint_id.toString() === c._id.toString()
+        (img) =>
+          img.complaint_id &&
+          (img.complaint_id.toString() === c._id.toString() ||
+            img.complaint_id.toString() === masterId.toString())
       );
       const beforeImgDoc = complaintImages.find((img) => img.image_type === "BEFORE");
       const afterImgDoc = complaintImages.find((img) => img.image_type === "AFTER");
@@ -655,18 +713,19 @@ const getAllRepairs = async (req, res) => {
       const beforeImage = beforeImgDoc?.image_url || latestRepair?.before_image || c.image_url || null;
       const afterImage = afterImgDoc?.image_url || latestRepair?.after_image || null;
 
+      const effectiveStatus = c.workGroupId?.status || c.status;
       let displayStatus = "Not Assigned";
       let progress = 0;
-      if (c.status === "ASSIGNED") {
+      if (effectiveStatus === "ASSIGNED") {
         displayStatus = "Assigned";
         progress = 25;
-      } else if (c.status === "IN_PROGRESS") {
+      } else if (effectiveStatus === "IN_PROGRESS") {
         displayStatus = "In Progress";
         progress = 65;
-      } else if (c.status === "RESOLVED") {
+      } else if (effectiveStatus === "RESOLVED") {
         displayStatus = "Completed";
         progress = 100;
-      } else if (c.status === "CLOSED") {
+      } else if (effectiveStatus === "CLOSED") {
         displayStatus = "Closed";
         progress = 100;
       }
@@ -727,8 +786,8 @@ const getAllRepairs = async (req, res) => {
         area: c.area_id?.name || c.locality || c.city || "",
         priority: displayPriority,
         status: displayStatus,
-        rawStatus: c.status,
-        isClosed: c.status === "CLOSED",
+        rawStatus: effectiveStatus,
+        isClosed: effectiveStatus === "CLOSED",
         progress,
         assignedWorkers: assignedWorkerNames,
         assignedDate: assignedDateFormatted,
@@ -768,6 +827,11 @@ const getAllRepairs = async (req, res) => {
             })
           : "Recently",
         history: historyTimeline,
+        // WorkGroup attributes
+        isDuplicate: Boolean(c.isDuplicate),
+        masterComplaintId: c.masterComplaintId || null,
+        workGroupId: c.workGroupId?.workGroupId || null,
+        linkedCount: c.workGroupId?.linkedComplaints?.length || 1,
       };
     });
 
@@ -793,7 +857,8 @@ const getAllRepairs = async (req, res) => {
           (w.id && w.id.toLowerCase().includes(q)) ||
           (w.title && w.title.toLowerCase().includes(q)) ||
           (w.location && w.location.toLowerCase().includes(q)) ||
-          (w.assignedWorkers && w.assignedWorkers.some((worker) => worker && worker.toLowerCase().includes(q)))
+          (w.assignedWorkers && w.assignedWorkers.some((worker) => worker && worker.toLowerCase().includes(q))) ||
+          (w.workGroupId && w.workGroupId.toLowerCase().includes(q))
       );
     }
 

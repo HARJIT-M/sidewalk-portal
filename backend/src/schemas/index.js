@@ -7,6 +7,7 @@ const StatusHistory = require("./StatusHistory");
 const RepairHistory = require("./RepairHistory");
 const Notification = require("./Notification");
 const Area = require("./Area");
+const WorkGroup = require("./WorkGroup");
 
 module.exports = {
   User,
@@ -18,4 +19,5 @@ module.exports = {
   RepairHistory,
   Notification,
   Area,
+  WorkGroup,
 };

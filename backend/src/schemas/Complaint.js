@@ -130,6 +130,23 @@ const complaintSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isDuplicate: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    masterComplaintId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Complaint",
+      default: null,
+      index: true,
+    },
+    workGroupId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "WorkGroup",
+      default: null,
+      index: true,
+    },
     reported_at: {
       type: Date,
       default: Date.now,
@@ -145,5 +162,7 @@ const complaintSchema = new mongoose.Schema(
 
 complaintSchema.index({ geo_location: "2dsphere" });
 complaintSchema.index({ manager_id: 1, status: 1 });
+complaintSchema.index({ workGroupId: 1 });
+complaintSchema.index({ masterComplaintId: 1 });
 
 module.exports = mongoose.model("Complaint", complaintSchema);

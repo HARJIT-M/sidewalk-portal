@@ -11,6 +11,7 @@ import {
   ArrowRight,
   Inbox,
   X,
+  Link2,
 } from "lucide-react";
 import userApi from "../../../services/userApi";
 import "./viewcomplaint.css";
@@ -31,6 +32,7 @@ const ViewComplaints = () => {
   const [loading, setLoading] = useState(true);
 
   const [selectedComplaint, setSelectedComplaint] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
@@ -59,10 +61,28 @@ const ViewComplaints = () => {
     }
   };
 
+  const handleOpenDetails = async (complaint) => {
+    setSelectedComplaint(complaint);
+    setLoadingDetails(true);
+    try {
+      const res = await userApi.getComplaintDetails(complaint.id || complaint.mongoId);
+      if (res && res.success && res.complaint) {
+        setSelectedComplaint((prev) => ({
+          ...prev,
+          ...res.complaint,
+        }));
+      }
+    } catch (err) {
+      console.warn("Could not load extended details:", err);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
   const formatStatus = (status) => {
     if (!status) return "Pending";
     if (status === "IN_PROGRESS") return "In Progress";
-    if (status === "RESOLVED" || status === "CLOSED") return "Completed";
+    if (status === "RESOLVED" || status === "CLOSED" || status === "COMPLETED") return "Completed";
     if (status === "ASSIGNED") return "Assigned";
     return "Pending";
   };
@@ -96,7 +116,8 @@ const ViewComplaints = () => {
     (complaint) =>
       (complaint.id || "").toLowerCase().includes(query) ||
       (complaint.title || "").toLowerCase().includes(query) ||
-      (complaint.location || "").toLowerCase().includes(query)
+      (complaint.location || "").toLowerCase().includes(query) ||
+      (complaint.workGroupId || "").toLowerCase().includes(query)
   );
 
   const stats = {
@@ -133,39 +154,42 @@ const ViewComplaints = () => {
 
         <div className="vc-header-text">
           <h1>My Complaints</h1>
-          <p>Track and view the complaints you have submitted.</p>
+          <p>Track and view the complaints you have submitted with real-time maintenance updates.</p>
         </div>
 
         <div className="vc-user">
           <div className="vc-avatar">{initial}</div>
-          <div>
-            <h3>{user.name || "My Account"}</h3>
-            {user.email && <span>{user.email}</span>}
+          <div className="vc-user-text">
+            <strong>{user.name || "Citizen"}</strong>
+            <span>Verified Citizen</span>
           </div>
         </div>
       </div>
 
 
       {/* ============================
-          STATISTICS
+          STAT CARDS
       ============================ */}
 
       <div className="vc-stats">
-        {statCards.map(({ label, value, icon: Icon, tone }, i) => (
-          <div
-            className={`vc-stat vc-stat-${tone}`}
-            key={label}
-            style={{ animationDelay: `${0.1 + i * 0.08}s` }}
-          >
-            <div className="vc-stat-icon">
-              <Icon size={22} strokeWidth={2.2} />
+        {statCards.map((card, i) => {
+          const Icon = card.icon;
+          return (
+            <div
+              className={`vc-stat vc-stat-${card.tone} ${card.tone}`}
+              key={card.label}
+              style={{ animationDelay: `${i * 0.08}s` }}
+            >
+              <div className="vc-stat-icon">
+                <Icon size={22} strokeWidth={2.4} />
+              </div>
+              <div className="vc-stat-text">
+                <strong className="vc-stat-num">{card.value}</strong>
+                <span className="vc-stat-label">{card.label}</span>
+              </div>
             </div>
-            <div>
-              <strong>{value}</strong>
-              <span>{label}</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
 
@@ -200,7 +224,7 @@ const ViewComplaints = () => {
           <Search size={18} strokeWidth={2} />
           <input
             type="text"
-            placeholder="Search by complaint ID, title or location..."
+            placeholder="Search by complaint ID, title, location or WorkGroup..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -251,6 +275,25 @@ const ViewComplaints = () => {
 
                   <h3 className="vc-card-title">{complaint.title}</h3>
 
+                  {complaint.isDuplicate && (
+                    <div style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      padding: "3px 8px",
+                      borderRadius: "12px",
+                      background: "#ecfdf5",
+                      color: "#059669",
+                      border: "1px solid #a7f3d0",
+                      marginBottom: "8px",
+                      width: "fit-content",
+                    }}>
+                      <Link2 size={12} /> Linked to {complaint.workGroupId || "Maintenance Group"}
+                    </div>
+                  )}
+
                   <div className="vc-meta">
                     <span>
                       <MapPin size={14} strokeWidth={2} />
@@ -282,7 +325,7 @@ const ViewComplaints = () => {
 
                     <button
                       className="vc-view"
-                      onClick={() => setSelectedComplaint(complaint)}
+                      onClick={() => handleOpenDetails(complaint)}
                     >
                       View Details
                       <ArrowRight size={15} strokeWidth={2.4} />
@@ -305,6 +348,7 @@ const ViewComplaints = () => {
         const displayStatus = formatStatus(selectedComplaint.status);
         const displayPriority = formatPriority(selectedComplaint.priority);
         const stage = stageOf(selectedComplaint.status);
+        const submittedPhoto = selectedComplaint.image || (selectedComplaint.images && selectedComplaint.images[0]?.url) || null;
 
         return (
           <div
@@ -342,7 +386,48 @@ const ViewComplaints = () => {
                 <span className={`vc-priority ${cls(displayPriority)}`}>
                   {displayPriority} Priority
                 </span>
+
+                {selectedComplaint.workGroupId && (
+                  <span style={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    padding: "4px 10px",
+                    borderRadius: "12px",
+                    background: "#ede9fe",
+                    color: "#6d28d9",
+                    border: "1px solid #ddd6fe",
+                  }}>
+                    WorkGroup: {selectedComplaint.workGroupId}
+                  </span>
+                )}
               </div>
+
+              {/* SMART DUPLICATE / UNIFIED MAINTENANCE ACTIVITY BANNER */}
+              {selectedComplaint.isDuplicate && (
+                <div style={{
+                  background: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  borderRadius: "12px",
+                  padding: "14px 16px",
+                  marginBottom: "18px",
+                  display: "flex",
+                  gap: "12px",
+                  alignItems: "flex-start",
+                }}>
+                  <div style={{ color: "#16a34a", marginTop: "2px" }}>
+                    <CheckCircle2 size={20} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, color: "#15803d", marginBottom: "3px", fontSize: "14px" }}>
+                      Unified Maintenance Activity {selectedComplaint.workGroupId ? `(${selectedComplaint.workGroupId})` : ""}
+                    </div>
+                    <div style={{ fontSize: "13px", color: "#166534", lineHeight: "1.4" }}>
+                      {selectedComplaint.linkedMessage ||
+                        "Your complaint has been linked to an existing maintenance activity at this location. Our maintenance team is already working on this issue."}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Details */}
               <div className="vc-details">
@@ -353,7 +438,7 @@ const ViewComplaints = () => {
 
                 <div className="vc-detail">
                   <label>Reported Date</label>
-                  <span>{selectedComplaint.date}</span>
+                  <span>{selectedComplaint.date || selectedComplaint.reportedDate}</span>
                 </div>
 
                 <div className="vc-detail">
@@ -362,30 +447,91 @@ const ViewComplaints = () => {
                 </div>
 
                 <div className="vc-detail">
-                  <label>Location</label>
+                  <label>Reported Location</label>
                   <span>{selectedComplaint.location}</span>
                 </div>
 
-                <div className="vc-detail">
-                  <label>Latitude</label>
-                  <span>{selectedComplaint.latitude}</span>
-                </div>
+                {selectedComplaint.latitude && selectedComplaint.longitude && (
+                  <>
+                    <div className="vc-detail">
+                      <label>Latitude</label>
+                      <span>{selectedComplaint.latitude}</span>
+                    </div>
 
-                <div className="vc-detail">
-                  <label>Longitude</label>
-                  <span>{selectedComplaint.longitude}</span>
-                </div>
+                    <div className="vc-detail">
+                      <label>Longitude</label>
+                      <span>{selectedComplaint.longitude}</span>
+                    </div>
+                  </>
+                )}
+
+                {/* Assigned maintenance crew (workers) */}
+                {selectedComplaint.assignedWorkers && selectedComplaint.assignedWorkers.length > 0 && (
+                  <div className="vc-detail">
+                    <label>Assigned Maintenance Crew</label>
+                    <span style={{ fontWeight: 600, color: "#4f46e5" }}>
+                      {selectedComplaint.assignedWorkers.join(", ")}
+                    </span>
+                  </div>
+                )}
+
+                {/* Scheduled / Work Dates */}
+                {selectedComplaint.workStartDate && (
+                  <div className="vc-detail">
+                    <label>Work Start Date</label>
+                    <span>
+                      {new Date(selectedComplaint.workStartDate).toLocaleDateString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </span>
+                  </div>
+                )}
+
+                {selectedComplaint.workEndDate && (
+                  <div className="vc-detail">
+                    <label>Estimated / Completed Date</label>
+                    <span>
+                      {new Date(selectedComplaint.workEndDate).toLocaleDateString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Description */}
               <div className="vc-description">
                 <label>Description</label>
-                <p>{selectedComplaint.description}</p>
+                <p>{selectedComplaint.description || "No description provided."}</p>
               </div>
+
+              {/* Submitted Photo */}
+              {submittedPhoto && (
+                <div style={{ marginTop: "14px", marginBottom: "16px" }}>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>
+                    Your Submitted Photo
+                  </label>
+                  <img
+                    src={submittedPhoto}
+                    alt="Reported footpath damage"
+                    style={{
+                      width: "100%",
+                      maxHeight: "220px",
+                      objectFit: "cover",
+                      borderRadius: "12px",
+                      border: "1px solid #e5e7eb",
+                    }}
+                  />
+                </div>
+              )}
 
               {/* Timeline */}
               <div className="vc-timeline-wrap">
-                <h3>Complaint Status</h3>
+                <h3>Shared Maintenance Progress</h3>
 
                 <div className="vc-timeline">
 
@@ -395,7 +541,7 @@ const ViewComplaints = () => {
                     </div>
                     <div>
                       <strong>Complaint Submitted</strong>
-                      <span>{selectedComplaint.date}</span>
+                      <span>{selectedComplaint.date || selectedComplaint.reportedDate}</span>
                     </div>
                   </div>
 
@@ -404,7 +550,11 @@ const ViewComplaints = () => {
                     <div>
                       <strong>Work Assigned</strong>
                       <span>
-                        {stage >= 2 ? "Workers assigned" : "Waiting for assignment"}
+                        {stage >= 2
+                          ? selectedComplaint.assignedWorkers?.length
+                            ? `Assigned to ${selectedComplaint.assignedWorkers.join(", ")}`
+                            : "Maintenance crew assigned"
+                          : "Waiting for assignment"}
                       </span>
                     </div>
                   </div>
@@ -414,7 +564,7 @@ const ViewComplaints = () => {
                     <div>
                       <strong>Work In Progress</strong>
                       <span>
-                        {stage >= 3 ? "Repair work started" : "Not started"}
+                        {stage >= 3 ? "Repair work actively in progress on site" : "Not started"}
                       </span>
                     </div>
                   </div>
@@ -426,7 +576,7 @@ const ViewComplaints = () => {
                     <div>
                       <strong>Completed</strong>
                       <span>
-                        {stage >= 4 ? "Repair completed" : "Waiting for completion"}
+                        {stage >= 4 ? "Footpath repair completed and verified" : "Waiting for completion"}
                       </span>
                     </div>
                   </div>

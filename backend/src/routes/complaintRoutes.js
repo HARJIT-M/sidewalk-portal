@@ -12,6 +12,10 @@ const {
   getUserComplaints,
   deleteComplaint,
   getPotentialDuplicates,
+  updateWorkGroupStatus,
+  getWorkGroupDetails,
+  linkComplaintToWorkGroupHandler,
+  unlinkComplaintFromWorkGroupHandler,
 } = require("../controllers/complaintController");
 const uploadComplaintImages = require("../middleware/complaintUploadMiddleware");
 
@@ -37,7 +41,16 @@ router.post("/:id/assign", authorize("MANAGER", "ADMIN"), assignComplaintWorkers
 router.delete("/:id", authorize("MANAGER"), deleteComplaint);
 
 // ==========================================
-// 3. USER COMPLAINTS (USER)
+// 3. WORKGROUP UNIFIED OPERATIONS (MANAGER & ADMIN)
+// ==========================================
+router.put("/workgroup/:id/status", authorize("MANAGER", "ADMIN"), updateWorkGroupStatus);
+router.put("/:id/workgroup-status", authorize("MANAGER", "ADMIN"), updateWorkGroupStatus);
+router.get("/workgroup/:id", authorize("MANAGER", "ADMIN"), getWorkGroupDetails);
+router.post("/:id/link-workgroup", authorize("MANAGER", "ADMIN"), linkComplaintToWorkGroupHandler);
+router.post("/:id/unlink-workgroup", authorize("MANAGER", "ADMIN"), unlinkComplaintFromWorkGroupHandler);
+
+// ==========================================
+// 4. USER COMPLAINTS (USER)
 // ==========================================
 router.post(
   "/",
@@ -50,7 +63,7 @@ router.get("/admin-routing", authorize("ADMIN"), getAdminRoutingComplaints);
 router.patch("/:id/route", authorize("ADMIN"), routeComplaintToManager);
 
 // ==========================================
-// 4. COMMON COMPLAINT DETAILS (WORKER & MANAGER & USER)
+// 5. COMMON COMPLAINT DETAILS (WORKER & MANAGER & USER)
 // ==========================================
 router.get("/:id/duplicates", authorize("MANAGER", "ADMIN"), getPotentialDuplicates);
 router.get("/:id", getComplaintDetails);

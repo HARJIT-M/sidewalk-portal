@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 const managerApi = axios.create({
   baseURL: API_BASE_URL,
@@ -221,6 +221,58 @@ export const verifyRepairWork = async (complaintId, payload = {}) => {
   } catch (error) {
     throw new Error(
       error?.response?.data?.message || "Failed to verify repair work."
+    );
+  }
+};
+
+// ==========================================
+// 5. WORKGROUP UNIFIED TRACKING & MANAGEMENT
+// ==========================================
+export const updateWorkGroupStatus = async (id, status, remarks = "") => {
+  try {
+    const response = await managerApi.put(`/api/complaints/workgroup/${id}/status`, {
+      status,
+      remarks,
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error?.response?.data?.message || "Failed to update WorkGroup status."
+    );
+  }
+};
+
+export const getWorkGroupDetails = async (id) => {
+  try {
+    const response = await managerApi.get(`/api/complaints/workgroup/${id}`);
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error?.response?.data?.message || "Failed to load WorkGroup details."
+    );
+  }
+};
+
+export const linkComplaintToWorkGroup = async (complaintId, targetWorkGroupId) => {
+  try {
+    const response = await managerApi.post(`/api/complaints/${complaintId}/link-workgroup`, {
+      targetWorkGroupId,
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error?.response?.data?.message || "Failed to link complaint to WorkGroup."
+    );
+  }
+};
+
+export const unlinkComplaintFromWorkGroup = async (complaintId) => {
+  try {
+    const response = await managerApi.post(`/api/complaints/${complaintId}/unlink-workgroup`);
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error?.response?.data?.message || "Failed to unlink complaint from WorkGroup."
     );
   }
 };
