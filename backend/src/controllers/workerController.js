@@ -265,8 +265,10 @@ const getAvailableWorkers = async (req, res) => {
       .select("employee_code worker_role skills user_id manager_id");
 
     const workerOptions = activeWorkers.map((w, index) => ({
-      id: index + 1,
-      workerId: w._id,
+      id: String(w._id),
+      _id: String(w._id),
+      workerId: String(w._id),
+      index: index + 1,
       employeeCode: w.employee_code,
       name: w.user_id ? w.user_id.name : `Worker ${w.employee_code}`,
       role: w.worker_role || "Maintenance Worker",

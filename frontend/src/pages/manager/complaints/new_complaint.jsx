@@ -103,14 +103,18 @@ const Complaints = () => {
       })
       .then((res) => {
         if (!isCurrentRequest || !res) return;
-        const workers = (res.workers || []).map((w) => ({
-          id: w._id || w.id,
-          name: w.name,
-          employeeCode: w.employeeCode || w.employee_code || "WRK",
-          team: w.zone || w.area || "City Maintenance",
-          role: w.specialization || "Sidewalk Repair",
-          phone: w.phone || "",
-        }));
+        const workers = (res.workers || []).map((w) => {
+          const workerId = String(w.workerId || w._id || w.id);
+          return {
+            id: workerId,
+            workerId: workerId,
+            name: w.name,
+            employeeCode: w.employeeCode || w.employee_code || "WRK",
+            team: w.team || w.zone || w.area || "City Maintenance",
+            role: w.role || w.specialization || "Sidewalk Repair",
+            phone: w.phone || "",
+          };
+        });
         setAvailableWorkers(workers);
       })
       .catch((err) => {
@@ -423,33 +427,72 @@ const Complaints = () => {
 
   return (
     <div className="mc-page">
-      {/* ================= PAGE HEADER ================= */}
-      <div className="mc-header">
-        <div className="mc-header-text">
+      {/* ================= HERO BANNER ================= */}
+      <section className="mc-hero">
+        <div className="mc-hero-rings" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div className="mc-hero-slabs" aria-hidden="true">
+          <i></i><i></i><i></i><i></i>
+        </div>
+
+        <div className="mc-hero-text">
+          <span className="mc-hero-tag">
+            <ClipboardList size={14} strokeWidth={2.4} /> Manager Portal
+          </span>
           <h1>Footpath Complaints</h1>
           <p>Review damage reports, link duplicates into unified maintenance WorkGroups, and assign teams.</p>
         </div>
 
-        <div className="mc-header-stats">
-          <div className="mc-stat">
-            <strong>{complaints.length}</strong>
-            <span>Total</span>
+        <div className="mc-count">
+          <strong>{complaints.length}</strong>
+          <span>Total Complaints</span>
+        </div>
+      </section>
+
+      {/* ================= STATISTICS ROW ================= */}
+      <div className="mc-stats">
+        <div className="mc-stat mc-stat-total">
+          <div className="mc-stat-icon">
+            <ClipboardList size={22} strokeWidth={2.2} />
           </div>
-          <div className="mc-stat">
+          <div className="mc-stat-text">
+            <strong>{complaints.length}</strong>
+            <span>Total Reported</span>
+          </div>
+        </div>
+
+        <div className="mc-stat mc-stat-pending">
+          <div className="mc-stat-icon">
+            <Clock size={22} strokeWidth={2.2} />
+          </div>
+          <div className="mc-stat-text">
             <strong>
               {complaints.filter((c) => c.status === "Pending" || c.status === "Not Assigned").length}
             </strong>
-            <span>Pending</span>
+            <span>Pending Review</span>
           </div>
-          <div className="mc-stat">
+        </div>
+
+        <div className="mc-stat mc-stat-progress">
+          <div className="mc-stat-icon">
+            <RefreshCw size={22} strokeWidth={2.2} />
+          </div>
+          <div className="mc-stat-text">
             <strong>
-              {complaints.filter((c) => c.status === "In Progress").length}
+              {complaints.filter((c) => c.status === "In Progress" || c.status === "Assigned").length}
             </strong>
-            <span>In Progress</span>
+            <span>Active / Assigned</span>
           </div>
-          <div className="mc-stat">
+        </div>
+
+        <div className="mc-stat mc-stat-done">
+          <div className="mc-stat-icon">
+            <CheckCircle2 size={22} strokeWidth={2.2} />
+          </div>
+          <div className="mc-stat-text">
             <strong>
-              {complaints.filter((c) => c.status === "Completed" || c.status === "Resolved").length}
+              {complaints.filter((c) => c.status === "Completed" || c.status === "Resolved" || c.status === "Closed").length}
             </strong>
             <span>Resolved</span>
           </div>

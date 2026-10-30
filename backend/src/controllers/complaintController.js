@@ -734,16 +734,31 @@ const assignComplaintWorkers = async (req, res) => {
       });
     }
 
-    const workerIds = selectedWorkers.map((selection) =>
-      typeof selection === "string" ? selection : selection?.workerId
-    );
+    const rawWorkerIds = selectedWorkers.map((selection) => {
+      if (typeof selection === "string") return selection.trim();
+      if (selection && typeof selection === "object") {
+        return (selection.workerId || selection.id || selection._id || "").toString().trim();
+      }
+      return String(selection).trim();
+    });
+
+    const resolvedWorkerIds = [];
+    for (const wid of rawWorkerIds) {
+      if (mongoose.Types.ObjectId.isValid(wid)) {
+        resolvedWorkerIds.push(wid);
+      } else {
+        const found = await Worker.findOne({ employee_code: wid });
+        if (found) {
+          resolvedWorkerIds.push(String(found._id));
+        }
+      }
+    }
+
+    const workerIds = [...new Set(resolvedWorkerIds)];
+
     if (
-      workerIds.some(
-        (workerId) =>
-          typeof workerId !== "string" ||
-          !mongoose.Types.ObjectId.isValid(workerId)
-      ) ||
-      new Set(workerIds).size !== workerIds.length
+      workerIds.length === 0 ||
+      workerIds.length !== rawWorkerIds.length
     ) {
       return res.status(400).json({
         success: false,
