@@ -105,7 +105,7 @@ const Login = () => {
         <div className="lg-brand">
           <div className="lg-brand-icon">P</div>
           <div>
-            <b>Paadhai</b>
+            <b>UrbanStep</b>
             <span>Footpath Repair Portal</span>
           </div>
         </div>
@@ -208,7 +208,7 @@ const Login = () => {
           </form>
 
           <p className="lg-switch">
-            New to Paadhai? <Link to="/signup">Create an account</Link>
+            New to UrbanStep? <Link to="/signup">Create an account</Link>
           </p>
 
         </div>

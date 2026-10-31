@@ -105,14 +105,14 @@ const Signup = () => {
         <div className="su-brand">
           <div className="su-brand-icon">P</div>
           <div>
-            <b>Paadhai</b>
+            <b>UrbanStep</b>
             <span>Footpath Repair Portal</span>
           </div>
         </div>
 
         <div className="su-hero-body">
           <h1>
-            Join Paadhai.
+            Join UrbanStep.
             <br />
             <span className="su-hl">Fix your street.</span>
           </h1>
@@ -154,7 +154,7 @@ const Signup = () => {
 
               <h2>Account created successfully</h2>
               <p>
-                Welcome to Paadhai, {form.name.trim().split(" ")[0]}. Taking
+                Welcome to UrbanStep, {form.name.trim().split(" ")[0]}. Taking
                 you to the login page...
               </p>
 

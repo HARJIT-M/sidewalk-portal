@@ -18,7 +18,7 @@ import {
 import "./landingpage.css";
 
 /* ---------- website name (change here and it updates everywhere) ---------- */
-const SITE_NAME = "Paadhai";
+const SITE_NAME = "UrbanStep";
 const TAGLINE = "Digital Footpath Inspection & Repair Portal";
 
 const STAGES = [
@@ -613,9 +613,9 @@ const LandingPage = () => {
                 Report a footpath issue
                 <ArrowRight size={16} strokeWidth={2.5} />
               </Link>
-              <Link to="/login" className="btn-ghost">
+              {/* <Link to="/login" className="btn-ghost">
                 I'm an inspector / worker
-              </Link>
+              </Link> */}
             </div>
 
           </div>
@@ -817,7 +817,7 @@ const LandingPage = () => {
 
           <div className="hero-actions center">
             <Link to="/signup" className="btn-primary light">
-              Get started — it's free
+              Get started
               <ArrowRight size={16} strokeWidth={2.5} />
             </Link>
           </div>
@@ -845,7 +845,7 @@ const LandingPage = () => {
             <small>{TAGLINE}</small>
           </div>
 
-          <p>© 2026 {SITE_NAME} · Coimbatore Municipal Corporation</p>
+          <p>© 2026 {SITE_NAME}</p>
 
         </div>
 

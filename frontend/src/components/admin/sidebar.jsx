@@ -64,7 +64,7 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
         </div>
 
         <div className="brand-text">
-          <h2>Footpath</h2>
+          <h2>UrbanStep</h2>
           <span>Admin Portal</span>
         </div>
 

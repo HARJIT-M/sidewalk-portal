@@ -73,7 +73,7 @@ const UserSidebar = ({ collapsed, setCollapsed }) => {
           <div className="brand-icon">U</div>
 
           <div className="brand-text">
-            <h2>Footpath</h2>
+            <h2>UrbanStep</h2>
             <span>Citizen Portal</span>
           </div>
         </div>

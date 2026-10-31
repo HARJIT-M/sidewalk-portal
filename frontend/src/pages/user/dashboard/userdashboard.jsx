@@ -145,7 +145,7 @@ const UserDashboard = () => {
 
         <div className="ud-hero-text">
           <span className="ud-hero-tag">
-            <MapPin size={14} strokeWidth={2.4} /> Paadhai
+            <MapPin size={14} strokeWidth={2.4} /> UrbanStep
           </span>
           <h1>
             Welcome back{firstName ? `, ${firstName}` : ""}!

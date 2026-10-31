@@ -35,6 +35,7 @@
   padding: 28px 30px 40px;
   font-family: "Segoe UI", Arial, sans-serif;
   color: var(--ink);
+  overflow-x: hidden;
   background:
     radial-gradient(circle at 95% 0%, rgba(124, 58, 237, 0.14), transparent 34%),
     radial-gradient(circle at 0% 100%, rgba(79, 70, 229, 0.1), transparent 38%),
@@ -156,6 +157,11 @@
   display: flex;
   align-items: center;
   gap: 18px;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.up-identity > div:last-child {
   min-width: 0;
 }
 
@@ -197,6 +203,7 @@
   font-size: 30px;
   font-weight: 800;
   letter-spacing: -0.4px;
+  overflow-wrap: anywhere;
 }
 
 .up-header p {
@@ -267,6 +274,10 @@
   animation: upRise 0.35s ease both;
 }
 
+.up-alert svg {
+  flex-shrink: 0;
+}
+
 .up-alert.success {
   background: #f0fdf4;
   border: 1px solid #bbf7d0;
@@ -286,7 +297,7 @@
 
 .up-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
   margin-bottom: 24px;
 }
@@ -297,6 +308,7 @@
   display: flex;
   align-items: center;
   gap: 16px;
+  min-width: 0;
   padding: 20px;
   border-radius: 18px;
   background: white;
@@ -366,9 +378,14 @@
 
 .up-main {
   display: grid;
-  grid-template-columns: 300px 1fr;
+  grid-template-columns: 300px minmax(0, 1fr);
   gap: 22px;
   align-items: start;
+}
+
+.up-side,
+.up-details {
+  min-width: 0;
 }
 
 
@@ -417,6 +434,7 @@
   margin: 0 0 4px;
   font-size: 18px;
   font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .up-side-role {
@@ -568,6 +586,7 @@
 }
 
 .up-info .label svg {
+  flex-shrink: 0;
   color: var(--purple);
 }
 
@@ -654,6 +673,8 @@
   max-width: 520px;
   max-height: 90vh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   border-radius: 24px;
   background: white;
   font-family: "Segoe UI", Arial, sans-serif;
@@ -665,6 +686,11 @@
 @keyframes upModal {
   from { opacity: 0; transform: translateY(16px) scale(0.97); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes upSheet {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
 }
 
 .up-modal-head {
@@ -693,6 +719,7 @@
 
 .up-modal-head > div {
   position: relative;
+  min-width: 0;
 }
 
 .up-modal-label {
@@ -857,30 +884,47 @@
 
 
 /* =====================================================
-   RESPONSIVE
+   RESPONSIVE: TABLET  (<= 950px)
 ===================================================== */
 
 @media (max-width: 950px) {
   .up-stats {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .up-main {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  /* side card becomes a compact strip */
+  /* side card becomes a compact strip:
+     avatar on the left, name / role / pill stacked on the right */
   .up-side {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 20px;
     align-items: center;
-    gap: 20px;
     padding: 24px 22px 22px;
     text-align: left;
   }
 
   .up-side-avatar {
+    grid-row: 1 / span 3;
     margin: 0;
-    flex-shrink: 0;
+  }
+
+  .up-side h3 {
+    grid-column: 2;
+    margin: 0 0 2px;
+  }
+
+  .up-side-role {
+    grid-column: 2;
+    margin-bottom: 8px;
+  }
+
+  .up-side-pill {
+    grid-column: 2;
+    justify-self: start;
   }
 
   .up-contact-list,
@@ -888,22 +932,32 @@
   .up-note {
     display: none;
   }
-
-  .up-side-pill {
-    margin-top: 4px;
-  }
 }
+
+
+/* =====================================================
+   RESPONSIVE: MOBILE  (<= 650px)
+===================================================== */
 
 @media (max-width: 650px) {
   .up-page {
     padding: 20px;
   }
 
+  /* ---------- header ---------- */
   .up-header {
     flex-direction: column;
     align-items: flex-start;
+    flex-wrap: nowrap;
+    gap: 20px;
     padding: 24px 22px;
     border-radius: 20px;
+  }
+
+  /* the 320px flex-basis would become a HEIGHT in a column layout */
+  .up-identity {
+    flex: 0 0 auto;
+    width: 100%;
   }
 
   .up-header h1 {
@@ -919,24 +973,104 @@
   .up-btn-ghost {
     width: 100%;
     justify-content: center;
+    min-height: 46px;
   }
 
+  /* ---------- stats: keep 2 columns, just tighter ---------- */
   .up-stats {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
+    margin-bottom: 20px;
   }
 
-  .up-side {
+  .up-stat {
     flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 18px 16px 16px;
+  }
+
+  .up-stat-icon {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    border-radius: 13px;
+  }
+
+  .up-stat strong {
+    font-size: 24px;
+  }
+
+  .up-stat span {
+    margin-top: 4px;
+    font-size: 12px;
+  }
+
+  /* ---------- side card: centred stack, contact info visible ---------- */
+  .up-side {
+    display: block;
+    padding: 26px 20px 20px;
     text-align: center;
   }
 
+  .up-side-avatar {
+    margin: 0 auto 14px;
+  }
+
+  .up-side h3,
+  .up-side-role {
+    grid-column: auto;
+  }
+
+  .up-side-pill {
+    justify-self: auto;
+  }
+
+  .up-divider {
+    display: block;
+  }
+
+  .up-contact-list {
+    display: flex;
+  }
+
+  .up-note {
+    display: flex;
+    margin-top: 16px;
+  }
+
+  /* ---------- details card ---------- */
+  .up-main {
+    gap: 18px;
+  }
+
   .up-details {
-    padding: 6px 18px 20px;
+    padding: 4px 18px 20px;
+    border-radius: 20px;
   }
 
   .up-tabs {
+    margin: 0 -18px 18px;
+    padding: 0 18px;
     overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .up-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .up-tab {
+    flex-shrink: 0;
+    margin-bottom: 0;
+    padding: 15px 4px;
+    min-height: 48px;
+  }
+
+  .up-tab + .up-tab {
+    margin-left: 14px;
   }
 
   .up-info {
@@ -945,16 +1079,44 @@
     gap: 4px;
   }
 
+  .up-info .label {
+    white-space: normal;
+  }
+
   .up-info .value {
     text-align: left;
   }
 
-  .up-form {
-    padding: 22px 20px 22px;
+  /* ---------- popups become bottom sheets ---------- */
+  .up-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .up-modal {
+    max-width: none;
+    max-height: 92vh;
+    max-height: 92dvh;
+    border-radius: 24px 24px 0 0;
+    animation: upSheet 0.3s cubic-bezier(0.19, 1, 0.22, 1);
   }
 
   .up-modal-head {
     padding: 20px;
+  }
+
+  .up-modal-head h2 {
+    font-size: 20px;
+  }
+
+  .up-form {
+    padding: 22px 20px calc(22px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* 16px stops iOS Safari zooming in when an input is focused */
+  .up-group input {
+    height: 50px;
+    font-size: 16px;
   }
 
   .up-modal-footer {
@@ -964,6 +1126,103 @@
   .up-cancel,
   .up-save {
     width: 100%;
+    min-height: 48px;
+  }
+}
+
+
+/* =====================================================
+   RESPONSIVE: SMALL PHONES  (<= 480px)
+===================================================== */
+
+@media (max-width: 480px) {
+  .up-page {
+    padding: 14px 14px 32px;
+  }
+
+  .up-header {
+    padding: 22px 18px;
+    margin-bottom: 18px;
+  }
+
+  .up-identity {
+    gap: 14px;
+  }
+
+  .up-header-avatar {
+    width: 54px;
+    height: 54px;
+    min-width: 54px;
+    border-radius: 17px;
+    font-size: 22px;
+  }
+
+  .up-header h1 {
+    font-size: 22px;
+  }
+
+  .up-header p {
+    font-size: 13px;
+  }
+
+  .up-eyebrow {
+    font-size: 10px;
+  }
+
+  .up-alert {
+    padding: 12px 14px;
+    font-size: 13px;
+  }
+
+  .up-stat {
+    padding: 16px 14px 14px;
+  }
+
+  .up-side {
+    padding: 24px 16px 18px;
+  }
+
+  .up-side-avatar {
+    width: 72px;
+    height: 72px;
+    font-size: 27px;
+  }
+
+  .up-details {
+    padding: 2px 16px 18px;
+  }
+
+  .up-tabs {
+    margin: 0 -16px 16px;
+    padding: 0 16px;
+  }
+
+  .up-info {
+    font-size: 13.5px;
+  }
+
+  .up-impact {
+    margin-top: 18px;
+  }
+}
+
+
+/* =====================================================
+   RESPONSIVE: VERY SMALL  (<= 360px)
+===================================================== */
+
+@media (max-width: 360px) {
+  .up-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .up-stat {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .up-header h1 {
+    font-size: 20px;
   }
 }
 

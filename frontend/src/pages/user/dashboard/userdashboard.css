@@ -143,6 +143,7 @@
 
 .ud-hero-text {
   position: relative;
+  flex: 1 1 320px;
   min-width: 0;
 }
 
@@ -749,6 +750,11 @@
     align-items: flex-start;
     padding: 26px 22px;
     border-radius: 20px;
+  }
+
+  .ud-hero-text {
+    flex: 0 0 auto;   /* stop the 320px basis from becoming a height */
+    width: 100%;
   }
 
   .ud-hero h1 {

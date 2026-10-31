@@ -111,7 +111,8 @@
 
 .vc-header-text {
   position: relative;
-  min-width: 0;
+  flex: 0 0 auto;   /* stop the 320px basis from becoming a height */
+    width: 100%;
 }
 
 .vc-header h1 {

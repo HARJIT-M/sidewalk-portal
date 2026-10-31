@@ -69,7 +69,7 @@ const WorkerSidebar = ({ collapsed, setCollapsed }) => {
       <div className="sidebar-brand">
         <div className="brand-icon">W</div>
         <div className="brand-text">
-          <h2>Footpath</h2>
+          <h2>UrbanStep</h2>
           <span>Worker Portal</span>
         </div>
       </div>
