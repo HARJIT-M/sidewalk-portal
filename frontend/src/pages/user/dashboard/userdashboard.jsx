@@ -10,9 +10,14 @@ import {
   Calendar,
   ArrowRight,
   Inbox,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import userApi from "../../../services/userApi";
 import "./userdashboard.css";
+
+// number of complaints shown per page
+const PAGE_SIZE = 5;
 
 // first name of the logged in user (saved by the login page)
 const getFirstName = () => {
@@ -24,11 +29,27 @@ const getFirstName = () => {
   }
 };
 
+// builds the page list, e.g. [1, "...", 4, 5, 6, "...", 10]
+const getPageNumbers = (current, total) => {
+  if (total <= 5) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const pages = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  if (start > 2) pages.push("...");
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (end < total - 1) pages.push("...");
+  pages.push(total);
+  return pages;
+};
+
 const UserDashboard = () => {
   const navigate = useNavigate();
 
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -65,6 +86,19 @@ const UserDashboard = () => {
     resolved: 0,
   };
   const complaints = dashboardData?.recentActivity || [];
+
+  // Pagination (5 complaints per page)
+  const totalPages = Math.max(1, Math.ceil(complaints.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * PAGE_SIZE;
+  const pagedComplaints = complaints.slice(startIndex, startIndex + PAGE_SIZE);
+  const showingFrom = complaints.length === 0 ? 0 : startIndex + 1;
+  const showingTo = startIndex + pagedComplaints.length;
+
+  const goToPage = (page) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+  };
 
   const badgeClass = (value) => value.toLowerCase().replace(/\s+/g, "-");
 
@@ -215,7 +249,7 @@ const UserDashboard = () => {
                 </thead>
 
                 <tbody>
-                  {complaints.map((complaint) => {
+                  {pagedComplaints.map((complaint) => {
                     const displayStatus = formatStatus(complaint.status);
                     const displayPriority = formatPriority(complaint.priority);
                     return (
@@ -256,7 +290,7 @@ const UserDashboard = () => {
 
             {/* ---- MOBILE CARD LIST ---- */}
             <div className="ud-cards">
-              {complaints.map((complaint) => {
+              {pagedComplaints.map((complaint) => {
                 const displayStatus = formatStatus(complaint.status);
                 const displayPriority = formatPriority(complaint.priority);
                 return (
@@ -290,6 +324,55 @@ const UserDashboard = () => {
                   </div>
                 );
               })}
+            </div>
+
+            {/* ---- PAGINATION ---- */}
+            <div className="ud-pagination">
+              <span className="ud-page-info">
+                Showing <strong>{showingFrom}–{showingTo}</strong> of{" "}
+                <strong>{complaints.length}</strong> complaints
+              </span>
+
+              {totalPages > 1 && (
+                <nav className="ud-page-controls" aria-label="Complaints pagination">
+                  <button
+                    className="ud-page-btn ud-page-nav"
+                    onClick={() => goToPage(safePage - 1)}
+                    disabled={safePage === 1}
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeft size={16} strokeWidth={2.6} />
+                    <span>Prev</span>
+                  </button>
+
+                  {getPageNumbers(safePage, totalPages).map((p, i) =>
+                    p === "..." ? (
+                      <span className="ud-page-ellipsis" key={`dots-${i}`}>
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={p}
+                        className={`ud-page-btn ${p === safePage ? "active" : ""}`}
+                        onClick={() => goToPage(p)}
+                        aria-current={p === safePage ? "page" : undefined}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+
+                  <button
+                    className="ud-page-btn ud-page-nav"
+                    onClick={() => goToPage(safePage + 1)}
+                    disabled={safePage === totalPages}
+                    aria-label="Next page"
+                  >
+                    <span>Next</span>
+                    <ChevronRight size={16} strokeWidth={2.6} />
+                  </button>
+                </nav>
+              )}
             </div>
           </>
         )}

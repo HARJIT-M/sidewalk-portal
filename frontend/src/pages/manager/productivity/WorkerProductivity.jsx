@@ -3,24 +3,31 @@ import {
   TrendingUp,
   Award,
   Users,
-  UserCheck,
-  UserX,
   CheckCircle2,
   Clock,
   Star,
   Search,
   RefreshCw,
-  Phone,
-  Mail,
   ChevronRight,
   X,
   Activity,
-  Calendar,
   AlertCircle,
-  ExternalLink,
+  Trophy,
+  Medal,
+  Phone,
+  Timer,
 } from "lucide-react";
 import { getWorkerProductivity } from "../../../services/managerApi";
 import "./WorkerProductivity.css";
+
+const RANKS = [
+  { cls: "rank-1", label: "#1 Performer", icon: Trophy },
+  { cls: "rank-2", label: "#2 Runner Up", icon: Medal },
+  { cls: "rank-3", label: "#3 Star Worker", icon: Medal },
+];
+
+// colour tier of a completion-rate bar
+const rateTier = (rate) => (rate >= 75 ? "high" : rate >= 40 ? "mid" : "low");
 
 const WorkerProductivity = () => {
   const [productivityData, setProductivityData] = useState(null);
@@ -53,6 +60,14 @@ const WorkerProductivity = () => {
     loadData();
   }, []);
 
+  // close the details popup with the Escape key
+  useEffect(() => {
+    if (!selectedWorker) return undefined;
+    const onKey = (e) => e.key === "Escape" && setSelectedWorker(null);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedWorker]);
+
   const summary = productivityData?.summary || {
     totalWorkers: 0,
     activeWorkers: 0,
@@ -72,10 +87,10 @@ const WorkerProductivity = () => {
     .filter((worker) => {
       const q = search.toLowerCase();
       const matchesSearch =
-        worker.name.toLowerCase().includes(q) ||
-        worker.employeeCode.toLowerCase().includes(q) ||
-        worker.role.toLowerCase().includes(q) ||
-        worker.phone.includes(q);
+        (worker.name || "").toLowerCase().includes(q) ||
+        (worker.employeeCode || "").toLowerCase().includes(q) ||
+        (worker.role || "").toLowerCase().includes(q) ||
+        (worker.phone || "").includes(q);
 
       const matchesStatus =
         filterStatus === "All" ||
@@ -92,35 +107,98 @@ const WorkerProductivity = () => {
       return 0;
     });
 
+  const availabilityClass = (status) =>
+    status === "ACTIVE"
+      ? "available"
+      : status === "ON_LEAVE"
+      ? "on-leave"
+      : "inactive";
+
+  const kpiCards = [
+    {
+      label: "Completed Repairs",
+      icon: CheckCircle2,
+      tone: "blue",
+      value: summary.totalCompletedTasks,
+      foot: (
+        <>
+          Out of <strong>{summary.totalAssignedTasks}</strong> total assigned tasks
+        </>
+      ),
+    },
+    {
+      label: "Team Completion Rate",
+      icon: TrendingUp,
+      tone: "green",
+      value: `${summary.teamCompletionRate}%`,
+      bar: Math.min(100, summary.teamCompletionRate),
+    },
+    {
+      label: "Workforce Status",
+      icon: Users,
+      tone: "purple",
+      value: (
+        <>
+          <span className="wp-num-active">{summary.activeWorkers}</span>
+          <span className="wp-num-sep">/</span>
+          <span className="wp-num-leave">{summary.onLeaveWorkers}</span>
+        </>
+      ),
+      foot: (
+        <>
+          <span className="wp-dot wp-dot-active"></span> {summary.activeWorkers} Available
+          <span className="wp-foot-gap"></span>
+          <span className="wp-dot wp-dot-leave"></span> {summary.onLeaveWorkers} On Leave
+        </>
+      ),
+    },
+    {
+      label: "Avg Quality Rating",
+      icon: Star,
+      tone: "amber",
+      value: `${summary.averageTeamRating} ★`,
+      foot: "Based on verified completed maintenance work",
+    },
+  ];
+
   return (
     <div className="wp-page">
+
       {/* =========================================
-          1. HEADER BANNER
+          1. HERO
       ========================================= */}
       <section className="wp-hero">
-        <div className="wp-hero-content">
-          <div className="wp-title-group">
-            <span className="wp-badge">
-              <Activity size={14} /> Team Performance Operations
-            </span>
-            <h1>Worker Productivity Dashboard</h1>
-            <p>
-              Monitor team resolution velocity, completion rates, workforce availability, and individual worker performance in real time.
-            </p>
-          </div>
-
-          <div className="wp-hero-actions">
-            <button className="wp-refresh-btn" onClick={loadData} disabled={loading}>
-              <RefreshCw size={16} className={loading ? "spin" : ""} />
-              {loading ? "Refreshing..." : "Refresh Metrics"}
-            </button>
-          </div>
+        <div className="wp-hero-rings" aria-hidden="true">
+          <span></span><span></span><span></span>
         </div>
+        <div className="wp-hero-slabs" aria-hidden="true">
+          <i></i><i></i><i></i><i></i>
+        </div>
+
+        <div className="wp-hero-text">
+          <span className="wp-hero-tag">
+            <Activity size={14} strokeWidth={2.4} /> Team Performance Operations
+          </span>
+          <h1>Worker Productivity Dashboard</h1>
+          <p>
+            Monitor team resolution velocity, completion rates, workforce availability, and
+            individual worker performance in real time.
+          </p>
+        </div>
+
+        <button className="wp-hero-btn" onClick={loadData} disabled={loading}>
+          <RefreshCw
+            size={16}
+            strokeWidth={2.5}
+            className={loading ? "wp-spin" : ""}
+          />
+          {loading ? "Refreshing..." : "Refresh Metrics"}
+        </button>
       </section>
 
       {errorMsg && (
-        <div className="wp-error-alert">
-          <AlertCircle size={18} />
+        <div className="wp-alert error" role="alert">
+          <AlertCircle size={18} strokeWidth={2.2} />
           <span>{errorMsg}</span>
           <button onClick={loadData}>Retry</button>
         </div>
@@ -129,119 +207,92 @@ const WorkerProductivity = () => {
       {/* =========================================
           2. KPI SUMMARY CARDS
       ========================================= */}
-      <section className="wp-kpi-grid">
-        <div className="wp-kpi-card accent-blue">
-          <div className="wp-kpi-top">
-            <span className="wp-kpi-label">Completed Repairs</span>
-            <div className="wp-kpi-icon blue">
-              <CheckCircle2 size={20} />
+      <section className="wp-kpis">
+        {kpiCards.map(({ label, icon: Icon, tone, value, foot, bar }, i) => (
+          <div
+            className={`wp-kpi wp-kpi-${tone}`}
+            key={label}
+            style={{ animationDelay: `${0.1 + i * 0.08}s` }}
+          >
+            <div className="wp-kpi-top">
+              <span>{label}</span>
+              <div className="wp-kpi-icon">
+                <Icon size={21} strokeWidth={2.2} />
+              </div>
             </div>
+            <div className="wp-kpi-value">{loading && !productivityData ? "..." : value}</div>
+            {bar !== undefined && (
+              <div className="wp-kpi-track">
+                <div className="wp-kpi-fill" style={{ width: `${bar}%` }} />
+              </div>
+            )}
+            {foot && <div className="wp-kpi-foot">{foot}</div>}
           </div>
-          <div className="wp-kpi-value">{summary.totalCompletedTasks}</div>
-          <div className="wp-kpi-foot">
-            Out of <strong>{summary.totalAssignedTasks}</strong> total assigned tasks
-          </div>
-        </div>
-
-        <div className="wp-kpi-card accent-green">
-          <div className="wp-kpi-top">
-            <span className="wp-kpi-label">Team Completion Rate</span>
-            <div className="wp-kpi-icon green">
-              <TrendingUp size={20} />
-            </div>
-          </div>
-          <div className="wp-kpi-value">{summary.teamCompletionRate}%</div>
-          <div className="wp-kpi-progress">
-            <div
-              className="wp-kpi-bar"
-              style={{ width: `${Math.min(100, summary.teamCompletionRate)}%` }}
-            />
-          </div>
-        </div>
-
-        <div className="wp-kpi-card accent-purple">
-          <div className="wp-kpi-top">
-            <span className="wp-kpi-label">Workforce Status</span>
-            <div className="wp-kpi-icon purple">
-              <Users size={20} />
-            </div>
-          </div>
-          <div className="wp-kpi-value">
-            <span style={{ color: "#10b981" }}>{summary.activeWorkers}</span>
-            <span style={{ fontSize: "16px", color: "#94a3b8", margin: "0 6px" }}>/</span>
-            <span style={{ color: "#f59e0b" }}>{summary.onLeaveWorkers}</span>
-          </div>
-          <div className="wp-kpi-foot">
-            <span className="dot dot-active"></span> {summary.activeWorkers} Available ·
-            <span className="dot dot-leave" style={{ marginLeft: "8px" }}></span> {summary.onLeaveWorkers} On Leave
-          </div>
-        </div>
-
-        <div className="wp-kpi-card accent-amber">
-          <div className="wp-kpi-top">
-            <span className="wp-kpi-label">Avg Quality Rating</span>
-            <div className="wp-kpi-icon amber">
-              <Star size={20} />
-            </div>
-          </div>
-          <div className="wp-kpi-value">{summary.averageTeamRating} ★</div>
-          <div className="wp-kpi-foot">Based on verified completed maintenance work</div>
-        </div>
+        ))}
       </section>
 
       {/* =========================================
-          3. LEADERBOARD / TOP PERFORMERS
+          3. LEADERBOARD
       ========================================= */}
       {leaderboard.length > 0 && (
-        <section className="wp-section wp-leaderboard-section">
-          <div className="wp-section-head">
-            <div className="wp-head-title">
-              <Award size={20} className="wp-gold-icon" />
-              <div>
-                <h2>Top Performing Workers</h2>
-                <p>Leading crew members ranked by total completed repairs and efficiency</p>
-              </div>
+        <section className="wp-panel">
+          <div className="wp-panel-head">
+            <div className="wp-panel-icon gold">
+              <Award size={21} strokeWidth={2.2} />
+            </div>
+            <div>
+              <h2>Top Performing Workers</h2>
+              <p>Leading crew members ranked by total completed repairs and efficiency</p>
             </div>
           </div>
 
-          <div className="wp-leaderboard-grid">
+          <div className="wp-leaders">
             {leaderboard.slice(0, 3).map((worker, idx) => {
-              const rankClass = idx === 0 ? "rank-1" : idx === 1 ? "rank-2" : "rank-3";
-              const rankLabel = idx === 0 ? "🥇 #1 Performer" : idx === 1 ? "🥈 #2 Runner Up" : "🥉 #3 Star Worker";
+              const rank = RANKS[idx];
+              const RankIcon = rank.icon;
 
               return (
-                <div key={worker.workerId} className={`wp-leader-card ${rankClass}`}>
-                  <span className="wp-rank-pill">{rankLabel}</span>
+                <div key={worker.workerId} className={`wp-leader ${rank.cls}`}>
+                  <span className="wp-rank-pill">
+                    <RankIcon size={13} strokeWidth={2.5} />
+                    {rank.label}
+                  </span>
 
                   <div className="wp-leader-avatar">
                     {worker.name.charAt(0).toUpperCase()}
                   </div>
 
                   <h3>{worker.name}</h3>
-                  <span className="wp-leader-code">{worker.employeeCode} · {worker.role}</span>
+                  <span className="wp-leader-code">
+                    {worker.employeeCode} · {worker.role}
+                  </span>
 
                   <div className="wp-leader-stats">
-                    <div className="wp-lstat">
+                    <div>
                       <strong>{worker.completedCount}</strong>
                       <span>Completed</span>
                     </div>
-                    <div className="wp-lstat-divider"></div>
-                    <div className="wp-lstat">
+                    <i></i>
+                    <div>
                       <strong>{worker.completionRate}%</strong>
                       <span>Rate</span>
                     </div>
-                    <div className="wp-lstat-divider"></div>
-                    <div className="wp-lstat">
+                    <i></i>
+                    <div>
                       <strong>{worker.onTimeRate}%</strong>
                       <span>On-Time</span>
                     </div>
                   </div>
 
-                  <div className="wp-leader-badge">
-                    <span className={`avail-indicator ${worker.availabilityStatus === "ACTIVE" ? "active" : "leave"}`}>
-                      ● {worker.statusDisplay}
+                  <div className="wp-leader-foot">
+                    <span className={`wp-chip ${availabilityClass(worker.availabilityStatus)}`}>
+                      <span className="wp-dot"></span>
+                      {worker.statusDisplay}
                     </span>
-                    <span className="wp-rating-tag">★ {worker.rating}</span>
+                    <span className="wp-rating">
+                      <Star size={13} fill="currentColor" strokeWidth={0} />
+                      {worker.rating}
+                    </span>
                   </div>
                 </div>
               );
@@ -251,12 +302,12 @@ const WorkerProductivity = () => {
       )}
 
       {/* =========================================
-          4. ALL WORKERS PRODUCTIVITY ROSTER
+          4. ROSTER
       ========================================= */}
-      <section className="wp-section">
-        <div className="wp-controls-row">
-          <div className="wp-search-box">
-            <Search size={18} />
+      <section className="wp-panel">
+        <div className="wp-controls">
+          <div className="wp-search">
+            <Search size={18} strokeWidth={2} />
             <input
               type="text"
               placeholder="Search worker by name, ID, or role..."
@@ -264,153 +315,148 @@ const WorkerProductivity = () => {
               onChange={(e) => setSearch(e.target.value)}
             />
             {search && (
-              <button className="clear-btn" onClick={() => setSearch("")}>
-                <X size={15} />
+              <button
+                type="button"
+                className="wp-search-clear"
+                onClick={() => setSearch("")}
+                aria-label="Clear search"
+              >
+                <X size={14} strokeWidth={2.5} />
               </button>
             )}
           </div>
 
-          <div className="wp-filter-group">
-            <div className="wp-pills">
+          <div className="wp-control-group">
+            <div className="wp-tabs">
               {["All", "Available", "On Leave"].map((tab) => (
                 <button
                   key={tab}
-                  className={`wp-pill-btn ${filterStatus === tab ? "active" : ""}`}
+                  className={`wp-tab ${filterStatus === tab ? "active" : ""}`}
                   onClick={() => setFilterStatus(tab)}
                 >
-                  {tab === "Available" && <span className="dot dot-active"></span>}
-                  {tab === "On Leave" && <span className="dot dot-leave"></span>}
+                  {tab === "Available" && <span className="wp-dot wp-dot-active"></span>}
+                  {tab === "On Leave" && <span className="wp-dot wp-dot-leave"></span>}
                   {tab}
                 </button>
               ))}
             </div>
 
-            <div className="wp-sort-select">
-              <label>Sort by:</label>
+            <label className="wp-sort">
+              Sort by
               <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
                 <option value="completed">Most Completed</option>
                 <option value="rate">Highest Completion Rate</option>
                 <option value="rating">Highest Rating</option>
                 <option value="ontime">Best On-Time Rate</option>
               </select>
-            </div>
+            </label>
           </div>
         </div>
 
-        {/* WORKER PRODUCTIVITY CARDS */}
         {filteredWorkers.length === 0 ? (
-          <div className="wp-empty-state">
-            <Users size={48} strokeWidth={1.5} />
+          <div className="wp-empty">
+            <Users size={44} strokeWidth={1.6} />
             <h3>No workers found</h3>
             <p>Try adjusting your search criteria or availability filter.</p>
           </div>
         ) : (
-          <div className="wp-workers-grid">
-            {filteredWorkers.map((worker) => (
-              <div key={worker.workerId} className="wp-worker-card">
-                {/* CARD HEADER */}
-                <div className="wp-card-header">
-                  <div className="wp-avatar-box">
-                    <div className="wp-avatar-circle">
+          <div className="wp-grid">
+            {filteredWorkers.map((worker, i) => (
+              <article
+                key={worker.workerId}
+                className={`wp-card ${availabilityClass(worker.availabilityStatus)}`}
+                style={{ animationDelay: `${Math.min(i, 8) * 0.06}s` }}
+              >
+                {/* header */}
+                <div className="wp-card-head">
+                  <div className="wp-person">
+                    <div className="wp-avatar">
                       {worker.name.charAt(0).toUpperCase()}
                     </div>
                     <div>
                       <h4>{worker.name}</h4>
-                      <span className="wp-code">{worker.employeeCode} · {worker.role}</span>
+                      <span className="wp-code">
+                        {worker.employeeCode} · {worker.role}
+                      </span>
                     </div>
                   </div>
 
-                  <span
-                    className={`wp-status-chip ${
-                      worker.availabilityStatus === "ACTIVE"
-                        ? "status-available"
-                        : worker.availabilityStatus === "ON_LEAVE"
-                        ? "status-on-leave"
-                        : "status-inactive"
-                    }`}
-                  >
-                    ● {worker.statusDisplay}
+                  <span className={`wp-chip ${availabilityClass(worker.availabilityStatus)}`}>
+                    <span className="wp-dot"></span>
+                    {worker.statusDisplay}
                   </span>
                 </div>
 
-                {/* METRICS ROW */}
-                <div className="wp-metrics-row">
-                  <div className="wp-metric-box">
-                    <span className="m-val">{worker.completedCount}</span>
-                    <span className="m-lbl">Completed</span>
+                {/* metrics */}
+                <div className="wp-metrics">
+                  <div>
+                    <strong className="done">{worker.completedCount}</strong>
+                    <span>Completed</span>
                   </div>
-                  <div className="wp-metric-box">
-                    <span className="m-val in-prog">{worker.inProgressCount}</span>
-                    <span className="m-lbl">In Progress</span>
+                  <div>
+                    <strong className="prog">{worker.inProgressCount}</strong>
+                    <span>In Progress</span>
                   </div>
-                  <div className="wp-metric-box">
-                    <span className="m-val pending">{worker.pendingCount}</span>
-                    <span className="m-lbl">Pending</span>
+                  <div>
+                    <strong className="pend">{worker.pendingCount}</strong>
+                    <span>Pending</span>
                   </div>
-                  <div className="wp-metric-box">
-                    <span className="m-val total">{worker.totalAssigned}</span>
-                    <span className="m-lbl">Total Tasks</span>
+                  <div>
+                    <strong>{worker.totalAssigned}</strong>
+                    <span>Total</span>
                   </div>
                 </div>
 
-                {/* COMPLETION RATE BAR */}
-                <div className="wp-progress-section">
-                  <div className="wp-prog-labels">
+                {/* completion rate */}
+                <div className="wp-rate">
+                  <div className="wp-rate-top">
                     <span>Task Completion Rate</span>
                     <strong>{worker.completionRate}%</strong>
                   </div>
-                  <div className="wp-prog-track">
+                  <div className="wp-track">
                     <div
-                      className="wp-prog-fill"
-                      style={{
-                        width: `${worker.completionRate}%`,
-                        backgroundColor:
-                          worker.completionRate >= 75
-                            ? "#10b981"
-                            : worker.completionRate >= 40
-                            ? "#4f46e5"
-                            : "#f59e0b",
-                      }}
+                      className={`wp-track-fill ${rateTier(worker.completionRate)}`}
+                      style={{ width: `${worker.completionRate}%` }}
                     />
                   </div>
                 </div>
 
-                {/* EXTRA DETAILS */}
-                <div className="wp-card-footer-info">
-                  <div className="wp-foot-item">
-                    <Clock size={14} />
-                    <span>Avg Turnaround: <strong>~{worker.avgCompletionHours}h</strong></span>
-                  </div>
-                  <div className="wp-foot-item">
-                    <Star size={14} color="#f59e0b" fill="#f59e0b" />
-                    <span>Rating: <strong>{worker.rating}</strong></span>
-                  </div>
-                  <div className="wp-foot-item">
-                    <span>On-Time: <strong>{worker.onTimeRate}%</strong></span>
-                  </div>
+                {/* extra details */}
+                <div className="wp-extras">
+                  <span>
+                    <Clock size={14} strokeWidth={2.2} />
+                    Avg <strong>~{worker.avgCompletionHours}h</strong>
+                  </span>
+                  <span>
+                    <Star size={14} fill="#f59e0b" strokeWidth={0} />
+                    <strong>{worker.rating}</strong>
+                  </span>
+                  <span>
+                    <Timer size={14} strokeWidth={2.2} />
+                    On-time <strong>{worker.onTimeRate}%</strong>
+                  </span>
                 </div>
 
-                {/* ACTION BUTTON */}
-                <div className="wp-card-action">
-                  <button
-                    className="wp-view-btn"
-                    onClick={() => setSelectedWorker(worker)}
-                  >
-                    View Performance Breakdown <ChevronRight size={15} />
-                  </button>
-                </div>
-              </div>
+                <button
+                  className="wp-view"
+                  onClick={() => setSelectedWorker(worker)}
+                >
+                  View Performance Breakdown
+                  <ChevronRight size={15} strokeWidth={2.5} />
+                </button>
+              </article>
             ))}
           </div>
         )}
       </section>
 
       {/* =========================================
-          5. WORKER DETAIL POPUP MODAL
+          5. DETAIL POPUP
       ========================================= */}
       {selectedWorker && (
-        <div className="wp-modal-overlay" onClick={() => setSelectedWorker(null)}>
+        <div className="wp-overlay" onClick={() => setSelectedWorker(null)}>
           <div className="wp-modal" onClick={(e) => e.stopPropagation()}>
+
             <div className="wp-modal-head">
               <div className="wp-modal-user">
                 <div className="wp-modal-avatar">
@@ -418,89 +464,98 @@ const WorkerProductivity = () => {
                 </div>
                 <div>
                   <h3>{selectedWorker.name}</h3>
-                  <span>{selectedWorker.employeeCode} · {selectedWorker.role}</span>
+                  <span>
+                    {selectedWorker.employeeCode} · {selectedWorker.role}
+                  </span>
                 </div>
               </div>
 
-              <button className="wp-close-btn" onClick={() => setSelectedWorker(null)}>
-                <X size={18} />
+              <button
+                className="wp-close"
+                onClick={() => setSelectedWorker(null)}
+                aria-label="Close"
+              >
+                <X size={18} strokeWidth={2.5} />
               </button>
             </div>
 
             <div className="wp-modal-body">
-              {/* STATUS & CONTACT BANNER */}
-              <div className="wp-modal-banner">
-                <div className="wp-mb-item">
-                  <span className="lbl">Availability</span>
-                  <span
-                    className={`wp-status-chip ${
-                      selectedWorker.availabilityStatus === "ACTIVE"
-                        ? "status-available"
-                        : "status-on-leave"
-                    }`}
-                  >
-                    ● {selectedWorker.statusDisplay}
+
+              {/* status & contact */}
+              <div className="wp-banner">
+                <div>
+                  <label>Availability</label>
+                  <span className={`wp-chip ${availabilityClass(selectedWorker.availabilityStatus)}`}>
+                    <span className="wp-dot"></span>
+                    {selectedWorker.statusDisplay}
                   </span>
                 </div>
-                <div className="wp-mb-item">
-                  <span className="lbl">Shift</span>
-                  <strong>{selectedWorker.shift}</strong>
+                <div>
+                  <label>Shift</label>
+                  <strong>{selectedWorker.shift || "N/A"}</strong>
                 </div>
-                <div className="wp-mb-item">
-                  <span className="lbl">Phone</span>
-                  <strong>{selectedWorker.phone || "N/A"}</strong>
+                <div>
+                  <label>Phone</label>
+                  <strong className="wp-with-icon">
+                    <Phone size={13} strokeWidth={2.3} />
+                    {selectedWorker.phone || "N/A"}
+                  </strong>
                 </div>
-                <div className="wp-mb-item">
-                  <span className="lbl">Overall Rating</span>
-                  <strong style={{ color: "#f59e0b" }}>★ {selectedWorker.rating} / 5.0</strong>
-                </div>
-              </div>
-
-              {/* STATS OVERVIEW */}
-              <div className="wp-modal-stats-grid">
-                <div className="wp-mstat">
-                  <span className="val">{selectedWorker.totalAssigned}</span>
-                  <span className="tit">Total Assigned</span>
-                </div>
-                <div className="wp-mstat">
-                  <span className="val green">{selectedWorker.completedCount}</span>
-                  <span className="tit">Completed</span>
-                </div>
-                <div className="wp-mstat">
-                  <span className="val blue">{selectedWorker.inProgressCount}</span>
-                  <span className="tit">In Progress</span>
-                </div>
-                <div className="wp-mstat">
-                  <span className="val purple">{selectedWorker.completionRate}%</span>
-                  <span className="tit">Completion Rate</span>
+                <div>
+                  <label>Overall Rating</label>
+                  <strong className="wp-gold">★ {selectedWorker.rating} / 5.0</strong>
                 </div>
               </div>
 
-              {/* RECENT COMPLETED TASKS */}
-              <div className="wp-modal-tasks-section">
+              {/* stats overview */}
+              <div className="wp-mstats">
+                <div>
+                  <strong>{selectedWorker.totalAssigned}</strong>
+                  <span>Total Assigned</span>
+                </div>
+                <div>
+                  <strong className="green">{selectedWorker.completedCount}</strong>
+                  <span>Completed</span>
+                </div>
+                <div>
+                  <strong className="blue">{selectedWorker.inProgressCount}</strong>
+                  <span>In Progress</span>
+                </div>
+                <div>
+                  <strong className="purple">{selectedWorker.completionRate}%</strong>
+                  <span>Completion Rate</span>
+                </div>
+              </div>
+
+              {/* recent completed */}
+              <div className="wp-tasks">
                 <h4>Recent Completed Tasks</h4>
                 {selectedWorker.recentCompleted && selectedWorker.recentCompleted.length > 0 ? (
                   <div className="wp-tasks-list">
                     {selectedWorker.recentCompleted.map((t) => (
-                      <div key={t.assignmentId} className="wp-task-row">
+                      <div key={t.assignmentId} className="wp-task">
                         <div className="wp-task-icon">
-                          <CheckCircle2 size={16} />
+                          <CheckCircle2 size={17} strokeWidth={2.4} />
                         </div>
-                        <div className="wp-task-desc">
-                          <strong>{t.complaintCode}: {t.title}</strong>
+                        <div>
+                          <strong>
+                            {t.complaintCode}: {t.title}
+                          </strong>
                           <span>Completed on: {t.completedAt || "Recently"}</span>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="wp-no-tasks-text">No completed tasks on record yet for this worker.</p>
+                  <p className="wp-no-tasks">
+                    No completed tasks on record yet for this worker.
+                  </p>
                 )}
               </div>
             </div>
 
             <div className="wp-modal-foot">
-              <button className="wp-btn-close" onClick={() => setSelectedWorker(null)}>
+              <button className="wp-btn-main" onClick={() => setSelectedWorker(null)}>
                 Close
               </button>
             </div>
@@ -512,4 +567,3 @@ const WorkerProductivity = () => {
 };
 
 export default WorkerProductivity;
-

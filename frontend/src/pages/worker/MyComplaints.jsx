@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   ArrowRight,
   Flag,
+  Hash,
 } from "lucide-react";
 import "./MyComplaints.css";
 
@@ -122,15 +123,21 @@ const MyComplaints = () => {
 
   // Stats
   const totalCount = profile?.stats?.totalAssigned ?? complaints.length;
-  const pendingCount = profile?.stats?.pending ?? complaints.filter(
-    (c) => getStatusDisplay(c.status, c.assignmentStatus) === "Pending"
-  ).length;
-  const progressCount = profile?.stats?.inProgress ?? complaints.filter(
-    (c) => getStatusDisplay(c.status, c.assignmentStatus) === "In Progress"
-  ).length;
-  const completedCount = profile?.stats?.completed ?? complaints.filter(
-    (c) => getStatusDisplay(c.status, c.assignmentStatus) === "Completed"
-  ).length;
+  const pendingCount =
+    profile?.stats?.pending ??
+    complaints.filter(
+      (c) => getStatusDisplay(c.status, c.assignmentStatus) === "Pending"
+    ).length;
+  const progressCount =
+    profile?.stats?.inProgress ??
+    complaints.filter(
+      (c) => getStatusDisplay(c.status, c.assignmentStatus) === "In Progress"
+    ).length;
+  const completedCount =
+    profile?.stats?.completed ??
+    complaints.filter(
+      (c) => getStatusDisplay(c.status, c.assignmentStatus) === "Completed"
+    ).length;
 
   const statusIcon = (status) => {
     if (status === "Pending") return <Clock size={13} strokeWidth={2.5} />;
@@ -161,17 +168,16 @@ const MyComplaints = () => {
         </div>
       </div>
 
-      {error && (
-        <div style={{ background: "#fee2e2", color: "#b91c1c", padding: "12px 18px", borderRadius: "10px", margin: "14px 0", fontWeight: "500" }}>
-          ⚠️ {error}
-        </div>
-      )}
+      {error && <div className="error-banner">⚠️ {error}</div>}
 
       {/* =========================
           STATS STRIP
       ========================= */}
       <div className="stats-strip">
-        <div className="stat-pill" onClick={() => setStatusFilter("All")} style={{ cursor: "pointer" }}>
+        <div
+          className={`stat-pill clickable ${statusFilter === "All" ? "selected" : ""}`}
+          onClick={() => setStatusFilter("All")}
+        >
           <div className="stat-pill-icon total">
             <ClipboardList size={17} strokeWidth={2} />
           </div>
@@ -181,7 +187,10 @@ const MyComplaints = () => {
           </div>
         </div>
 
-        <div className="stat-pill" onClick={() => setStatusFilter("Pending")} style={{ cursor: "pointer" }}>
+        <div
+          className={`stat-pill clickable ${statusFilter === "Pending" ? "selected" : ""}`}
+          onClick={() => setStatusFilter("Pending")}
+        >
           <div className="stat-pill-icon pending">
             <Clock size={17} strokeWidth={2} />
           </div>
@@ -191,7 +200,10 @@ const MyComplaints = () => {
           </div>
         </div>
 
-        <div className="stat-pill" onClick={() => setStatusFilter("In Progress")} style={{ cursor: "pointer" }}>
+        <div
+          className={`stat-pill clickable ${statusFilter === "In Progress" ? "selected" : ""}`}
+          onClick={() => setStatusFilter("In Progress")}
+        >
           <div className="stat-pill-icon progress">
             <Wrench size={17} strokeWidth={2} />
           </div>
@@ -201,7 +213,10 @@ const MyComplaints = () => {
           </div>
         </div>
 
-        <div className="stat-pill" onClick={() => setStatusFilter("Completed")} style={{ cursor: "pointer" }}>
+        <div
+          className={`stat-pill clickable ${statusFilter === "Completed" ? "selected" : ""}`}
+          onClick={() => setStatusFilter("Completed")}
+        >
           <div className="stat-pill-icon completed">
             <CheckCircle2 size={17} strokeWidth={2} />
           </div>
@@ -252,8 +267,9 @@ const MyComplaints = () => {
           COMPLAINTS CARD GRID
       ========================= */}
       {loading && complaints.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>
-          <p>Loading complaints from MongoDB...</p>
+        <div className="loading-box">
+          <div className="loading-spinner" />
+          <p>Loading your complaints…</p>
         </div>
       ) : filteredComplaints.length > 0 ? (
         <div className="complaint-cards-grid">
@@ -262,49 +278,68 @@ const MyComplaints = () => {
               complaint.status,
               complaint.assignmentStatus
             );
-            const statusClass = statusDisplay.toLowerCase().replace(" ", "-");
+            const statusClass = String(statusDisplay).toLowerCase().replace(" ", "-");
             const priorityClass = complaint.priority?.toLowerCase() || "medium";
 
             return (
-              <div className="complaint-card" key={complaint.id}>
-                <div className={`complaint-card-accent ${statusClass}`}></div>
+              <div className={`complaint-card ${statusClass}`} key={complaint.id}>
+                {/* ---- Gradient header band ---- */}
+                <div className="card-head">
+                  <span className="card-id">
+                    <Hash size={12} strokeWidth={2.8} />
+                    {complaint.id}
+                  </span>
+                  <span className={`status ${statusClass}`}>
+                    {statusIcon(statusDisplay)}
+                    {statusDisplay}
+                  </span>
+                </div>
 
-                <div className="complaint-card-body">
-                  <div className="complaint-card-top">
-                    <span className="complaint-id">{complaint.id}</span>
-                    <span className={`status ${statusClass}`}>
-                      {statusIcon(statusDisplay)}
-                      {statusDisplay}
-                    </span>
-                  </div>
-
+                {/* ---- Body ---- */}
+                <div className="card-main">
                   <h3 className="issue-title">{complaint.issue}</h3>
 
-                  <p className="location">
-                    <MapPin size={13} strokeWidth={2} className="inline-icon" />
-                    {complaint.location || complaint.area || "Location not specified"}
-                  </p>
-
-                  <div className="complaint-card-meta">
-                    <span className="meta-item">
-                      <Calendar size={12} strokeWidth={2} />
-                      {complaint.reportedDate}
+                  <div className="location-row">
+                    <span className="location-icon">
+                      <MapPin size={15} strokeWidth={2.2} />
                     </span>
-
-                    <span className={`priority ${priorityClass}`}>
-                      <Flag size={11} strokeWidth={2.5} />
-                      {complaint.priority}
-                    </span>
+                    <div>
+                      <small>Location</small>
+                      <p>
+                        {complaint.location ||
+                          complaint.area ||
+                          "Location not specified"}
+                      </p>
+                    </div>
                   </div>
 
+                  <div className="info-grid">
+                    <div className="info-box">
+                      <span className="info-label">
+                        <Calendar size={12} strokeWidth={2.2} /> Reported
+                      </span>
+                      <strong>{complaint.reportedDate || "—"}</strong>
+                    </div>
+
+                    <div className="info-box">
+                      <span className="info-label">
+                        <Flag size={12} strokeWidth={2.2} /> Priority
+                      </span>
+                      <span className={`priority ${priorityClass}`}>
+                        {complaint.priority || "Medium"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ---- Footer ---- */}
+                <div className="card-foot">
                   <button
                     className="view-btn"
-                    onClick={() =>
-                      navigate(`/worker/complaints/${complaint.id}`)
-                    }
+                    onClick={() => navigate(`/worker/complaints/${complaint.id}`)}
                   >
                     {statusDisplay === "Pending" ? "Start / View" : "View Details"}
-                    <ArrowRight size={14} strokeWidth={2.5} />
+                    <ArrowRight size={15} strokeWidth={2.5} />
                   </button>
                 </div>
               </div>
@@ -314,7 +349,7 @@ const MyComplaints = () => {
       ) : (
         <div className="no-complaints">
           <div className="no-complaint-icon">
-            <ClipboardList size={30} strokeWidth={1.5} />
+            <ClipboardList size={30} strokeWidth={1.8} />
           </div>
           <h3>No complaints found</h3>
           <p>Try changing your search or filter criteria.</p>

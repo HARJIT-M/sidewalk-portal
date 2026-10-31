@@ -908,7 +908,7 @@ const assignComplaintWorkers = async (req, res) => {
       }));
 
       if (session) {
-        await Assignment.create(assignmentPayload, { session });
+        await Assignment.create(assignmentPayload, { session , ordered: true });
       } else {
         await Assignment.create(assignmentPayload);
       }
@@ -924,7 +924,7 @@ const assignComplaintWorkers = async (req, res) => {
       }));
 
       if (session) {
-        await StatusHistory.create(statusHistoryEntries, { session });
+        await StatusHistory.create(statusHistoryEntries, { session , ordered: true });
       } else {
         await StatusHistory.create(statusHistoryEntries);
       }
@@ -940,7 +940,7 @@ const assignComplaintWorkers = async (req, res) => {
       }));
 
       if (session) {
-        await Notification.create(workerNotifications, { session });
+        await Notification.create(workerNotifications, { session , ordered: true });
       } else {
         await Notification.create(workerNotifications);
       }

@@ -8,6 +8,7 @@ import {
   CalendarRange,
   X,
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   ExternalLink,
   Check,
@@ -16,8 +17,8 @@ import {
   Users,
   Clock,
   Layers,
-  Copy,
-  Link2,
+  ArrowLeftRight,
+  Image as ImageIcon,
 } from "lucide-react";
 import {
   getManagerComplaints,
@@ -39,6 +40,29 @@ const toDateInputValue = (date) => {
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
+
+// photo tile used in the duplicate comparison: opens the full image in a new tab
+const PhotoBox = ({ src, alt, emptyLabel }) =>
+  src ? (
+    <a
+      className="mc-photo"
+      href={src}
+      target="_blank"
+      rel="noreferrer"
+      title="Open full size"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <img src={src} alt={alt} />
+      <span className="mc-photo-open">
+        <ExternalLink size={12} strokeWidth={2.4} /> Open
+      </span>
+    </a>
+  ) : (
+    <div className="mc-photo mc-photo-empty">
+      <ImageIcon size={26} strokeWidth={1.7} />
+      <span>{emptyLabel}</span>
+    </div>
+  );
 
 const Complaints = () => {
   const [complaints, setComplaints] = useState([]);
@@ -132,6 +156,19 @@ const Complaints = () => {
       isCurrentRequest = false;
     };
   }, [showAssignPopup, startDate, endDate]);
+
+  // close popups with the Escape key
+  useEffect(() => {
+    if (!showDetails && !showAssignPopup) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        setShowDetails(false);
+        setShowAssignPopup(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showDetails, showAssignPopup]);
 
   const updateScheduleDate = (setter, value) => {
     setter(value);
@@ -425,8 +462,71 @@ const Complaints = () => {
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
+  const statCards = [
+    {
+      label: "Total Reported",
+      value: complaints.length,
+      icon: ClipboardList,
+      tone: "total",
+    },
+    {
+      label: "Pending Review",
+      value: complaints.filter((c) => c.status === "Pending" || c.status === "Not Assigned").length,
+      icon: Clock,
+      tone: "pending",
+    },
+    {
+      label: "Active / Assigned",
+      value: complaints.filter((c) => c.status === "In Progress" || c.status === "Assigned").length,
+      icon: RefreshCw,
+      tone: "progress",
+    },
+    {
+      label: "Resolved",
+      value: complaints.filter(
+        (c) => c.status === "Completed" || c.status === "Resolved" || c.status === "Closed"
+      ).length,
+      icon: CheckCircle2,
+      tone: "done",
+    },
+  ];
+
+  // small helper: the shared WorkGroup status buttons (used in both popups)
+  const renderStatusButtons = (labels) => (
+    <div className="mc-wg-actions">
+      <span>Update WorkGroup Status:</span>
+      <button
+        type="button"
+        className="mc-chip-btn progress"
+        disabled={updatingStatus}
+        onClick={() => handleUpdateWorkGroupStatus("IN_PROGRESS")}
+      >
+        {labels.progress}
+      </button>
+      <button
+        type="button"
+        className="mc-chip-btn done"
+        disabled={updatingStatus}
+        onClick={() => handleUpdateWorkGroupStatus("COMPLETED")}
+      >
+        {labels.done}
+      </button>
+      {labels.reset && (
+        <button
+          type="button"
+          className="mc-chip-btn reset"
+          disabled={updatingStatus}
+          onClick={() => handleUpdateWorkGroupStatus("PENDING")}
+        >
+          {labels.reset}
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <div className="mc-page">
+
       {/* ================= HERO BANNER ================= */}
       <section className="mc-hero">
         <div className="mc-hero-rings" aria-hidden="true">
@@ -451,82 +551,62 @@ const Complaints = () => {
       </section>
 
       {/* ================= STATISTICS ROW ================= */}
-      <div className="mc-stats">
-        <div className="mc-stat mc-stat-total">
-          <div className="mc-stat-icon">
-            <ClipboardList size={22} strokeWidth={2.2} />
+      <section className="mc-stats">
+        {statCards.map(({ label, value, icon: Icon, tone }, i) => (
+          <div
+            className={`mc-stat mc-stat-${tone}`}
+            key={label}
+            style={{ animationDelay: `${0.1 + i * 0.08}s` }}
+          >
+            <div className="mc-stat-icon">
+              <Icon size={22} strokeWidth={2.2} />
+            </div>
+            <div className="mc-stat-text">
+              <strong>{value}</strong>
+              <span>{label}</span>
+            </div>
           </div>
-          <div className="mc-stat-text">
-            <strong>{complaints.length}</strong>
-            <span>Total Reported</span>
-          </div>
-        </div>
-
-        <div className="mc-stat mc-stat-pending">
-          <div className="mc-stat-icon">
-            <Clock size={22} strokeWidth={2.2} />
-          </div>
-          <div className="mc-stat-text">
-            <strong>
-              {complaints.filter((c) => c.status === "Pending" || c.status === "Not Assigned").length}
-            </strong>
-            <span>Pending Review</span>
-          </div>
-        </div>
-
-        <div className="mc-stat mc-stat-progress">
-          <div className="mc-stat-icon">
-            <RefreshCw size={22} strokeWidth={2.2} />
-          </div>
-          <div className="mc-stat-text">
-            <strong>
-              {complaints.filter((c) => c.status === "In Progress" || c.status === "Assigned").length}
-            </strong>
-            <span>Active / Assigned</span>
-          </div>
-        </div>
-
-        <div className="mc-stat mc-stat-done">
-          <div className="mc-stat-icon">
-            <CheckCircle2 size={22} strokeWidth={2.2} />
-          </div>
-          <div className="mc-stat-text">
-            <strong>
-              {complaints.filter((c) => c.status === "Completed" || c.status === "Resolved" || c.status === "Closed").length}
-            </strong>
-            <span>Resolved</span>
-          </div>
-        </div>
-      </div>
+        ))}
+      </section>
 
       {/* ================= ALERTS ================= */}
       {errorMsg && (
-        <div className="mc-alert mc-alert-error">
-          <AlertCircle size={16} strokeWidth={2.4} />
+        <div className="mc-alert error" role="alert">
+          <AlertCircle size={18} strokeWidth={2.2} />
           <span>{errorMsg}</span>
-          <button onClick={() => setErrorMsg("")} aria-label="Close">
-            <X size={14} />
+          <button onClick={() => setErrorMsg("")} aria-label="Dismiss">
+            <X size={14} strokeWidth={2.5} />
           </button>
         </div>
       )}
 
       {successMsg && (
-        <div className="mc-alert mc-alert-success">
-          <CheckCircle2 size={16} strokeWidth={2.4} />
+        <div className="mc-alert success" role="status">
+          <CheckCircle2 size={18} strokeWidth={2.2} />
           <span>{successMsg}</span>
         </div>
       )}
 
-      {/* ================= TOOLBAR ================= */}
-      <div className="mc-toolbar">
+      {/* ================= FILTERS ================= */}
+      <div className="mc-filters">
         <div className="mc-search">
-          <Search size={16} strokeWidth={2.2} />
+          <Search size={18} strokeWidth={2} />
           <input
             type="text"
             placeholder="Search by ID, title, locality or WorkGroup..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          {search && (
+            <button
+              type="button"
+              className="mc-search-clear"
+              onClick={() => setSearch("")}
+              aria-label="Clear search"
+            >
+              <X size={14} strokeWidth={2.5} />
+            </button>
+          )}
         </div>
 
         <select
@@ -602,45 +682,22 @@ const Complaints = () => {
 
                 <div className="mc-card-body">
                   <div className="mc-card-top">
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                    <div className="mc-card-tags">
                       <span className="mc-id">{complaint.id}</span>
 
                       {/* WorkGroup & Duplicate Badge */}
                       {complaint.isDuplicate ? (
-                        <span style={{
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          padding: "2px 7px",
-                          borderRadius: "10px",
-                          background: "#fef3c7",
-                          color: "#92400e",
-                          border: "1px solid #fde68a",
-                        }}>
+                        <span className="mc-tag duplicate">
+                          <Layers size={11} strokeWidth={2.5} />
                           Duplicate · {complaint.workGroupId || "WG"}
                         </span>
                       ) : complaint.linkedCount > 1 ? (
-                        <span style={{
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          padding: "2px 7px",
-                          borderRadius: "10px",
-                          background: "#e0e7ff",
-                          color: "#3730a3",
-                          border: "1px solid #c7d2fe",
-                        }}>
+                        <span className="mc-tag lead">
+                          <Layers size={11} strokeWidth={2.5} />
                           Lead ({complaint.linkedCount} reports · {complaint.workGroupId || "WG"})
                         </span>
                       ) : complaint.workGroupId ? (
-                        <span style={{
-                          fontSize: "11px",
-                          fontWeight: 600,
-                          padding: "2px 7px",
-                          borderRadius: "10px",
-                          background: "#f3f4f6",
-                          color: "#4b5563",
-                        }}>
-                          {complaint.workGroupId}
-                        </span>
+                        <span className="mc-tag group">{complaint.workGroupId}</span>
                       ) : null}
                     </div>
 
@@ -812,104 +869,74 @@ const Complaints = () => {
 
               {/* UNIFIED WORKGROUP BANNER & CONTROLS */}
               {selectedComplaint.workGroupId && (
-                <div style={{
-                  background: "#f0fdf4",
-                  border: "1px solid #bbf7d0",
-                  borderRadius: "12px",
-                  padding: "16px",
-                  marginBottom: "16px",
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#16a34a", fontWeight: 700 }}>
-                      <CheckCircle2 size={18} />
+                <div className="mc-wg">
+                  <div className="mc-wg-head">
+                    <div className="mc-wg-title">
+                      <CheckCircle2 size={18} strokeWidth={2.4} />
                       <span>Unified Maintenance WorkGroup ({selectedComplaint.workGroupId})</span>
                     </div>
 
-                    <span style={{ fontSize: "12px", background: "#dcfce7", color: "#15803d", padding: "3px 8px", borderRadius: "10px", fontWeight: 600 }}>
-                      {selectedComplaint.workGroup?.linkedComplaintsCount || selectedComplaint.linkedCount || 1} Citizen Report(s) Linked
+                    <span className="mc-wg-badge">
+                      {selectedComplaint.workGroup?.linkedComplaintsCount ||
+                        selectedComplaint.linkedCount ||
+                        1}{" "}
+                      Citizen Report(s) Linked
                     </span>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "10px", fontSize: "13px", marginTop: "10px" }}>
+                  <div className="mc-wg-grid">
                     <div>
-                      <span style={{ color: "#6b7280" }}>Lead Report:</span>
-                      <div style={{ fontWeight: 600, color: "#111827" }}>{selectedComplaint.masterComplaintId || selectedComplaint.id}</div>
+                      <span>Lead Report</span>
+                      <strong>{selectedComplaint.masterComplaintId || selectedComplaint.id}</strong>
                     </div>
                     <div>
-                      <span style={{ color: "#6b7280" }}>Shared Status:</span>
-                      <div style={{ fontWeight: 600, color: "#16a34a" }}>{selectedComplaint.status}</div>
+                      <span>Shared Status</span>
+                      <strong className="good">{selectedComplaint.status}</strong>
                     </div>
                     <div>
-                      <span style={{ color: "#6b7280" }}>Assigned Crew:</span>
-                      <div style={{ fontWeight: 600, color: "#111827" }}>
+                      <span>Assigned Crew</span>
+                      <strong>
                         {selectedComplaint.assignedWorkers?.join(", ") || "No crew assigned yet"}
-                      </div>
+                      </strong>
                     </div>
                   </div>
 
-                  {/* UPDATE SHARED STATUS BUTTONS */}
-                  <div style={{ marginTop: "14px", display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", borderTop: "1px dashed #bbf7d0", paddingTop: "10px" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 600, color: "#374151" }}>Update WorkGroup Status:</span>
-                    <button
-                      type="button"
-                      disabled={updatingStatus}
-                      style={{ padding: "4px 10px", borderRadius: "10px", background: "#4f46e5", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 600 }}
-                      onClick={() => handleUpdateWorkGroupStatus("IN_PROGRESS")}
-                    >
-                      In Progress
-                    </button>
-                    <button
-                      type="button"
-                      disabled={updatingStatus}
-                      style={{ padding: "4px 10px", borderRadius: "10px", background: "#10b981", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 600 }}
-                      onClick={() => handleUpdateWorkGroupStatus("COMPLETED")}
-                    >
-                      Completed
-                    </button>
-                    <button
-                      type="button"
-                      disabled={updatingStatus}
-                      style={{ padding: "4px 10px", borderRadius: "10px", background: "#6b7280", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 600 }}
-                      onClick={() => handleUpdateWorkGroupStatus("PENDING")}
-                    >
-                      Reset to Pending
-                    </button>
-                  </div>
+                  {renderStatusButtons({
+                    progress: "In Progress",
+                    done: "Completed",
+                    reset: "Reset to Pending",
+                  })}
 
                   {/* VIEW ALL LINKED REPORTS ACCORDION */}
                   {selectedComplaint.workGroup?.linkedComplaints?.length > 1 && (
-                    <div style={{ marginTop: "12px" }}>
+                    <div className="mc-wg-linked">
                       <button
                         type="button"
+                        className="mc-wg-toggle"
                         onClick={() => setShowLinkedReports(!showLinkedReports)}
-                        style={{
-                          background: "#fff",
-                          border: "1px solid #d1d5db",
-                          borderRadius: "8px",
-                          padding: "6px 12px",
-                          fontSize: "12px",
-                          fontWeight: 600,
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "6px",
-                          color: "#374151",
-                        }}
                       >
-                        <Layers size={13} />
-                        {showLinkedReports ? "Hide Linked Citizen Reports" : `View All ${selectedComplaint.workGroup.linkedComplaints.length} Linked Reports`}
+                        <Layers size={14} strokeWidth={2.3} />
+                        {showLinkedReports
+                          ? "Hide Linked Citizen Reports"
+                          : `View All ${selectedComplaint.workGroup.linkedComplaints.length} Linked Reports`}
                       </button>
 
                       {showLinkedReports && (
-                        <div style={{ marginTop: "10px", maxHeight: "180px", overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "10px", background: "#ffffff" }}>
+                        <div className="mc-wg-list">
                           {selectedComplaint.workGroup.linkedComplaints.map((lc) => (
-                            <div key={lc.id} style={{ padding: "6px 0", borderBottom: "1px solid #f3f4f6", fontSize: "12px" }}>
-                              <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600 }}>
-                                <span>{lc.id} {lc.isMaster ? "(Lead)" : "(Duplicate)"}</span>
-                                <span style={{ color: "#16a34a" }}>{lc.status}</span>
+                            <div key={lc.id} className="mc-wg-item">
+                              <div className="mc-wg-item-top">
+                                <span>
+                                  {lc.id} {lc.isMaster ? "(Lead)" : "(Duplicate)"}
+                                </span>
+                                <em>{lc.status}</em>
                               </div>
-                              <div style={{ color: "#4b5563" }}>{lc.title} · {lc.description?.slice(0, 50)}...</div>
-                              <div style={{ color: "#9ca3af", fontSize: "11px" }}>Reported by: {lc.reportedBy} ({lc.reportedPhone || "No phone"})</div>
+                              <p>
+                                {lc.title} · {lc.description?.slice(0, 50)}...
+                              </p>
+                              <small>
+                                Reported by: {lc.reportedBy} ({lc.reportedPhone || "No phone"})
+                              </small>
                             </div>
                           ))}
                         </div>
@@ -1081,7 +1108,7 @@ const Complaints = () => {
             className="mc-overlay"
             onClick={() => setShowAssignPopup(false)}
           >
-            <div className="mc-modal mc-modal-narrow" onClick={(e) => e.stopPropagation()}>
+            <div className="mc-modal mc-modal-assign" onClick={(e) => e.stopPropagation()}>
               <div className="mc-modal-head">
                 <div>
                   <span className="mc-modal-id">{selectedComplaint.id}</span>
@@ -1115,80 +1142,64 @@ const Complaints = () => {
 
                 {/* IF ALREADY ASSIGNED: Display WorkGroup Info, DO NOT show worker assignment form */}
                 {isAlreadyAssigned ? (
-                  <div style={{
-                    background: "#f0fdf4",
-                    border: "1px solid #bbf7d0",
-                    borderRadius: "12px",
-                    padding: "16px",
-                    marginTop: "16px",
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#16a34a", fontWeight: 700, marginBottom: "8px" }}>
-                      <CheckCircle2 size={18} />
-                      <span>Unified Maintenance WorkGroup ({selectedComplaint.workGroupId || "WG001"})</span>
+                  <div className="mc-wg">
+                    <div className="mc-wg-head">
+                      <div className="mc-wg-title">
+                        <CheckCircle2 size={18} strokeWidth={2.4} />
+                        <span>
+                          Unified Maintenance WorkGroup ({selectedComplaint.workGroupId || "WG001"})
+                        </span>
+                      </div>
                     </div>
 
-                    <p style={{ margin: "0 0 12px 0", fontSize: "13px", color: "#166534" }}>
-                      This complaint is already linked to an active maintenance group. All linked reports share the same assigned workers and repair progress.
+                    <p className="mc-wg-note">
+                      This complaint is already linked to an active maintenance group. All linked
+                      reports share the same assigned workers and repair progress.
                     </p>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "13px", marginBottom: "14px" }}>
+                    <div className="mc-wg-grid two">
                       <div>
-                        <span style={{ color: "#6b7280" }}>Lead Complaint ID:</span>
-                        <div style={{ fontWeight: 600, color: "#111827" }}>{selectedComplaint.masterComplaintId || selectedComplaint.id}</div>
+                        <span>Lead Complaint ID</span>
+                        <strong>{selectedComplaint.masterComplaintId || selectedComplaint.id}</strong>
                       </div>
                       <div>
-                        <span style={{ color: "#6b7280" }}>Total Linked Reports:</span>
-                        <div style={{ fontWeight: 600, color: "#111827" }}>{selectedComplaint.workGroup?.linkedComplaintsCount || selectedComplaint.linkedCount || 1} report(s)</div>
+                        <span>Total Linked Reports</span>
+                        <strong>
+                          {selectedComplaint.workGroup?.linkedComplaintsCount ||
+                            selectedComplaint.linkedCount ||
+                            1}{" "}
+                          report(s)
+                        </strong>
                       </div>
                       <div>
-                        <span style={{ color: "#6b7280" }}>Shared Assigned Workers:</span>
-                        <div style={{ fontWeight: 600, color: "#111827" }}>{selectedComplaint.assignedWorkers?.join(", ") || "Assigned Crew"}</div>
+                        <span>Shared Assigned Workers</span>
+                        <strong>{selectedComplaint.assignedWorkers?.join(", ") || "Assigned Crew"}</strong>
                       </div>
                       <div>
-                        <span style={{ color: "#6b7280" }}>Current Status:</span>
-                        <div style={{ fontWeight: 600, color: "#16a34a" }}>{selectedComplaint.status}</div>
+                        <span>Current Status</span>
+                        <strong className="good">{selectedComplaint.status}</strong>
                       </div>
                     </div>
 
-                    {/* Quick Shared Status Update Buttons */}
-                    <div style={{ borderTop: "1px dashed #bbf7d0", paddingTop: "12px" }}>
-                      <span style={{ fontSize: "12px", fontWeight: 600, color: "#374151", display: "block", marginBottom: "8px" }}>
-                        Update Shared WorkGroup Status:
-                      </span>
-                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                        <button
-                          type="button"
-                          disabled={updatingStatus}
-                          style={{ padding: "5px 12px", borderRadius: "10px", background: "#4f46e5", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 600 }}
-                          onClick={() => handleUpdateWorkGroupStatus("IN_PROGRESS")}
-                        >
-                          Mark In Progress
-                        </button>
-                        <button
-                          type="button"
-                          disabled={updatingStatus}
-                          style={{ padding: "5px 12px", borderRadius: "10px", background: "#10b981", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 600 }}
-                          onClick={() => handleUpdateWorkGroupStatus("COMPLETED")}
-                        >
-                          Mark Completed
-                        </button>
-                      </div>
-                    </div>
+                    {renderStatusButtons({
+                      progress: "Mark In Progress",
+                      done: "Mark Completed",
+                    })}
                   </div>
                 ) : (
                   <>
                     {/* POTENTIAL DUPLICATES SECTION (GPS PROXIMITY) */}
-                    <div className="mc-duplicates-section">
+                    <div className="mc-dups">
                       <div className="mc-dups-header">
                         <div className="mc-dups-title">
-                          <Layers size={16} />
+                          <Layers size={16} strokeWidth={2.3} />
                           <span>Potential Duplicate Reports (GPS Proximity)</span>
                         </div>
 
                         {potentialDuplicates.length > 0 && (
                           <button
                             type="button"
-                            className="mc-dups-toggle-btn"
+                            className="mc-dups-toggle"
                             onClick={toggleAllDuplicates}
                           >
                             {selectedDuplicates.length === potentialDuplicates.length
@@ -1200,68 +1211,107 @@ const Complaints = () => {
 
                       {loadingDuplicates ? (
                         <div className="mc-dups-loading">
-                          <span className="dups-spinner"></span>
+                          <span className="mc-dups-spinner"></span>
                           <span>Scanning for nearby reports within 100 meters...</span>
                         </div>
                       ) : potentialDuplicates.length === 0 ? (
                         <div className="mc-dups-empty">
-                          <CheckCircle2 size={15} color="#10b981" />
-                          <span>No duplicate reports found within 100m. This appears to be an isolated issue.</span>
+                          <CheckCircle2 size={16} strokeWidth={2.4} />
+                          <span>
+                            No duplicate reports found within 100m. This appears to be an isolated issue.
+                          </span>
                         </div>
                       ) : (
-                        <div className="mc-dups-container">
+                        <>
                           <div className="mc-dups-alert">
-                            <span>⚠️ <strong>{potentialDuplicates.length} potential duplicate(s)</strong> detected within 100m. Select reports to link to this WorkGroup:</span>
+                            <AlertTriangle size={16} strokeWidth={2.4} />
+                            <span>
+                              <strong>{potentialDuplicates.length} potential duplicate(s)</strong>{" "}
+                              detected within 100m. Compare the photos, then select the reports to
+                              link to this WorkGroup. Tap a photo to open it full size.
+                            </span>
                           </div>
 
                           <div className="mc-dups-list">
                             {potentialDuplicates.map((dup) => {
-                              const isChecked = selectedDuplicates.includes(dup.id || dup.mongoId);
+                              const dupKey = dup.id || dup.mongoId;
+                              const isChecked = selectedDuplicates.includes(dupKey);
 
                               return (
                                 <div
-                                  key={dup.id || dup.mongoId}
+                                  key={dupKey}
                                   className={`mc-dup-card ${isChecked ? "checked" : ""}`}
-                                  onClick={() => toggleDuplicate(dup.id || dup.mongoId)}
+                                  onClick={() => toggleDuplicate(dupKey)}
                                 >
-                                  <div className="mc-dup-check">
+                                  <div className="mc-dup-head">
                                     <input
                                       type="checkbox"
                                       checked={isChecked}
                                       onChange={() => {}}
+                                      aria-label={`Link ${dup.id} to this WorkGroup`}
                                     />
+                                    <span className="mc-dup-id">{dup.id}</span>
+                                    <span className="mc-dup-distance">
+                                      <MapPin size={11} strokeWidth={2.5} /> {dup.distanceFormatted}
+                                    </span>
+                                    <span
+                                      className={`mc-dup-match ${String(dup.matchConfidence || "")
+                                        .toLowerCase()
+                                        .replace(/\s+/g, "-")}`}
+                                    >
+                                      {dup.matchConfidence} Match
+                                    </span>
                                   </div>
 
-                                  {dup.image && (
-                                    <img
-                                      src={dup.image}
-                                      alt="Report"
-                                      className="mc-dup-thumb"
-                                    />
-                                  )}
+                                  {/* PHOTO COMPARISON: this report vs the nearby report */}
+                                  <div className="mc-compare">
+                                    <figure>
+                                      <figcaption>
+                                        <i className="to"></i>
+                                        <span>Comparing to</span>
+                                        <b>{selectedComplaint.id}</b>
+                                      </figcaption>
+                                      <PhotoBox
+                                        src={selectedComplaint.image}
+                                        alt={`This report ${selectedComplaint.id}`}
+                                        emptyLabel="No photo on this report"
+                                      />
+                                    </figure>
 
-                                  <div className="mc-dup-info">
-                                    <div className="mc-dup-top">
-                                      <span className="mc-dup-id">{dup.id}</span>
-                                      <span className="mc-dup-distance">
-                                        <MapPin size={11} /> {dup.distanceFormatted}
-                                      </span>
-                                      <span className={`mc-dup-match ${dup.matchConfidence.toLowerCase().replace(/\s+/g, "-")}`}>
-                                        {dup.matchConfidence} Match
-                                      </span>
+                                    <div className="mc-compare-vs" aria-hidden="true">
+                                      <ArrowLeftRight size={16} strokeWidth={2.5} />
                                     </div>
-                                    <h5 className="mc-dup-title">{dup.title}</h5>
-                                    <p className="mc-dup-desc">{dup.description?.slice(0, 85)}{dup.description?.length > 85 ? "..." : ""}</p>
-                                    <div className="mc-dup-foot">
-                                      <span>Reported by: <strong>{dup.reportedBy}</strong></span>
-                                      <span>{dup.reportedDate}</span>
-                                    </div>
+
+                                    <figure>
+                                      <figcaption>
+                                        <i className="with"></i>
+                                        <span>Comparing with</span>
+                                        <b>{dup.id}</b>
+                                      </figcaption>
+                                      <PhotoBox
+                                        src={dup.image}
+                                        alt={`Nearby report ${dup.id}`}
+                                        emptyLabel="No photo on this report"
+                                      />
+                                    </figure>
+                                  </div>
+
+                                  <h5 className="mc-dup-title">{dup.title}</h5>
+                                  <p className="mc-dup-desc">
+                                    {dup.description?.slice(0, 110)}
+                                    {dup.description?.length > 110 ? "..." : ""}
+                                  </p>
+                                  <div className="mc-dup-foot">
+                                    <span>
+                                      Reported by: <strong>{dup.reportedBy}</strong>
+                                    </span>
+                                    <span>{dup.reportedDate}</span>
                                   </div>
                                 </div>
                               );
                             })}
                           </div>
-                        </div>
+                        </>
                       )}
                     </div>
 

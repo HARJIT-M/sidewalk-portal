@@ -13,9 +13,29 @@ import {
   Inbox,
   AlertCircle,
   Building2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { getManagerDashboard } from "../../../services/managerApi";
 import "./new_dashboard.css";
+
+// number of complaints shown per page
+const PAGE_SIZE = 5;
+
+// builds the page list, e.g. [1, "...", 4, 5, 6, "...", 10]
+const getPageNumbers = (current, total) => {
+  if (total <= 5) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const pages = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  if (start > 2) pages.push("...");
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (end < total - 1) pages.push("...");
+  pages.push(total);
+  return pages;
+};
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -34,6 +54,7 @@ const Dashboard = () => {
     resolvedComplaints: 0,
   });
   const [complaints, setComplaints] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const fetchDashboardData = async () => {
     try {
@@ -44,6 +65,7 @@ const Dashboard = () => {
         if (res.manager) setManager(res.manager);
         if (res.stats) setStats(res.stats);
         if (res.complaints) setComplaints(res.complaints);
+        setCurrentPage(1);
       }
     } catch (err) {
       console.error("Error loading dashboard data:", err);
@@ -63,6 +85,19 @@ const Dashboard = () => {
   };
 
   const cls = (value) => String(value).toLowerCase().replace(/\s+/g, "-");
+
+  // Pagination (5 complaints per page)
+  const totalPages = Math.max(1, Math.ceil(complaints.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * PAGE_SIZE;
+  const pagedComplaints = complaints.slice(startIndex, startIndex + PAGE_SIZE);
+  const showingFrom = complaints.length === 0 ? 0 : startIndex + 1;
+  const showingTo = startIndex + pagedComplaints.length;
+
+  const goToPage = (page) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+  };
 
   const statCards = [
     { label: "Total Complaints", value: stats.totalComplaints, icon: ClipboardList, tone: "total" },
@@ -187,7 +222,7 @@ const Dashboard = () => {
                 </thead>
 
                 <tbody>
-                  {complaints.map((complaint) => {
+                  {pagedComplaints.map((complaint) => {
                     const priority = complaint.priority || "Medium";
                     const status = complaint.status || "Pending";
                     return (
@@ -238,7 +273,7 @@ const Dashboard = () => {
 
             {/* ---- MOBILE CARD LIST ---- */}
             <div className="md-cards">
-              {complaints.map((complaint) => {
+              {pagedComplaints.map((complaint) => {
                 const priority = complaint.priority || "Medium";
                 const status = complaint.status || "Pending";
                 return (
@@ -279,6 +314,55 @@ const Dashboard = () => {
                   </div>
                 );
               })}
+            </div>
+
+            {/* ---- PAGINATION ---- */}
+            <div className="md-pagination">
+              <span className="md-page-info">
+                Showing <strong>{showingFrom}–{showingTo}</strong> of{" "}
+                <strong>{complaints.length}</strong> complaints
+              </span>
+
+              {totalPages > 1 && (
+                <nav className="md-page-controls" aria-label="Complaints pagination">
+                  <button
+                    className="md-page-btn md-page-nav"
+                    onClick={() => goToPage(safePage - 1)}
+                    disabled={safePage === 1}
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeft size={16} strokeWidth={2.6} />
+                    <span>Prev</span>
+                  </button>
+
+                  {getPageNumbers(safePage, totalPages).map((p, i) =>
+                    p === "..." ? (
+                      <span className="md-page-ellipsis" key={`dots-${i}`}>
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={p}
+                        className={`md-page-btn ${p === safePage ? "active" : ""}`}
+                        onClick={() => goToPage(p)}
+                        aria-current={p === safePage ? "page" : undefined}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+
+                  <button
+                    className="md-page-btn md-page-nav"
+                    onClick={() => goToPage(safePage + 1)}
+                    disabled={safePage === totalPages}
+                    aria-label="Next page"
+                  >
+                    <span>Next</span>
+                    <ChevronRight size={16} strokeWidth={2.6} />
+                  </button>
+                </nav>
+              )}
             </div>
           </>
         )}

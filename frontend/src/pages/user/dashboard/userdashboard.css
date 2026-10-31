@@ -580,6 +580,97 @@
 
 
 /* =====================================================
+   PAGINATION
+===================================================== */
+
+.ud-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1.5px solid var(--line);
+  background: var(--cream);
+}
+
+.ud-page-info {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ud-page-info strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.ud-page-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ud-page-btn {
+  min-width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  background: white;
+  color: var(--purple-dark);
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.ud-page-btn:hover:not(:disabled):not(.active) {
+  background: var(--soft);
+  border-color: var(--purple-light);
+  transform: translateY(-1px);
+}
+
+.ud-page-btn.active {
+  background: var(--grad);
+  border-color: transparent;
+  color: white;
+  box-shadow: 0 6px 14px rgba(124, 58, 237, 0.35);
+  cursor: default;
+}
+
+.ud-page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ud-page-btn:focus-visible {
+  outline: 3px solid rgba(124, 58, 237, 0.35);
+  outline-offset: 2px;
+}
+
+.ud-page-nav {
+  padding: 0 12px 0 8px;
+}
+
+.ud-page-nav:last-child {
+  padding: 0 8px 0 12px;
+}
+
+.ud-page-ellipsis {
+  min-width: 24px;
+  text-align: center;
+  color: var(--muted);
+  font-weight: 700;
+  user-select: none;
+}
+
+
+/* =====================================================
    PRIORITY
 ===================================================== */
 
@@ -687,6 +778,13 @@
   .ud-cards {
     display: flex;
   }
+
+  /* pagination stacks and centres */
+  .ud-pagination {
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+  }
 }
 
 @media (max-width: 480px) {
@@ -709,6 +807,26 @@
 
   .ud-cards {
     padding: 12px;
+  }
+
+  .ud-pagination {
+    padding: 14px 12px;
+  }
+
+  /* icon-only Prev / Next on very small screens */
+  .ud-page-nav span {
+    display: none;
+  }
+
+  .ud-page-nav,
+  .ud-page-nav:last-child {
+    padding: 0;
+  }
+
+  .ud-page-btn {
+    min-width: 34px;
+    height: 34px;
+    padding: 0 8px;
   }
 }
 

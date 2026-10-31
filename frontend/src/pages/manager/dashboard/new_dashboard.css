@@ -571,6 +571,97 @@
 
 
 /* =====================================================
+   PAGINATION
+===================================================== */
+
+.md-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1.5px solid var(--line);
+  background: var(--cream);
+}
+
+.md-page-info {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.md-page-info strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.md-page-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.md-page-btn {
+  min-width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  background: white;
+  color: var(--purple-dark);
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.md-page-btn:hover:not(:disabled):not(.active) {
+  background: var(--soft);
+  border-color: var(--purple-light);
+  transform: translateY(-1px);
+}
+
+.md-page-btn.active {
+  background: var(--grad);
+  border-color: transparent;
+  color: white;
+  box-shadow: 0 6px 14px rgba(124, 58, 237, 0.35);
+  cursor: default;
+}
+
+.md-page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.md-page-btn:focus-visible {
+  outline: 3px solid rgba(124, 58, 237, 0.35);
+  outline-offset: 2px;
+}
+
+.md-page-nav {
+  padding: 0 12px 0 8px;
+}
+
+.md-page-nav:last-child {
+  padding: 0 8px 0 12px;
+}
+
+.md-page-ellipsis {
+  min-width: 24px;
+  text-align: center;
+  color: var(--muted);
+  font-weight: 700;
+  user-select: none;
+}
+
+
+/* =====================================================
    PRIORITY + STATUS
 ===================================================== */
 
@@ -667,6 +758,13 @@
   .md-cards {
     display: flex;
   }
+
+  /* pagination stacks and centres */
+  .md-pagination {
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+  }
 }
 
 @media (max-width: 480px) {
@@ -689,6 +787,26 @@
 
   .md-cards {
     padding: 12px;
+  }
+
+  .md-pagination {
+    padding: 14px 12px;
+  }
+
+  /* icon-only Prev / Next on very small screens */
+  .md-page-nav span {
+    display: none;
+  }
+
+  .md-page-nav,
+  .md-page-nav:last-child {
+    padding: 0;
+  }
+
+  .md-page-btn {
+    min-width: 34px;
+    height: 34px;
+    padding: 0 8px;
   }
 }
 
