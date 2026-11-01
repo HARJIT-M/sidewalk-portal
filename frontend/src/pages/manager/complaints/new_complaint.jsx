@@ -672,12 +672,16 @@ const Complaints = () => {
                 key={complaint.id || complaint.mongoId}
                 style={{ animationDelay: `${Math.min(i, 8) * 0.06}s` }}
               >
-                {complaint.image && (
+                {complaint.image ? (
                   <img
                     className="mc-card-image"
                     src={complaint.image}
                     alt={`Reported issue: ${complaint.title}`}
                   />
+                ) : (
+                  <div className="mc-photo mc-photo-empty">
+                    <ImageIcon size={26} strokeWidth={1.7} />
+                  </div>
                 )}
 
                 <div className="mc-card-body">
@@ -694,14 +698,19 @@ const Complaints = () => {
                       ) : complaint.linkedCount > 1 ? (
                         <span className="mc-tag lead">
                           <Layers size={11} strokeWidth={2.5} />
-                          Lead ({complaint.linkedCount} reports · {complaint.workGroupId || "WG"})
+                          Lead ({complaint.linkedCount} reports ·{" "}
+                          {complaint.workGroupId || "WG"})
                         </span>
                       ) : complaint.workGroupId ? (
-                        <span className="mc-tag group">{complaint.workGroupId}</span>
+                        <span className="mc-tag group">
+                          {complaint.workGroupId}
+                        </span>
                       ) : null}
                     </div>
 
-                    <span className={`mc-status ${statusClass(complaint.status)}`}>
+                    <span
+                      className={`mc-status ${statusClass(complaint.status)}`}
+                    >
                       <span className="mc-dot"></span>
                       {complaint.status}
                     </span>
@@ -757,7 +766,7 @@ const Complaints = () => {
                       <strong>
                         {complaint.workStartDate
                           ? `${formatDate(complaint.workStartDate)} → ${formatDate(
-                              complaint.workEndDate
+                              complaint.workEndDate,
                             )}`
                           : "Not scheduled"}
                       </strong>

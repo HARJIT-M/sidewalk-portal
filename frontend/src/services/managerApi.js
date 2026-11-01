@@ -123,7 +123,18 @@ export const getComplaintDuplicates = async (id, radius = 100) => {
     const response = await managerApi.get(`/api/complaints/${id}/duplicates`, {
       params: { radius },
     });
-    return response.data;
+
+    const result = response.data;
+
+    const filteredDuplicates = (result.duplicates ?? []).filter(
+      (item) => item.status !== "COMPLETED"
+    );
+
+    return {
+      ...result,
+      duplicates: filteredDuplicates,
+      count: filteredDuplicates.length,
+    };
   } catch (error) {
     throw new Error(
       error?.response?.data?.message || "Failed to find potential duplicates."

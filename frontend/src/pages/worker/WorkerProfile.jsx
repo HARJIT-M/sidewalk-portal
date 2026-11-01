@@ -81,7 +81,7 @@ const WorkerProfile = () => {
     try {
       const res = await updateWorkerProfile(editForm);
       if (res.success) {
-        setAlertMsg({ text: "Profile updated successfully in MongoDB!", type: "success" });
+        setAlertMsg({ text: "Profile updated successfully", type: "success" });
         setShowEditPopup(false);
         await loadProfile();
         setTimeout(() => setAlertMsg({ text: "", type: "success" }), 4000);
@@ -110,7 +110,7 @@ const WorkerProfile = () => {
       });
 
       if (res.success) {
-        setAlertMsg({ text: "Password changed successfully in MongoDB!", type: "success" });
+        setAlertMsg({ text: "Password changed successfully", type: "success" });
         setShowPasswordPopup(false);
         setPassForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
         setTimeout(() => setAlertMsg({ text: "", type: "success" }), 4000);
@@ -125,7 +125,7 @@ const WorkerProfile = () => {
     return (
       <div className="workers-page">
         <div style={{ textAlign: "center", padding: "60px", color: "#64748b" }}>
-          <p>Loading worker profile from MongoDB...</p>
+          <p>Loading worker profile...</p>
         </div>
       </div>
     );
@@ -326,13 +326,13 @@ const WorkerProfile = () => {
               Personal & Contact
             </button>
 
-            <button
+            {/* <button
               className={`details-tab ${activeTab === "work" ? "active" : ""}`}
               onClick={() => setActiveTab("work")}
             >
               <Truck size={15} strokeWidth={2} />
               Deployment & Equipment
-            </button>
+            </button>  */}
           </div>
 
           {activeTab === "personal" ? (
@@ -436,7 +436,7 @@ const WorkerProfile = () => {
             <div className="worker-modal-header">
               <div>
                 <span className="modal-label">WORKER ACCOUNT</span>
-                <h2>Edit Profile Details (MongoDB)</h2>
+                <h2>Edit Profile Details</h2>
               </div>
               <button
                 className="modal-close"
@@ -540,7 +540,7 @@ const WorkerProfile = () => {
             <div className="worker-modal-header">
               <div>
                 <span className="modal-label">SECURITY SETTINGS</span>
-                <h2>Change Password (MongoDB)</h2>
+                <h2>Change Password</h2>
               </div>
               <button
                 className="modal-close"

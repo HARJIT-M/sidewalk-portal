@@ -201,7 +201,7 @@ const WorkerComplaintDetails = () => {
     return (
       <div className="complaint-details-page">
         <div style={{ textAlign: "center", padding: "60px", color: "#64748b" }}>
-          <h2>Loading complaint details from MongoDB...</h2>
+          <h2>Loading complaint details...</h2>
         </div>
       </div>
     );
@@ -541,7 +541,7 @@ const WorkerComplaintDetails = () => {
                   disabled={submitting}
                 >
                   {submitting
-                    ? "Saving to MongoDB..."
+                    ? "Saving to DB..."
                     : workStatus === "Completed"
                     ? "✓ Mark as Completed & Submit"
                     : "Save Progress Update"}
@@ -552,7 +552,7 @@ const WorkerComplaintDetails = () => {
 
           {/* Repair Timeline History */}
           <div className="history-section">
-            <h3>Repair & Status History (MongoDB)</h3>
+            <h3>Repair & Status History</h3>
             <div className="history-timeline">
               {complaint.statusHistory && complaint.statusHistory.length > 0 ? (
                 complaint.statusHistory.map((item, index) => (

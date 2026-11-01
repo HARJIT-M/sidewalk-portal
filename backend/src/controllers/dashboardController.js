@@ -129,6 +129,7 @@ const getWorkerDashboard = async (req, res) => {
         (c) =>
           (c.assignmentStatus === "IN_PROGRESS" ||
             c.assignmentStatus === "ASSIGNED") &&
+          c.status!== "COMPLETED" &&
           c.status !== "RESOLVED" &&
           c.status !== "CLOSED"
       ) || null;

@@ -289,9 +289,11 @@ const MyComplaints = () => {
                     <Hash size={12} strokeWidth={2.8} />
                     {complaint.id}
                   </span>
-                  <span className={`status ${statusClass}`}>
+                  <span className={`status ${statusClass}`} style={{display:"flex",gap:"4px"}}>
                     {statusIcon(statusDisplay)}
+                    <span>
                     {statusDisplay}
+                    </span>
                   </span>
                 </div>
 
